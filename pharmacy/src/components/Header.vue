@@ -31,17 +31,14 @@
           Crear Producto
         </router-link>
 
-        <!-- Configuración de puertos (disponible para todos) -->
+        <!-- Configuración de puertos (solo para admin y empleados) -->
         <button
+          v-if="isLoggedIn && (userStore.getUser().role === 'admin' || userStore.getUser().role === 'employee')"
           @click="openPortSelector"
           class="nav-item admin-config-button"
         >
           ⚙️ Configurar Puertos
         </button>
-
-        <router-link to="/prescriptions" class="nav-item">
-          Ver Recetas
-        </router-link>
 
         <!-- Si el usuario está loggeado -->
         <template v-if="isLoggedIn">
@@ -74,8 +71,9 @@
         >Catálogo de Productos</router-link
       >
      
-      <!-- Configuración de puertos (móvil - disponible para todos) -->
+      <!-- Configuración de puertos (móvil - solo para admin y empleados) -->
       <button
+        v-if="isLoggedIn && (userStore.getUser().role === 'admin' || userStore.getUser().role === 'employee')"
         @click="openPortSelector(); toggleMenu();"
         class="mobile-item admin-config-button"
       >

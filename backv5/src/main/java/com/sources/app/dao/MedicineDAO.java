@@ -110,4 +110,45 @@ public class MedicineDAO {
             return null;
         }
     }
+
+    /**
+     * Obtiene la lista de principios activos únicos.
+     */
+    public List<String> getUniqueActivePrinciples() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Query<String> query = session.createQuery("SELECT DISTINCT m.activeMedicament FROM Medicine m", String.class);
+            return query.list();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Obtiene 5 productos aleatorios.
+     */
+    public List<Medicine> getRandomMedicines(int count) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Query<Medicine> query = session.createQuery("FROM Medicine ORDER BY RAND()", Medicine.class);
+            query.setMaxResults(count);
+            return query.list();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Obtiene los productos más vendidos (ordenados por SOLD_UNITS descendente).
+     */
+    public List<Medicine> getBestSellers(int count) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Query<Medicine> query = session.createQuery("FROM Medicine m ORDER BY m.soldUnits DESC", Medicine.class);
+            query.setMaxResults(count);
+            return query.list();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
 }

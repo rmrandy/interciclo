@@ -94,7 +94,12 @@ public class MedicineHandler implements HttpHandler {
         if (path.equalsIgnoreCase(ENDPOINT)) {
             // Get all medicines
             List<Medicine> medicines = medicineDAO.getAll();
-            sendResponse(exchange, 200, objectMapper.writeValueAsString(medicines));
+            String response = objectMapper.writeValueAsString(medicines);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.getBytes(StandardCharsets.UTF_8).length);
+            OutputStream os = exchange.getResponseBody();
+            os.write(response.getBytes(StandardCharsets.UTF_8));
+            os.close();
         } else {
             // Get medicine by ID from path
             try {
@@ -105,7 +110,12 @@ public class MedicineHandler implements HttpHandler {
                 }
                 Medicine medicine = medicineDAO.getById(id);
                 if (medicine != null) {
-                    sendResponse(exchange, 200, objectMapper.writeValueAsString(medicine));
+                    String response = objectMapper.writeValueAsString(medicine);
+                    exchange.getResponseHeaders().set("Content-Type", "application/json");
+                    exchange.sendResponseHeaders(200, response.getBytes(StandardCharsets.UTF_8).length);
+                    OutputStream os = exchange.getResponseBody();
+                    os.write(response.getBytes(StandardCharsets.UTF_8));
+                    os.close();
                 } else {
                     exchange.sendResponseHeaders(404, -1); // Not Found
                 }
@@ -140,7 +150,12 @@ public class MedicineHandler implements HttpHandler {
                 createMed.getSoldUnits()
         );
         if (medicine != null) {
-            sendResponse(exchange, 201, objectMapper.writeValueAsString(medicine));
+            String response = objectMapper.writeValueAsString(medicine);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(201, response.getBytes(StandardCharsets.UTF_8).length);
+            OutputStream os = exchange.getResponseBody();
+            os.write(response.getBytes(StandardCharsets.UTF_8));
+            os.close();
         } else {
             sendResponse(exchange, 400, "{\"error\": \"Failed to create medicine\"}");
         }
@@ -170,7 +185,12 @@ public class MedicineHandler implements HttpHandler {
             
             Medicine updatedMedicine = medicineDAO.update(updateMed);
             if (updatedMedicine != null) {
-                sendResponse(exchange, 200, objectMapper.writeValueAsString(updatedMedicine));
+                String response = objectMapper.writeValueAsString(updatedMedicine);
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, response.getBytes(StandardCharsets.UTF_8).length);
+                OutputStream os = exchange.getResponseBody();
+                os.write(response.getBytes(StandardCharsets.UTF_8));
+                os.close();
             } else {
                 // Could be 404 if ID not found, or 400 if update failed for other reasons
                 sendResponse(exchange, 404, "{\"error\": \"Failed to update medicine or medicine not found\"}"); 

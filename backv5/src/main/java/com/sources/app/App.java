@@ -10,6 +10,11 @@ import java.net.*;
 import java.util.Enumeration;
 
 import java.net.InetSocketAddress;
+import com.sources.app.controllers.MedicineController;
+import com.sources.app.handlers.ActivePrinciplesHandler;
+import com.sources.app.handlers.RecommendedMedicinesHandler;
+import com.sources.app.handlers.BestSellersHandler;
+import com.sources.app.handlers.MedicineHandler;
 
 /**
  * Clase principal de la aplicación que inicializa y configura el servidor HTTP
@@ -124,6 +129,9 @@ public class App {
         server.createContext("/api2/categories", new CategoryHandler(categoryDAO));
         server.createContext("/api2/comments", new CommentsHandler(commentsDAO));
         server.createContext("/api2/hospitals", new HospitalHandler(hospitalDAO));
+        server.createContext("/api2/medicines/actives", new ActivePrinciplesHandler(medicineDAO));
+        server.createContext("/api2/medicines/recommended", new RecommendedMedicinesHandler(medicineDAO));
+        server.createContext("/api2/medicines/bestsellers", new BestSellersHandler(medicineDAO));
         server.createContext("/api2/medicines", new MedicineHandler(medicineDAO));
         server.createContext("/api2/medicines/search", new SearchMedicineHandler(medicineDAO));
         server.createContext("/api2/order_medicines", new OrderMedicineHandler(orderMedicineDAO));
@@ -136,5 +144,9 @@ public class App {
         server.setExecutor(null); // Usa el executor por defecto
         server.start();
         System.out.println("Servidor iniciado en http://" + ip + ":" + port + "/api2");
+
+        // ... otros controladores ...
+       // resources.add(MedicineController.class);
+        // ... existing code ...
     }
 }
