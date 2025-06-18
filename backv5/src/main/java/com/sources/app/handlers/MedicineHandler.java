@@ -41,12 +41,9 @@ public class MedicineHandler implements HttpHandler {
      */
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        // Set CORS headers
         exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
-        exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
+        exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-        // Handle CORS preflight requests
         if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
             exchange.sendResponseHeaders(204, -1);
             return;
@@ -72,6 +69,8 @@ public class MedicineHandler implements HttpHandler {
                 }
             } else if ("PUT".equalsIgnoreCase(method)) {
                 handlePut(exchange, path);
+            } else if ("DELETE".equalsIgnoreCase(method)) {
+                handleDelete(exchange, path);
             } else {
                 exchange.sendResponseHeaders(405, -1); // Method Not Allowed
             }
@@ -194,6 +193,28 @@ public class MedicineHandler implements HttpHandler {
             } else {
                 // Could be 404 if ID not found, or 400 if update failed for other reasons
                 sendResponse(exchange, 404, "{\"error\": \"Failed to update medicine or medicine not found\"}"); 
+            }
+        } catch (NumberFormatException e) {
+            sendResponse(exchange, 400, "{\"error\": \"Invalid ID format in path\"}");
+        }
+    }
+
+    /**
+     * Maneja las solicitudes DELETE para eliminar un medicamento por su ID.
+     * Espera el ID en la ruta (e.g., /api2/medicines/{id})
+     */
+    private void handleDelete(HttpExchange exchange, String path) throws IOException {
+        try {
+            Long id = extractIdFromPath(path);
+            if (id == null) {
+                exchange.sendResponseHeaders(400, -1); // Invalid path format
+                return;
+            }
+            boolean deleted = medicineDAO.delete(id);
+            if (deleted) {
+                exchange.sendResponseHeaders(204, -1); // No Content
+            } else {
+                sendResponse(exchange, 404, "{\"error\": \"Medicine not found\"}");
             }
         } catch (NumberFormatException e) {
             sendResponse(exchange, 400, "{\"error\": \"Invalid ID format in path\"}");

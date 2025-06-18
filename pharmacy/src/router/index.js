@@ -15,6 +15,7 @@ import { authService } from '@/services/authService';
 import Cart from "@/components/Cart.vue";
 import AdminDash from '@/pages/AdminDash.vue'; // Importar el dashboard administrativo
 import DetalleReceta from '@/pages/DetalleReceta.vue'
+import CheckoutPage from '../pages/CheckoutPage.vue';
 
 // Rutas para usuarios públicos y autenticados
 const userRoutes = [
@@ -37,6 +38,13 @@ const userRoutes = [
     component: DetalleReceta,
     meta: { requiresAuth: true }
   },
+  {
+    path: '/gestion-productos',
+    name: 'GestionProductos',
+    component: () => import('../pages/GestionProductos.vue'),
+    meta: { requiresAuth: true, allowedRoles: ['admin', 'employee'] }
+  },
+  { path: '/checkout', name: 'Checkout', component: CheckoutPage, meta: { requiresAuth: true } },
 ];
 
 // Rutas exclusivas para administradores

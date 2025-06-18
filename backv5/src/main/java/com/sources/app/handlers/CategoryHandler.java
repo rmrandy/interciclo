@@ -59,6 +59,8 @@ public class CategoryHandler implements HttpHandler {
                 handleGet(exchange);
             } else if("PUT".equalsIgnoreCase(method)){
                 handlePut(exchange);
+            } else if("DELETE".equalsIgnoreCase(method)){
+                handleDelete(exchange);
             } else {
                 exchange.sendResponseHeaders(405, -1); // Method Not Allowed
             }
@@ -166,6 +168,29 @@ public class CategoryHandler implements HttpHandler {
             sendResponse(exchange, 200, objectMapper.writeValueAsString(category));
         } else {
              sendResponse(exchange, 400, "{\"error\": \"Failed to update category or category not found\"}");
+        }
+    }
+
+    /**
+     * Maneja las solicitudes DELETE para eliminar una categoría por su ID.
+     * Espera un parámetro de consulta 'id'.
+     */
+    private void handleDelete(HttpExchange exchange) throws IOException {
+        String query = exchange.getRequestURI().getQuery();
+        if(query != null && query.startsWith("id=")){
+            try {
+                Long id = Long.parseLong(query.substring(3));
+                boolean deleted = categoryDAO.delete(id);
+                if(deleted){
+                    sendResponse(exchange, 204, "");
+                } else {
+                    sendResponse(exchange, 404, "{\"error\": \"Category not found\"}");
+                }
+            } catch (NumberFormatException e) {
+                sendResponse(exchange, 400, "{\"error\": \"Invalid ID format\"}");
+            }
+        } else {
+            sendResponse(exchange, 400, "{\"error\": \"ID is required for delete\"}");
         }
     }
     

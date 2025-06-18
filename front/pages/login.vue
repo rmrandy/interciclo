@@ -23,7 +23,7 @@ const handleLogin = async () => {
       description: "Procesando tu solicitud, por favor espera...",
     });
     const response = await axios.post(
-      `http://${ip}:8080/api/login`, // URL de tu endpoint de login
+      `http://${ip}:8080/api2/login`, // URL de tu endpoint de login
       {
         email: email.value,
         password: password.value,

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, type Ref } from "vue";
 import axios from "axios";
-import { getInsuranceApiUrl } from "../../utils/api";
+
 interface Pharmacy {
   idPharmacy: number;
   name: string;
@@ -22,7 +22,7 @@ const fetchPharmacy = async () => {
       title: "Loading pharmacies",
       description: "Please wait...",
     });
-    const response = await axios.get(getInsuranceApiUrl("/pharmacy"));
+    const response = await axios.get(`http://${ip}:8080/api2/pharmacies`);
     pharmacies.value = response.data;
     pharmacyChanges = response.data.map((pharmacy: Pharmacy) => ({ ...pharmacy }));
     console.log("Hospitals obtenidos:", pharmacies.value);
@@ -47,7 +47,7 @@ const addPharmacy = async () => {
     title: "Adding pharmacy",
     description: "Please wait...",
   });
-  await axios.post(getInsuranceApiUrl("/pharmacy"), {
+  await axios.post(`http://${ip}:8080/api2/pharmacies`, {
     name: 'juan',
     address: 'pinula',
     phone: 0,
@@ -141,7 +141,7 @@ fetchPharmacy();
         <input type="text" class="field mb-8" :defaultValue="pharmacy.phone" @input="
           (event) => {
             const target = event.target as HTMLInputElement;
-            pharmacyChanges[index].phone = target.value;
+            pharmacyChanges[index].phone = parseInt(target.value);
           }
         " />
         <span class="text-primary font-semibold">E-Mail</span>

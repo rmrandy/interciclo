@@ -5,6 +5,9 @@ import com.sources.app.util.HibernateUtil;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 import org.hibernate.query.Query;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.Persistence;
 
 import java.util.List;
 
@@ -14,6 +17,13 @@ import java.util.List;
  * que representan los productos farmacéuticos disponibles. Utiliza Hibernate para interacciones con la base de datos.
  */
 public class MedicineDAO {
+    private final EntityManagerFactory emf;
+    private final EntityManager em;
+
+    public MedicineDAO() {
+        this.emf = Persistence.createEntityManagerFactory("default");
+        this.em = emf.createEntityManager();
+    }
 
     /**
      * Crea un nuevo registro de Medicamento en la base de datos.
@@ -150,5 +160,56 @@ public class MedicineDAO {
             e.printStackTrace();
             return null;
         }
+    }
+
+    public Medicine updateStock(Long id, Integer quantity) {
+        try {
+            em.getTransaction().begin();
+            Medicine medicine = em.find(Medicine.class, id);
+            if (medicine != null) {
+                medicine.setStock(medicine.getStock() - quantity);
+                em.merge(medicine);
+                em.getTransaction().commit();
+                return medicine;
+            }
+            em.getTransaction().rollback();
+            return null;
+        } catch (Exception e) {
+            if (em.getTransaction().isActive()) {
+                em.getTransaction().rollback();
+            }
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Elimina un medicamento por su ID.
+     * @param id El ID del medicamento a eliminar.
+     * @return true si se eliminó correctamente, false si no existe o hubo error.
+     */
+    public boolean delete(Long id) {
+        Transaction tx = null;
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            tx = session.beginTransaction();
+            Medicine medicine = session.get(Medicine.class, id);
+            if (medicine != null) {
+                session.delete(medicine);
+                tx.commit();
+                return true;
+            } else {
+                if (tx != null) tx.rollback();
+                return false;
+            }
+        } catch (Exception e) {
+            if (tx != null) tx.rollback();
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public void close() {
+        em.close();
+        emf.close();
     }
 }

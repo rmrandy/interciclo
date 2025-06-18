@@ -40,10 +40,6 @@
               <span class="value">{{ product.concentration }}</span>
             </div>
             <div class="detalle-item">
-              <span class="label">Presentación:</span>
-              <span class="value">{{ product.presentacion }}</span>
-            </div>
-            <div class="detalle-item">
               <span class="label">Marca:</span>
               <span class="value">{{ product.brand }}</span>
             </div>
@@ -66,13 +62,22 @@
               />
               <button @click="incrementQuantity" :disabled="quantity >= product.stock" class="qty-btn">+</button>
             </div>
-            <button
-              @click="redirectToCheckout"
-              :disabled="!quantity || quantity < 1 || quantity > product.stock || product.stock === 0"
-              class="comprar-btn"
-            >
-              Comprar ahora
-            </button>
+            <div class="compra-buttons">
+              <button
+                @click="addToCart"
+                :disabled="!quantity || quantity < 1 || quantity > product.stock || product.stock === 0"
+                class="add-cart-btn"
+              >
+                <span class="icon">🛒</span> Agregar al carrito
+              </button>
+              <button
+                @click="redirectToCheckout"
+                :disabled="!quantity || quantity < 1 || quantity > product.stock || product.stock === 0"
+                class="comprar-btn"
+              >
+                Comprar ahora
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -162,24 +167,18 @@ export default {
       // Obtener todas las órdenes para el usuario
       axios.get(ApiService.getPharmacyApiUrl(`/orders?userId=${userId}`))
         .then(response => {
-          console.log('Response from orders GET:', response.data);
           const orders = response.data;
           const orderInProgress = orders.find(order => order.status === 'En progreso');
           if (orderInProgress) {
-            console.log('Found order in progress:', orderInProgress);
             return orderInProgress;
           } else {
             return axios.post(ApiService.getPharmacyApiUrl("/orders"), {
               user: { idUser: userId },
               status: 'En progreso'
-            }).then(response => {
-              console.log('Response from orders POST:', response.data);
-              return response.data;
-            });
+            }).then(response => response.data);
           }
         })
         .then(order => {
-          console.log('ORDEN:', order);
           return axios.get(ApiService.getPharmacyApiUrl(`/order_medicines?id=${order.idOrder}%2C${this.product.idMedicine}`))
               .then(response => {
                 let items = response.data;
@@ -187,7 +186,7 @@ export default {
                 return items;
               })
               .catch(error => {
-                if (error.response?.status === 404) return [];    // no existe → crear
+                if (error.response?.status === 404) return [];
                 throw error;
               })
               .then(orderMedicines => {
@@ -199,17 +198,34 @@ export default {
                   cost: this.product.price,
                   total: this.product.price * this.quantity
                 };
-                return existing
-                    ? axios.put(ApiService.getPharmacyApiUrl("/order_medicines"), payload)
-                    : axios.post(ApiService.getPharmacyApiUrl("/order_medicines"), payload);
+                if (existing) {
+                  // Actualizar cantidad sumando la nueva cantidad seleccionada
+                  payload.quantity += existing.quantity;
+                  return axios.put(ApiService.getPharmacyApiUrl("/order_medicines"), { ...payload, id: existing.id });
+                } else {
+                  return axios.post(ApiService.getPharmacyApiUrl("/order_medicines"), payload);
+                }
               });
         })
-        .then(response => {
-          console.log('Orden y medicamento añadidos o actualizados:', response.data);
+        .then(() => {
+          alert('Producto agregado al carrito con la cantidad seleccionada.');
         })
         .catch(error => {
-          console.error('Error en el proceso de la orden:', error);
+          alert('Error al agregar el producto al carrito.');
+          console.error(error);
         });
+    },
+    addToCart() {
+      // Verificar si el usuario está logueado
+      const userStore = useUserStore();
+      if (!userStore.user) {
+        // Si no está logueado, redirigir a login
+        this.$router.push('/login');
+        return;
+      }
+      
+      // Usar la función purchaseProduct existente para agregar al carrito
+      this.purchaseProduct();
     }
   }
 };
@@ -387,6 +403,39 @@ export default {
   margin: 0 0.5rem;
 }
 
+.compra-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.add-cart-btn {
+  background: linear-gradient(135deg, #16a34a 0%, #22d3ee 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 1;
+}
+
+.add-cart-btn:hover {
+  background: linear-gradient(135deg, #22d3ee 0%, #16a34a 100%);
+  transform: scale(1.05);
+}
+
+.add-cart-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .comprar-btn {
   background-color: #3498db;
   color: white;
@@ -397,9 +446,7 @@ export default {
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.2s;
-  width: 100%;
-  max-width: 400px;
-  align-self: center;
+  flex: 1;
 }
 
 .comprar-btn:hover:not(:disabled) {

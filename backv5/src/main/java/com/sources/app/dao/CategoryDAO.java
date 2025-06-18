@@ -88,4 +88,29 @@ public class CategoryDAO {
             return null;
         }
     }
+
+    /**
+     * Elimina una categoría por su ID.
+     * @param id El ID de la categoría a eliminar.
+     * @return true si se eliminó correctamente, false si no existe o hubo error.
+     */
+    public boolean delete(Long id) {
+        Transaction tx = null;
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            tx = session.beginTransaction();
+            Category category = session.get(Category.class, id);
+            if (category != null) {
+                session.delete(category);
+                tx.commit();
+                return true;
+            } else {
+                if (tx != null) tx.rollback();
+                return false;
+            }
+        } catch (Exception e) {
+            if (tx != null) tx.rollback();
+            e.printStackTrace();
+            return false;
+        }
+    }
 }

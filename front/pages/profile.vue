@@ -47,7 +47,7 @@ const fetchUser = async () => {
       throw new Error("No se encontró idUser en localStorage");
     }
 
-    const response = await axios.get(getInsuranceApiUrl(`/users/${id}`));
+    const response = await axios.get(`http://${ip}:8080/api2/users/${id}`);
     user.value = response.data;
     setProfile(user.value!);
   } catch (error) {
@@ -187,7 +187,7 @@ const fetchAppointment = async () => {
       throw new Error("No se encontró idUser en localStorage");
     }
 
-    const response = await axios.get(getInsuranceApiUrl(`/appointment?user_id=${id}`));
+    const response = await axios.get(`http://${ip}:8080/api2/appointment?user_id=${id}`);
 
     appointments.value = response.data;
     console.log(id);

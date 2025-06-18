@@ -14,7 +14,6 @@
     <div v-else-if="medicine" class="medicine-details">
       <div class="medicine-header">
         <h2>{{ medicine.name }}</h2>
-        <span class="medicine-badge" v-if="medicine.prescription">Requiere receta médica</span>
       </div>
 
       <div class="medicine-data">
@@ -24,15 +23,11 @@
             <span class="value">{{ medicine.activeMedicament }}</span>
           </div>
           <div class="data-item">
-            <span class="label">Presentación:</span>
-            <span class="value">{{ medicine.presentacion }}</span>
-          </div>
-          <div class="data-item">
             <span class="label">Precio Unitario:</span>
             <span class="value price">Q{{ medicine.price.toFixed(2) }}</span>
           </div>
           <div class="data-item">
-            <span class="label">Cantidad (paquetes):</span>
+            <span class="label">Cantidad:</span>
             <span class="value">{{ quantity }}</span>
           </div>
           <div class="data-item">
@@ -54,106 +49,6 @@
             No hay suficiente stock disponible. Solo quedan {{ medicine.stock }} unidades.
           </p>
         </div>
-      </div>
-
-      <!-- Verificación de receta médica -->
-      <div v-if="medicine.prescription" class="prescription-section">
-        <h3>Recetas Médicas Disponibles</h3>
-         <div class="prescription-container">
-            <!-- Lista de recetas a la izquierda -->
-            <div class="prescription-list">
-              <div v-if="isPrescriptionPending" class="loading-recipes">
-                <div class="loading-spinner-small"></div>
-                <p>Cargando recetas...</p>
-              </div>
-              
-              <div v-else-if="!userRecipes || userRecipes.length === 0" class="no-recipes">
-                <p>No se encontraron recetas disponibles</p>
-                <button @click="recargarRecetas" class="reload-button">
-                  <span class="reload-icon">⟳</span> Recargar recetas
-                </button>
-                <div class="prescription-input">
-                  <label for="prescription">Adjuntar nueva receta:</label>
-                  <input type="file" id="prescription" @change="handlePrescriptionUpload" />
-                  <button @click="verifyPrescription" class="verify-button">Verificar receta</button>
-                </div>
-              </div>
-              
-              <div v-else>
-                <div class="recipe-actions top">
-                  <button @click="recargarRecetas" class="reload-button small">
-                    <span class="reload-icon">⟳</span> Actualizar
-                  </button>
-                </div>
-                <div 
-                  v-for="recipe in userRecipes" 
-                  :key="recipe._id" 
-                  class="recipe-item"
-                  :class="{ 'active': selectedRecipe && selectedRecipe._id === recipe._id }"
-                  @click="forceSelectRecipe(recipe)"
-                >
-                  <div class="recipe-header">
-                    <span class="recipe-code">{{ recipe.formatted_code }}</span>
-                    <span class="recipe-date">{{ recipe.formatted_date }}</span>
-                  </div>
-                  <div class="recipe-doctor">Dr. {{ recipe.doctor }}</div>
-                </div>
-              </div>
-            </div>
-            
-            <!-- Detalle de la receta a la derecha -->
-            <div class="prescription-detail">
-              <div v-if="selectedRecipe" class="recipe-detail-content">
-                <h4>Detalle de la Receta</h4>
-                <div class="recipe-info">
-                  <p><strong>Código:</strong> {{ selectedRecipe.formatted_code }}</p>
-                  <p><strong>Fecha:</strong> {{ selectedRecipe.formatted_date }}</p>
-                  <p><strong>Doctor:</strong> {{ selectedRecipe.doctor }}</p>
-                  <p v-if="selectedRecipe.special_notes"><strong>Notas:</strong> {{ selectedRecipe.special_notes }}</p>
-                </div>
-                
-                <h4>Medicamentos recetados:</h4>
-                <div class="medicine-list">
-                  <div v-for="(med, index) in selectedRecipe.medicines" :key="index" class="medicine-item"
-                       :class="{'matching-medicine': medicine && med.principioActivo === medicine.activeMedicament}">
-                    <p><strong>{{ med.principioActivo }}</strong> {{ med.concentracion }}</p>
-                    <p v-if="med.presentacion">Presentación: {{ med.presentacion }}</p>
-                    <p>Dosis: {{ med.dosis }} unidades | Frecuencia: {{ med.frecuencia }} veces al día | Duración: {{ med.duracion }} días</p>
-                    <p v-if="med.diagnostico">Diagnóstico: {{ med.diagnostico }}</p>
-                    <div v-if="medicine && med.principioActivo === medicine.activeMedicament" class="calculation-details">
-                      <p class="calculation-text">
-                        <strong>Cálculo:</strong> 
-                        {{ med.dosis }} unidades × 
-                        {{ med.frecuencia }} veces/día × 
-                        {{ med.duracion }} días = 
-                        <strong>{{ parseInt(med.dosis) * parseInt(med.frecuencia) * parseInt(med.duracion) }} unidades totales</strong>
-                      </p>
-                      <p class="calculation-text">
-                        <strong>Paquetes necesarios:</strong> 
-                        ⌈{{ parseInt(med.dosis) * parseInt(med.frecuencia) * parseInt(med.duracion) }} 
-                        ÷ {{ medicine.presentacion }}⌉ = 
-                        <strong>{{ Math.ceil((parseInt(med.dosis) * parseInt(med.frecuencia) * parseInt(med.duracion)) / medicine.presentacion) }} paquete(s)</strong>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div class="recipe-actions">
-                  <button 
-                    @click="useSelectedRecipe" 
-                    class="use-recipe-button"
-                    :disabled="!canUseSelectedRecipe"
-                  >
-                    Usar esta receta
-                  </button>
-                </div>
-              </div>
-              
-              <div v-else class="no-recipe-selected">
-                <p>Seleccione una receta para ver detalles</p>
-              </div>
-            </div>
-          </div>
       </div>
 
       <!-- Verificación de seguro -->
@@ -295,7 +190,7 @@
               <h4>Medicamento</h4>
               <div class="detail-info">
                 <p><strong>Nombre:</strong> {{ medicine.name }}</p>
-                <p><strong>Principio Activo:</strong> {{ medicine.activeMedicament }}</p>
+                <p><strong>Categoria:</strong> {{ medicine.activeMedicament }}</p>
                 <p><strong>Presentación:</strong> {{ medicine.presentacion }}</p>
                 <p><strong>Precio Unitario:</strong> Q{{ medicine.price.toFixed(2) }}</p>
               </div>
@@ -304,48 +199,17 @@
             <div class="detail-section">
               <h4>Detalles de la Compra</h4>
               <div class="detail-info">
-                <p><strong>Cantidad (paquetes):</strong> {{ quantity }}</p>
+                <p><strong>Cantidad:</strong> {{ quantity }}</p>
                 <p><strong>Subtotal:</strong> Q{{ (medicine.price * quantity).toFixed(2) }}</p>
                 <p v-if="hasInsurance"><strong>Descuento Seguro:</strong> Q{{ ((medicine.price * quantity) * (coveragePercentage / 100)).toFixed(2) }}</p>
                 <p><strong>Total a Pagar:</strong> Q{{ calculateTotalToPay().toFixed(2) }}</p>
               </div>
             </div>
             
-            <div v-if="selectedRecipe" class="detail-section">
-              <h4>Receta Médica Utilizada</h4>
-              <div class="detail-info">
-                <p><strong>Código:</strong> {{ selectedRecipe.formatted_code }}</p>
-                <p><strong>Fecha:</strong> {{ selectedRecipe.formatted_date }}</p>
-                <p><strong>Doctor:</strong> {{ selectedRecipe.doctor }}</p>
-                <div v-if="medicineMatch" class="calculation-details">
-                  <p class="calculation-text">
-                    <strong>Cálculo:</strong> 
-                    {{ medicineMatch.dosis }} unidades × 
-                    {{ medicineMatch.frecuencia }} veces/día × 
-                    {{ medicineMatch.duracion }} días = 
-                    <strong>{{ parseInt(medicineMatch.dosis) * parseInt(medicineMatch.frecuencia) * parseInt(medicineMatch.duracion) }} unidades totales</strong>
-                  </p>
-                  <p class="calculation-text">
-                    <strong>Paquetes necesarios:</strong> 
-                    ⌈{{ parseInt(medicineMatch.dosis) * parseInt(medicineMatch.frecuencia) * parseInt(medicineMatch.duracion) }} 
-                    ÷ {{ medicine.presentacion }}⌉ = 
-                    <strong>{{ Math.ceil((parseInt(medicineMatch.dosis) * parseInt(medicineMatch.frecuencia) * parseInt(medicineMatch.duracion)) / medicine.presentacion) }} paquete(s)</strong>
-                  </p>
-                </div>
-              </div>
-            </div>
-             <div v-else-if="medicine.prescription" class="detail-section">
-                <h4>Receta Médica</h4>
-                 <div class="detail-info">
-                    <p class="status-warning">Se requiere receta, pero no se ha seleccionado ninguna.</p>
-                 </div>
-             </div>
-            
             <div class="detail-section">
               <h4>Estado de la Compra</h4>
               <div class="detail-info">
                 <p><strong>Stock disponible:</strong> <span :class="hasStock ? 'status-ok' : 'status-error'">{{ hasStock ? 'Sí' : 'No' }}</span></p>
-                <p v-if="medicine.prescription"><strong>Receta médica:</strong> <span :class="hasPrescription ? 'status-ok' : 'status-pending'">{{ hasPrescription ? 'Validada' : 'Pendiente/No seleccionada' }}</span></p>
                 <p><strong>Seguro médico:</strong> <span :class="hasInsurance ? 'status-ok' : 'status-info'">{{ hasInsurance ? `Cobertura del ${coveragePercentage}%` : 'No disponible' }}</span></p>
               </div>
             </div>
@@ -398,15 +262,10 @@ const medicine = ref(null);
 const quantity = ref(1);
 const isLoading = ref(true);
 const hasStock = ref(false);
-const hasPrescription = ref(false);
-const isPrescriptionPending = ref(false);
 const hasInsurance = ref(false);
 const coveragePercentage = ref(0);
 const showConfirmationModal = ref(false);
-const userRecipes = ref([]);
-const selectedRecipe = ref(null);
 const showDetailModal = ref(false);
-const medicineMatch = ref(null);
 
 // Nuevos estados para tarjeta y seguro
 const cardNumber = ref('');
@@ -422,18 +281,6 @@ const canConfirmPurchase = computed(() => {
   return hasStock.value && isCardValid.value;
 });
 
-// Verificar si se puede usar la receta seleccionada
-const canUseSelectedRecipe = computed(() => {
-  if (!selectedRecipe.value || !medicine.value) return false;
-  
-  // Verificar si la receta contiene el medicamento actual
-  const matchFound = selectedRecipe.value.medicines.find(med => 
-    med.principioActivo === medicine.value.activeMedicament
-  );
-  
-  return !!matchFound;
-});
-
 // Verificar stock disponible
 function verificarStock() {
   if (!medicine.value) {
@@ -442,134 +289,12 @@ function verificarStock() {
     return false;
   }
   
-  // Verificar si hay suficiente stock (siempre para cantidad 1)
-  hasStock.value = medicine.value.stock >= 1;
+  // Verificar si hay suficiente stock para la cantidad solicitada
+  hasStock.value = medicine.value.stock >= quantity.value;
   
-  console.log(`Verificación de stock: ${medicine.value.stock} disponibles, resultado: ${hasStock.value ? 'Disponible' : 'No disponible'}`);
+  console.log(`Verificación de stock: ${medicine.value.stock} disponibles, cantidad solicitada: ${quantity.value}, resultado: ${hasStock.value ? 'Disponible' : 'No disponible'}`);
   
   return hasStock.value;
-}
-
-// Forzar la selección de receta con cálculo visible
-function forceSelectRecipe(recipe) {
-  console.log('Forzando selección de receta:', recipe);
-  selectedRecipe.value = recipe;
-  
-  if (!medicine.value) {
-    console.warn('No hay medicamento cargado');
-    return;
-  }
-  
-  // Encuentra el medicamento que coincide
-  const matchingMedicine = recipe.medicines.find(med => 
-    med.principioActivo === medicine.value.activeMedicament
-  );
-  
-  if (matchingMedicine) {
-    medicineMatch.value = matchingMedicine;
-    hasPrescription.value = true;
-    
-    // Calcular explícitamente
-    const dosis = parseInt(matchingMedicine.dosis) || 0;
-    const frecuencia = parseInt(matchingMedicine.frecuencia) || 0;
-    const duracion = parseInt(matchingMedicine.duracion) || 0;
-    const unidadesTotales = dosis * frecuencia * duracion;
-    const paquetesNecesarios = Math.ceil(unidadesTotales / medicine.value.presentacion);
-    
-    // Actualizar cantidad
-    quantity.value = paquetesNecesarios || 1;
-    
-    console.log('Resultado del cálculo:', {
-      dosis,
-      frecuencia, 
-      duracion,
-      unidadesTotales,
-      unidadesPorPresentacion: medicine.value.presentacion,
-      paquetesNecesarios
-    });
-    
-    // Aplicar seguro si existe
-    if (recipe.has_insurance && userStore.user && userStore.user.policy) {
-      hasInsurance.value = true;
-      coveragePercentage.value = 70;
-    } else {
-      hasInsurance.value = false;
-      coveragePercentage.value = 0;
-    }
-  } else {
-    medicineMatch.value = null;
-    hasPrescription.value = false;
-    quantity.value = 1;
-    alert('Esta receta no contiene el medicamento seleccionado');
-  }
-}
-
-// Seleccionar una receta
-function selectRecipe(recipe) {
-  forceSelectRecipe(recipe);
-}
-
-// Cargar recetas
-async function loadRecipes() {
-  isPrescriptionPending.value = true;
-  try {
-    if (userStore.user && userStore.user.idUser) {
-      // En un entorno real, deberías obtener las recetas del usuario desde el backend
-      console.log('Cargando recetas para el usuario:', userStore.user.idUser);
-      
-      // Simulamos una llamada a la API
-      // En producción, aquí iría: const response = await axios.get(`http://${ip}:${apiPort}/api2/prescriptions/user/${userStore.user.idUser}`);
-      
-      // Por ahora, usamos datos de ejemplo
-      setTimeout(() => {
-        const recetasEjemplo = [
-          {
-            _id: "680f14e94d748efc0c04188b",
-            patient: userStore.user.idUser || "user123",
-            doctor: "67dcd3224d8c7c0ed8f0c01fe",
-            formatted_code: "00256-20250427-3478",
-            formatted_date: "27/04/2025 23:40:57",
-            has_insurance: userStore.user.policy ? true : false,
-            insurance_code: userStore.user.policy || null,
-            special_notes: "2",
-            created_at: "2025-04-27T23:40:57.300+00:00",
-            medicines: [
-              {
-                _id: "med-paracetamol-500",
-                principioActivo: "Paracetamol2",
-                concentracion: "500 MG",
-                presentacion: 30,
-                dosis: "2",
-                frecuencia: "1",
-                duracion: "4",
-                diagnostico: "2"
-              }
-            ]
-          }
-        ];
-        
-        userRecipes.value = recetasEjemplo;
-        console.log('Recetas cargadas:', userRecipes.value);
-        isPrescriptionPending.value = false;
-      }, 500);
-    } else {
-      console.warn('No hay usuario logueado para cargar recetas');
-      isPrescriptionPending.value = false;
-    }
-  } catch (error) {
-    console.error('Error al cargar recetas:', error);
-    isPrescriptionPending.value = false;
-  }
-}
-
-// Manejar carga de archivo
-function handlePrescriptionUpload(event) {
-  const file = event.target.files[0];
-  if (file) {
-    console.log('Archivo de receta seleccionado:', file.name);
-  } else {
-    console.log('No se seleccionó ningún archivo');
-  }
 }
 
 // Calcular total a pagar
@@ -811,7 +536,6 @@ async function confirmPurchase() {
       medicineId: medicine.value.idMedicine,
       userId: userStore.user.idUser,
       quantity: quantity.value,
-      recipeId: selectedRecipe.value?._id, // Incluir ID de receta si está seleccionada
       stockActual: medicine.value.stock
     });
     
@@ -865,21 +589,20 @@ async function confirmPurchase() {
       console.log('Medicamento añadido a la orden con éxito');
       
       // 4. Si hay seguro o receta, generar registro de factura
-      if (hasInsurance.value || selectedRecipe.value) {
+      if (hasInsurance.value) {
         console.log('Paso 4: Generando factura...');
-        const insuranceAmount = hasInsurance.value ? 
-          (medicine.value.price * quantity.value) * (coveragePercentage.value / 100) : 0;
-          
+        const insuranceAmount = (medicine.value.price * quantity.value) * (coveragePercentage.value / 100);
+        
         const patientAmount = (medicine.value.price * quantity.value) - insuranceAmount;
         
         const billData = {
-          prescription: selectedRecipe.value ? selectedRecipe.value._id : null,
+          prescription: null,
           total: medicine.value.price * quantity.value,
           subtotal: medicine.value.price * quantity.value,
           taxes: 0,
           coveredAmount: insuranceAmount,
           patientAmount: patientAmount,
-          copay: hasInsurance.value ? coveragePercentage.value : 0,
+          copay: coveragePercentage.value,
           status: 'Pagado',
           insuranceApprovalCode: hasInsurance.value ? 'AP' + Math.floor(Math.random() * 100000) : null
         };
@@ -950,80 +673,6 @@ function goBack() {
   router.back();
 }
 
-// Usar la receta seleccionada (marcarla como usada)
-function useSelectedRecipe() {
-  if (selectedRecipe.value && canUseSelectedRecipe.value) {
-    hasPrescription.value = true; // Ya debería ser true por selectRecipe
-    console.log('Usando receta:', selectedRecipe.value._id);
-    
-    // Mostrar confirmación visual (si es necesario)
-    // ... (código para cambiar estilo del botón si se desea)
-  } else {
-    alert('Esta receta no es válida para el medicamento actual.');
-  }
-}
-
-// Simular verificación de receta subida
-function verifyPrescription() {
-  const fileInput = document.getElementById('prescription');
-  if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-    alert('Por favor, adjunte una receta médica.');
-    return;
-  }
-  
-  isPrescriptionPending.value = true;
-  console.log('Simulando verificación de receta subida...');
-  
-  setTimeout(() => {
-    // Generar cantidades aleatorias pero realistas para la receta
-    const dosis = Math.floor(Math.random() * 2) + 1; // 1 o 2 unidades por dosis
-    const frecuencia = Math.floor(Math.random() * 3) + 1; // 1 a 3 veces al día
-    const duracion = Math.floor(Math.random() * 7) + 3; // 3 a 10 días
-    
-    const nuevaReceta = {
-      _id: "receta-" + Math.floor(Math.random() * 10000),
-      patient: userStore.user?.idUser || "usuario-actual",
-      doctor: "Doctor Subido",
-      formatted_code: "SUBIDA-" + new Date().toISOString().substring(0, 10),
-      formatted_date: new Date().toLocaleDateString(),
-      has_insurance: false,
-      special_notes: "Receta subida manualmente",
-      medicines: [
-        {
-          _id: "med-" + Math.floor(Math.random() * 10000),
-          principioActivo: medicine.value?.activeMedicament || 'Desconocido',
-          concentracion: medicine.value?.concentration || "N/A",
-          presentacion: medicine.value?.presentacion || 'N/A',
-          dosis: dosis.toString(),
-          frecuencia: frecuencia.toString(),
-          duracion: duracion.toString(),
-          diagnostico: "Subido manualmente"
-        }
-      ]
-    };
-    
-    userRecipes.value.unshift(nuevaReceta);
-    forceSelectRecipe(nuevaReceta); // Seleccionar y validar la nueva receta
-    isPrescriptionPending.value = false;
-    console.log('Receta subida y verificada (simulado) con cantidades:', {
-      dosis,
-      frecuencia,
-      duracion,
-      totalUnidades: dosis * frecuencia * duracion
-    });
-  }, 1500);
-}
-
-// Recargar recetas (simulación)
-function recargarRecetas() {
-  isPrescriptionPending.value = true;
-  console.log('Recargando recetas...');
-  setTimeout(() => {
-    loadRecipes();
-    isPrescriptionPending.value = false;
-  }, 1000);
-}
-
 // Cargar datos del medicamento
 onMounted(async () => {
   isLoading.value = true;
@@ -1048,18 +697,6 @@ onMounted(async () => {
       
       // Verificar seguro médico
       await checkInsurance();
-      
-      // Cargar recetas
-      await loadRecipes();
-      
-      // Si hay receta, seleccionar
-      if (route.query.recipeId) {
-        const recipeToSelect = userRecipes.value.find(r => r._id === route.query.recipeId);
-        if (recipeToSelect) {
-          console.log('Seleccionando receta inicial:', recipeToSelect);
-          selectRecipe(recipeToSelect);
-        }
-      }
     } else {
       // Si no encuentra por ID directo, intentamos buscar por principio activo como fallback
       try {
@@ -1073,7 +710,6 @@ onMounted(async () => {
           console.log('Medicamento encontrado con búsqueda alternativa:', medicine.value);
           verificarStock();
           await checkInsurance();
-          await loadRecipes();
         } else {
           console.warn('No se encontró el medicamento con ningún método');
           medicine.value = null;
@@ -1097,7 +733,6 @@ onMounted(async () => {
         console.log('Medicamento encontrado con búsqueda general:', medicine.value);
         verificarStock();
         await checkInsurance();
-        await loadRecipes();
       } else {
         medicine.value = null;
       }
@@ -1181,15 +816,6 @@ onMounted(async () => {
   font-weight: 600;
   color: #1e293b;
   margin: 0;
-}
-
-.medicine-badge {
-  background-color: #ef4444;
-  color: white;
-  padding: 0.3rem 0.6rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 600;
 }
 
 .medicine-data {
@@ -1297,237 +923,6 @@ onMounted(async () => {
   font-size: 1.1rem;
   font-weight: 600;
   margin: 0 0 0.5rem 0;
-}
-
-/* Sección de recetas */
-.prescription-section {
-  padding: 1.5rem;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.prescription-section h3 {
-  font-size: 1.2rem;
-  font-weight: 600;
-  margin: 0 0 1rem 0;
-}
-
-.prescription-container {
-  display: flex;
-  gap: 1.5rem;
-  min-height: 300px;
-}
-
-.prescription-list {
-  flex: 1;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  overflow: hidden;
-  background-color: #f8fafc;
-}
-
-.loading-recipes {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 150px;
-}
-
-.loading-spinner-small {
-  width: 20px;
-  height: 20px;
-  border: 3px solid #e2e8f0;
-  border-top: 3px solid #1e40af;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 0.5rem;
-}
-
-.no-recipes {
-  padding: 1.5rem;
-  text-align: center;
-}
-
-.reload-button {
-  background-color: #3b82f6;
-  color: white;
-  border: none;
-  padding: 0.6rem 1rem;
-  border-radius: 6px;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.3rem;
-  margin: 0.75rem auto;
-}
-
-.reload-button.small {
-  padding: 0.3rem 0.6rem;
-  font-size: 0.8rem;
-}
-
-.reload-icon {
-  display: inline-block;
-  font-size: 1.2rem;
-}
-
-.reload-button:hover {
-  background-color: #2563eb;
-}
-
-.recipe-item {
-  padding: 1rem;
-  border-bottom: 1px solid #e2e8f0;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.recipe-item:hover {
-  background-color: #e0f2fe;
-}
-
-.recipe-item.active {
-  background-color: #bfdbfe;
-}
-
-.recipe-header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-}
-
-.recipe-code {
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-.recipe-date {
-  font-size: 0.8rem;
-  color: #64748b;
-}
-
-.recipe-doctor {
-  font-size: 0.9rem;
-  color: #0f172a;
-}
-
-.prescription-detail {
-  flex: 1.5;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background-color: white;
-  padding: 1.5rem;
-}
-
-.no-recipe-selected {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: #64748b;
-  font-style: italic;
-}
-
-.recipe-detail-content h4 {
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin: 0 0 1rem 0;
-  color: #1e40af;
-}
-
-.recipe-info {
-  background-color: #f8fafc;
-  padding: 1rem;
-  border-radius: 8px;
-  margin-bottom: 1.5rem;
-}
-
-.recipe-info p {
-  margin: 0.5rem 0;
-}
-
-.medicine-list {
-  margin-top: 1rem;
-}
-
-.medicine-item {
-  padding: 1rem;
-  background-color: #f8fafc;
-  border-radius: 8px;
-  margin-bottom: 0.75rem;
-}
-
-.medicine-item.matching-medicine {
-  background-color: #e0f2fe;
-  border: 1px solid #60a5fa;
-}
-
-.medicine-item p {
-  margin: 0.3rem 0;
-}
-
-.calculation-details {
-  margin-top: 0.8rem;
-  padding: 0.8rem;
-  background-color: #f0f9ff;
-  border-radius: 6px;
-  border-left: 3px solid #3b82f6;
-}
-
-.calculation-text {
-  font-size: 0.9rem;
-  margin: 0.5rem 0;
-  color: #334155;
-  line-height: 1.5;
-}
-
-.recipe-actions {
-  margin-top: 1.5rem;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.recipe-actions.top {
-  margin-bottom: 0.5rem;
-  padding: 0.5rem;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.use-recipe-button {
-  background-color: #1e40af;
-  color: white;
-  border: none;
-  padding: 0.6rem 1.2rem;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.use-recipe-button:disabled {
-  background-color: #94a3b8;
-  cursor: not-allowed;
-}
-
-.prescription-input {
-  margin-top: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.verify-button {
-  background-color: #0284c7;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  align-self: flex-start;
 }
 
 .payment-summary {
@@ -1740,17 +1135,6 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
-  .prescription-container {
-    flex-direction: column;
-  }
-
-  .prescription-list,
-  .prescription-detail {
-    width: 100%;
-  }
-}
-
-@media (max-width: 640px) {
   .data-grid {
     grid-template-columns: 1fr;
   }

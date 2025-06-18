@@ -55,7 +55,7 @@ const fetchTransactions = async () => {
       title: "Loading services",
       description: "Please wait...",
     });
-    const response = await axios.get(getInsuranceApiUrl("/transactions"));
+    const response = await axios.get(`http://${ip}:8080/api2/transactions`);
     console.log("Prescriptions obtenidos:", response.data);
     transaction.value = response.data;
     notify({

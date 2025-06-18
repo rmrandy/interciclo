@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence
+                                 https://jakarta.ee/xml/ns/persistence/persistence_3_0.xsd"
+             version="3.0">
+    
+    <persistence-unit name="default" transaction-type="RESOURCE_LOCAL">
+        <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
+        
+        <!-- Entidades -->
+        <class>com.sources.app.entities.User</class>
+        <class>com.sources.app.entities.Bill</class>
+        <class>com.sources.app.entities.BillMedicine</class>
+        <class>com.sources.app.entities.Category</class>
+        <class>com.sources.app.entities.Comments</class>
+        <class>com.sources.app.entities.Hospital</class>
+        <class>com.sources.app.entities.Medicine</class>
+        <class>com.sources.app.entities.MedicineCatSubcat</class>
+        <class>com.sources.app.entities.Orders</class>
+        <class>com.sources.app.entities.OrderMedicine</class>
+        <class>com.sources.app.entities.Policy</class>
+        <class>com.sources.app.entities.Prescription</class>
+        <class>com.sources.app.entities.PrescriptionMedicine</class>
+        <class>com.sources.app.entities.Subcategory</class>
+        <class>com.sources.app.entities.Order</class>
+        <class>com.sources.app.entities.ProveedorInternacional</class>
+        
+        <properties>
+            <!-- Database connection properties -->
+            <property name="jakarta.persistence.jdbc.driver" value="oracle.jdbc.driver.OracleDriver"/>
+            <property name="jakarta.persistence.jdbc.url" value="jdbc:oracle:thin:@//64.225.58.196:1521/XEPDB1"/>
+            <property name="jakarta.persistence.jdbc.user" value="FARMACIA"/>
+            <property name="jakarta.persistence.jdbc.password" value="user123"/>
+            
+            <!-- Hibernate properties -->
+            <property name="hibernate.dialect" value="org.hibernate.dialect.OracleDialect"/>
+            <property name="hibernate.hbm2ddl.auto" value="update"/>
+            <property name="hibernate.show_sql" value="true"/>
+            <property name="hibernate.format_sql" value="true"/>
+            
+            <!-- Connection pool properties -->
+            <property name="hibernate.connection.pool_size" value="10"/>
+            <property name="hibernate.c3p0.min_size" value="5"/>
+            <property name="hibernate.c3p0.max_size" value="20"/>
+            <property name="hibernate.c3p0.timeout" value="300"/>
+            <property name="hibernate.c3p0.max_statements" value="50"/>
+            <property name="hibernate.c3p0.idle_test_period" value="3000"/>
+        </properties>
+    </persistence-unit>
+</persistence> 

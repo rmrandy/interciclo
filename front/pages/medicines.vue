@@ -37,7 +37,7 @@ const fetchMedicines = async () => {
       title: "Loading medicines",
       description: "Please wait...",
     });
-    const response = await axios.get(`http://${ip}:8080/api/medicine`);
+    const response = await axios.get(`http://${ip}:8080/api2/medicines`);
     medicines.value = response.data;
     medicineChanges = response.data.map((medicine: Medicine) => ({ ...medicine }));
     console.log("Medicines obtenidas:", medicines.value);
@@ -58,7 +58,7 @@ const fetchMedicines = async () => {
 
 const updateMedicine = async (medicine: Medicine) => {
   try {
-    const response = await axios.put(`http://${ip}:8080/api/medicine/${medicine.idMedicine}`, medicine);
+    const response = await axios.put(`http://${ip}:8080/api2/medicines/${medicine.idMedicine}`, medicine);
     console.log("Medicine actualizada:", response.data);
     notify({
       type: "success",

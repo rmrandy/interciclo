@@ -1,47 +1,80 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <template>
   <div class="cart-container">
-    <h1>Carrito de Compras</h1>
-
-    <!-- Si no existe una orden en progreso -->
-    <div v-if="!currentOrder">
-      <p>No tienes una orden en progreso.</p>
+    <div class="cart-header">
+      <h2 class="cart-title">
+        <span class="cart-icon">🛒</span>
+        Carrito de Compras
+      </h2>
+      <span class="cart-count">{{ cartItems.length }} productos</span>
     </div>
 
-    <!-- Si existe una orden en progreso, se muestran los ítems -->
-    <div v-else>
-      <table>
-        <thead>
-        <tr>
-          <th>Medicamento</th>
-          <th>Cantidad</th>
-          <th>Costo Unitario</th>
-          <th>Total</th>
-          <th>Eliminar</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr v-for="item in cartItems" :key="item.medicine.idMedicine">
-          <td>{{ item.medicine.name }}</td>
-          <td>{{ item.quantity }}</td>
-          <td>{{ item.cost }}</td>
-          <td>{{ item.total }}</td>
-          <td>
-            <button @click="removeItem(item)">X</button>
-          </td>
-        </tr>
-        </tbody>
-      </table>
-      <button @click="openModal">Completar compra</button>
+    <div v-if="cartItems.length === 0" class="empty-cart">
+      <div class="empty-cart-icon">📦</div>
+      <h3>Tu carrito está vacío</h3>
+      <p>Agrega algunos productos para comenzar</p>
+      <router-link to="/" class="btn btn-primary">
+        <span class="btn-icon">🏠</span>
+        Ir al Inicio
+      </router-link>
+    </div>
 
-      <div v-if="isModalOpen" class="modal">
-        <div class="modal-content">
-          <h2>Completar compra</h2>
-          <input v-model="cardNumber" placeholder="Número de tarjeta" />
-          <input v-model="cardExpiry" @input="handleExpiryInput" placeholder="MM/YY" />
-          <input v-model="cardCvv" placeholder="CVV" />
-          <button @click="completePurchase">Confirmar Compra</button>
-          <button @click="closeModal">Cancelar</button>
+    <div v-else class="cart-content">
+      <div class="cart-items">
+        <div v-for="item in cartItems" :key="item.id" class="cart-item">
+          <div class="item-image">
+            <img :src="item.image" :alt="item.name" />
+          </div>
+          <div class="item-details">
+            <h3 class="item-name">{{ item.name }}</h3>
+            <p class="item-active">{{ item.activeMedicament }}</p>
+            <div class="item-price">Q{{ (item.price || 0).toFixed(2) }}</div>
+          </div>
+          <div class="item-quantity">
+            <button @click="decreaseQuantity(item)" class="quantity-btn" :disabled="item.quantity <= 1">
+              <span class="quantity-icon">➖</span>
+            </button>
+            <span class="quantity-value">{{ item.quantity }}</span>
+            <button @click="increaseQuantity(item)" class="quantity-btn">
+              <span class="quantity-icon">➕</span>
+            </button>
+          </div>
+          <div class="item-total">
+            <span class="total-amount">Q{{ ((item.price || 0) * item.quantity).toFixed(2) }}</span>
+          </div>
+          <button @click="removeItem(item)" class="remove-btn">
+            <span class="remove-icon">🗑️</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="cart-summary">
+        <div class="summary-header">
+          <h3>Resumen de Compra</h3>
+        </div>
+        <div class="summary-items">
+          <div class="summary-item">
+            <span>Subtotal:</span>
+            <span>Q{{ subtotal.toFixed(2) }}</span>
+          </div>
+          <div class="summary-item">
+            <span>IVA (12%):</span>
+            <span>Q{{ tax.toFixed(2) }}</span>
+          </div>
+          <div class="summary-item total">
+            <span>Total:</span>
+            <span>Q{{ total.toFixed(2) }}</span>
+          </div>
+        </div>
+        <div class="summary-actions">
+          <button @click="clearCart" class="btn btn-secondary">
+            <span class="btn-icon">🗑️</span>
+            Vaciar Carrito
+          </button>
+          <button @click="checkout" class="btn btn-success">
+            <span class="btn-icon">💳</span>
+            Proceder al Pago
+          </button>
         </div>
       </div>
     </div>
@@ -53,7 +86,10 @@ import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
 import { useUserStore } from '@/stores/userStore'
 import ApiService from '../services/ApiService';  
+import { useRouter } from 'vue-router'
+
 const userStore = useUserStore()
+const router = useRouter()
 
 const currentOrder = ref(null)
 const cartItems = ref([])
@@ -76,8 +112,17 @@ const fetchCartItems = async (orderId) => {
   try {
     const response = await axios.get(ApiService.getPharmacyApiUrl("/order_medicines"))
     const allItems = response.data
-    // Filtrar solo los ítems que corresponden a la orden en progreso
-    cartItems.value = allItems.filter(item => item.orders.idOrder === orderId)
+    // Filtrar solo los ítems que corresponden a la orden en progreso y mapear el precio
+    cartItems.value = allItems
+      .filter(item => item.orders.idOrder === orderId)
+      .map(item => ({
+        ...item,
+        // Asegura que siempre haya un campo price numérico
+        price: typeof item.price === 'number' ? item.price : (item.cost || (item.medicine && item.medicine.price) || 0),
+        name: item.name || (item.medicine && item.medicine.name) || '',
+        image: item.image || (item.medicine && item.medicine.image) || '',
+        activeMedicament: item.activeMedicament || (item.medicine && item.medicine.activeMedicament) || '',
+      }))
   } catch (error) {
     console.error('Error fetching cart items:', error)
   }
@@ -96,55 +141,35 @@ const removeItem = async (item) => {
   }
 }
 
-// Referencias y funciones para completar la compra
-const isModalOpen = ref(false);
-const cardNumber = ref('');
-const cardExpiry = ref('');
-const cardCvv = ref('');
-
-const handleExpiryInput = () => {
-  let val = cardExpiry.value.replace(/[^0-9]/g, '');
-  if (val.length > 2) {
-    cardExpiry.value = val.slice(0, 2) + '/' + val.slice(2, 4);
-  } else {
-    cardExpiry.value = val;
-  }
-};
-
-const isCardValid = computed(() => {
-  return cardNumber.value && cardExpiry.value && cardCvv.value;
+const subtotal = computed(() => {
+  return cartItems.value.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 });
 
-const openModal = () => {
-  isModalOpen.value = true;
+const tax = computed(() => {
+  return subtotal.value * 0.12;
+});
+
+const total = computed(() => {
+  return subtotal.value + tax.value;
+});
+
+const increaseQuantity = (item) => {
+  item.quantity++;
 };
 
-const closeModal = () => {
-  isModalOpen.value = false;
-};
-
-const completePurchase = async () => {
-  if (!isCardValid.value) return;
-  try {
-    // Se asume que currentOrder es la orden en progreso
-    const order = currentOrder.value;
-    if (!order) return;
-
-    // Actualizar la orden existente con estado 'Completado' enviando el objeto completo
-    await axios.put(ApiService.getPharmacyApiUrl("/orders"), {
-      idOrder: order.idOrder,
-      status: 'Completado',
-      user: order.user
-    });
-
-    closeModal();
-    alert('Gracias por tu compra');
-    window.location.href = '/';
-  } catch (error) {
-    console.error('Error completing purchase:', error);
-    alert('Error al completar la compra. Intente de nuevo.');
+const decreaseQuantity = (item) => {
+  if (item.quantity > 1) {
+    item.quantity--;
   }
-}
+};
+
+const clearCart = () => {
+  cartItems.value = [];
+};
+
+const checkout = () => {
+  router.push('/checkout');
+};
 
 onMounted(async () => {
   await fetchCurrentOrder()
@@ -156,38 +181,348 @@ onMounted(async () => {
 
 <style scoped>
 .cart-container {
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 24px;
+  min-height: calc(100vh - 70px);
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 20px;
+.cart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--border-color);
 }
 
-th, td {
-  padding: 8px;
-  border: 1px solid #ccc;
-  text-align: left;
+.cart-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 28px;
+  color: var(--text-primary);
+  margin: 0;
 }
 
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
+.cart-icon {
+  font-size: 32px;
+}
+
+.cart-count {
+  background: var(--primary-color);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* Carrito vacío */
+.empty-cart {
+  text-align: center;
+  padding: 80px 20px;
+  background: var(--bg-primary);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.empty-cart-icon {
+  font-size: 64px;
+  margin-bottom: 24px;
+  opacity: 0.6;
+}
+
+.empty-cart h3 {
+  color: var(--text-primary);
+  font-size: 24px;
+  margin: 0 0 12px 0;
+}
+
+.empty-cart p {
+  color: var(--text-secondary);
+  font-size: 16px;
+  margin: 0 0 32px 0;
+}
+
+/* Contenido del carrito */
+.cart-content {
+  display: grid;
+  grid-template-columns: 1fr 350px;
+  gap: 32px;
+}
+
+.cart-items {
+  background: var(--bg-primary);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.cart-item {
+  display: grid;
+  grid-template-columns: 80px 1fr auto auto auto;
+  gap: 20px;
+  align-items: center;
+  padding: 24px;
+  border-bottom: 1px solid var(--border-color);
+  transition: var(--transition);
+}
+
+.cart-item:hover {
+  background: var(--bg-accent);
+}
+
+.cart-item:last-child {
+  border-bottom: none;
+}
+
+.item-image {
+  width: 80px;
+  height: 80px;
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.item-image img {
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  object-fit: contain;
 }
-.modal-content {
-  background: #fff;
-  padding: 20px;
+
+.item-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.item-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.item-active {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.item-price {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent-color);
+}
+
+.item-quantity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-secondary);
+  padding: 8px 12px;
+  border-radius: var(--border-radius-sm);
+}
+
+.quantity-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
   border-radius: 4px;
-  width: 300px;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.quantity-btn:hover:not(:disabled) {
+  background: var(--primary-color);
+  color: white;
+}
+
+.quantity-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.quantity-icon {
+  font-size: 12px;
+}
+
+.quantity-value {
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 20px;
+  text-align: center;
+}
+
+.item-total {
+  text-align: right;
+}
+
+.total-amount {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent-color);
+}
+
+.remove-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: var(--border-radius-sm);
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-btn:hover {
+  background: var(--danger-color);
+  color: white;
+}
+
+.remove-icon {
+  font-size: 16px;
+}
+
+/* Resumen del carrito */
+.cart-summary {
+  background: var(--bg-primary);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 24px;
+  height: fit-content;
+  position: sticky;
+  top: 90px;
+}
+
+.summary-header {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.summary-header h3 {
+  color: var(--text-primary);
+  font-size: 20px;
+  margin: 0;
+}
+
+.summary-items {
+  margin-bottom: 24px;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  font-size: 16px;
+}
+
+.summary-item:not(:last-child) {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.summary-item.total {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent-color);
+  border-bottom: none;
+  padding-top: 16px;
+  margin-top: 8px;
+  border-top: 2px solid var(--border-color);
+}
+
+.summary-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.summary-actions .btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.btn-icon {
+  font-size: 16px;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .cart-content {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  
+  .cart-summary {
+    position: static;
+  }
+}
+
+@media (max-width: 768px) {
+  .cart-container {
+    padding: 16px;
+  }
+  
+  .cart-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  
+  .cart-item {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    text-align: center;
+  }
+  
+  .item-image {
+    width: 100%;
+    height: 120px;
+    margin: 0 auto;
+  }
+  
+  .item-quantity {
+    justify-content: center;
+  }
+  
+  .item-total {
+    text-align: center;
+  }
+  
+  .remove-btn {
+    justify-self: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .cart-title {
+    font-size: 24px;
+  }
+  
+  .cart-icon {
+    font-size: 28px;
+  }
+  
+  .empty-cart {
+    padding: 60px 16px;
+  }
+  
+  .empty-cart-icon {
+    font-size: 48px;
+  }
+  
+  .empty-cart h3 {
+    font-size: 20px;
+  }
 }
 </style>
