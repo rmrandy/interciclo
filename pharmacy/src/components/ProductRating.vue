@@ -56,7 +56,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, defineProps, defineEmits } from 'vue';
 import { useUserStore } from '@/stores/userStore';
 import ApiService from '../services/ApiService';
 import axios from 'axios';
@@ -112,7 +112,7 @@ const submitRating = async () => {
     };
 
     // Aquí harías la llamada a la API para guardar la calificación
-    // await axios.post(ApiService.getPharmacyApiUrl('/ratings'), ratingData);
+    await axios.post(ApiService.getPharmacyApiUrl(`/products/${props.productId}/ratings`), ratingData);
     
     // Por ahora, simulamos el éxito
     console.log('Rating submitted:', ratingData);
