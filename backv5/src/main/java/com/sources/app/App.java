@@ -110,7 +110,7 @@ public class App {
         java.util.Scanner scanner = new java.util.Scanner(System.in);
         String portInput = scanner.nextLine().trim();
         
-        int port = 8081; // Puerto predeterminado
+        int port = 8080; // Puerto predeterminado
         if (!portInput.isEmpty()) {
             try {
                 port = Integer.parseInt(portInput);
@@ -135,7 +135,7 @@ public class App {
         server.createContext("/api2/medicines", new MedicineHandler(medicineDAO));
         server.createContext("/api2/medicines/search", new SearchMedicineHandler(medicineDAO));
         server.createContext("/api2/order_medicines", new OrderMedicineHandler(orderMedicineDAO));
-        server.createContext("/api2/orders", new OrdersHandler(ordersDAO));
+        server.createContext("/api2/orders", new OrdersHandler(ordersDAO, orderMedicineDAO, medicineDAO));
         server.createContext("/api2/prescription_medicines", new PrescriptionMedicineHandler(prescriptionMedicineDAO));
         server.createContext("/api2/prescriptions", new PrescriptionHandler(prescriptionDAO));
         server.createContext("/api2/subcategories", new SubcategoryHandler(subcategoryDAO));

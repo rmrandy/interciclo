@@ -35,12 +35,12 @@
           </div>
           <div class="form-group">
             <label for="cardNumber">Número de Tarjeta</label>
-            <input id="cardNumber" v-model="cardNumber" maxlength="19" required />
+            <input id="cardNumber" v-model="cardNumber" maxlength="19" required @input="onCardNumberInput" inputmode="numeric" pattern="[0-9 ]*" />
           </div>
           <div class="form-row">
             <div class="form-group">
               <label for="cardExpiry">Expiración</label>
-              <input id="cardExpiry" v-model="cardExpiry" placeholder="MM/AA" maxlength="5" required />
+              <input id="cardExpiry" v-model="cardExpiry" placeholder="MM/AA" maxlength="5" required @input="onCardExpiryInput" inputmode="numeric" pattern="[0-9/]*" />
             </div>
             <div class="form-group">
               <label for="cardCVC">CVC</label>
@@ -50,8 +50,8 @@
           <button type="submit" class="btn btn-success" :disabled="isProcessing">Confirmar Compra</button>
         </form>
         <div v-if="success" class="success-message">
-          <h3>¡Compra realizada con éxito!</h3>
-          <p>Gracias por tu compra. Pronto recibirás la confirmación.</p>
+          <h3>¡Pedido enviado con éxito!</h3>
+          <p>Tu pedido ha sido enviado y está siendo procesado. Pronto recibirás la confirmación.</p>
           <router-link to="/catalogo" class="btn btn-primary">Seguir comprando</router-link>
         </div>
         <div v-if="error" class="error-message">
@@ -108,27 +108,48 @@ const fetchCart = async () => {
   }
 };
 
+const onCardNumberInput = (e) => {
+  let value = e.target.value.replace(/\D/g, '').slice(0, 16);
+  value = value.replace(/(.{4})/g, '$1 ').trim();
+  cardNumber.value = value;
+};
+const onCardExpiryInput = (e) => {
+  let value = e.target.value.replace(/\D/g, '').slice(0, 4);
+  if (value.length > 2) value = value.slice(0, 2) + '/' + value.slice(2);
+  cardExpiry.value = value;
+};
+
+const cleanCardNumber = computed(() => cardNumber.value.replace(/\D/g, ''));
+
 const confirmPurchase = async () => {
   isProcessing.value = true;
   error.value = '';
+  success.value = false;
+  // Validación mejorada de campos
+  if (!cardName.value || cleanCardNumber.value.length !== 16 || !/^\d{2}\/\d{2}$/.test(cardExpiry.value) || !/^\d{3,4}$/.test(cardCVC.value)) {
+    error.value = 'Por favor, completa los datos de pago correctamente.';
+    isProcessing.value = false;
+    return;
+  }
   try {
-    // 1. Marcar la orden como pagada
-    const ordersResponse = await axios.get(ApiService.getPharmacyApiUrl('/orders'));
-    const orders = ordersResponse.data;
     const userId = userStore.getUser().idUser;
-    const inProgressOrder = orders.find(o => o.user.idUser === userId && o.status === 'En progreso');
-    if (!inProgressOrder) {
-      error.value = 'No hay una orden activa.';
-      isProcessing.value = false;
-      return;
+    const productos = cartItems.value.map(item => ({
+      idMedicine: item.medicine?.idMedicine || item.idMedicine || item.id,
+      quantity: item.quantity
+    }));
+    const pago = {
+      cardName: cardName.value,
+      cardNumber: cleanCardNumber.value,
+      expDate: cardExpiry.value,
+      cvc: cardCVC.value
+    };
+    const response = await ApiService.checkoutOrder({ userId, productos, pago });
+    if (response && response.success) {
+      success.value = true;
+      cartItems.value = [];
+    } else {
+      error.value = response?.error || 'Error al procesar la compra. Intenta de nuevo.';
     }
-    await axios.put(ApiService.getPharmacyApiUrl(`/orders/${inProgressOrder.idOrder}`), {
-      ...inProgressOrder,
-      status: 'Pagado'
-    });
-    // 2. Limpiar el carrito
-    cartItems.value = [];
-    success.value = true;
   } catch (err) {
     error.value = 'Error al procesar la compra. Intenta de nuevo.';
   } finally {

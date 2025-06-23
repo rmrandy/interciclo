@@ -58,6 +58,12 @@
 
         <!-- Si el usuario está loggeado -->
         <template v-if="isLoggedIn">
+          <!-- Enlace al perfil -->
+          <router-link to="/perfil" class="nav-item">
+            <span class="nav-icon">👤</span>
+            Mi Perfil
+          </router-link>
+          
           <!-- Muestra el rol -->
           <div class="user-info">
             <span class="user-role">{{ userStore.getUser().role }}</span>
@@ -156,6 +162,11 @@
 
       <!-- Si está loggeado, muestra rol y logout (móvil) -->
       <template v-if="isLoggedIn">
+        <router-link to="/perfil" class="mobile-item" @click="toggleMenu">
+          <span class="mobile-icon">👤</span>
+          Mi Perfil
+        </router-link>
+        
         <div class="mobile-user-info">
           <span class="mobile-user-role">Rol: {{ userStore.user.role }}</span>
         </div>

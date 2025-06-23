@@ -8,6 +8,16 @@
         <span class="badge out-of-stock" v-else>Agotado</span>
       </div>
 
+      <!-- Rating Section -->
+      <div class="rating-section">
+        <ProductRating 
+          :product-id="product.idMedicine" 
+          :average-rating="product.averageRating" 
+          :rating-count="product.ratingCount"
+          @rating-updated="fetchProductDetails"
+        />
+      </div>
+
       <div class="producto-content">
         <div class="producto-imagen">
           <img
@@ -97,6 +107,7 @@
 
 <script>
 import Comentarios from '@/components/Comentarios.vue';
+import ProductRating from '@/components/ProductRating.vue';
 import axios from "axios";
 import { useUserStore } from '@/stores/userStore';
 import ApiService from '../services/ApiService';
@@ -104,7 +115,8 @@ import ApiService from '../services/ApiService';
 export default {
   name: "ProductoDetalle",
   components: {
-    Comentarios
+    Comentarios,
+    ProductRating
   },
   props: ["id"],
   data() {
@@ -248,8 +260,7 @@ export default {
 .producto-header h1 {
   font-size: 2rem;
   color: #2c3e50;
-  margin: 0;
-  flex-grow: 1;
+  margin-right: 1rem;
 }
 
 .badge {
@@ -510,5 +521,12 @@ export default {
   .main-image {
     max-height: 300px;
   }
+}
+
+.rating-section {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
 }
 </style>

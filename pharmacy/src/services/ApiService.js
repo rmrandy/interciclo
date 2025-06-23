@@ -7,8 +7,8 @@ const ip = process.env.VUE_APP_API_HOST || process.env.VUE_APP_IP || 'localhost'
 
 // Configuración de puertos por defecto
 const defaultPortConfig = {
-  pharmacy: '8081',    // Puerto por defecto para pharmacy
-  ensurance: '8080'    // Puerto por defecto para ensurance
+  pharmacy: '8080',    // Puerto por defecto para pharmacy
+  ensurance: '8082'    // Puerto por defecto para ensurance
 };
 
 // Almacenar la configuración de puertos
@@ -72,11 +72,26 @@ export const getEnsuranceApiUrl = (endpoint) => {
   return `http://${ip}:${portConfig.ensurance}/api2/${cleanEndpoint}`;
 };
 
+/**
+ * Envía la orden de compra al backend
+ * @param {Object} checkoutData
+ * @returns {Promise}
+ */
+export const checkoutOrder = async (checkoutData) => {
+  const url = getPharmacyApiUrl('orders/checkout');
+  return await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(checkoutData)
+  }).then(res => res.json());
+};
+
 // Exportar funciones y configuración por defecto
 export default {
   configureApiPorts,
   loadPortConfiguration,
   getPharmacyApiUrl,
   getEnsuranceApiUrl,
-  defaultPortConfig
+  defaultPortConfig,
+  checkoutOrder
 }; 

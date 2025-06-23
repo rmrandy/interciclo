@@ -10,6 +10,9 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import com.sources.app.entities.User; // Import para validación
+import com.sources.app.dao.OrderMedicineDAO;
+import com.sources.app.dao.MedicineDAO;
+import com.sources.app.entities.Medicine;
 
 /**
  * Manejador HTTP para gestionar las operaciones CRUD de los Pedidos (Orders).
@@ -18,6 +21,8 @@ import com.sources.app.entities.User; // Import para validación
  */
 public class OrdersHandler implements HttpHandler {
     private final OrdersDAO ordersDAO;
+    private final OrderMedicineDAO orderMedicineDAO;
+    private final MedicineDAO medicineDAO;
     private final ObjectMapper objectMapper;
     private static final String ENDPOINT = "/api2/orders";
 
@@ -25,9 +30,13 @@ public class OrdersHandler implements HttpHandler {
      * Constructor para OrdersHandler.
      *
      * @param ordersDAO El DAO para acceder a los datos de los pedidos.
+     * @param orderMedicineDAO El DAO para acceder a los datos de los registros de medicamentos en pedidos.
+     * @param medicineDAO El DAO para acceder a los datos de los medicamentos.
      */
-    public OrdersHandler(OrdersDAO ordersDAO) {
+    public OrdersHandler(OrdersDAO ordersDAO, OrderMedicineDAO orderMedicineDAO, MedicineDAO medicineDAO) {
         this.ordersDAO = ordersDAO;
+        this.orderMedicineDAO = orderMedicineDAO;
+        this.medicineDAO = medicineDAO;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -53,8 +62,11 @@ public class OrdersHandler implements HttpHandler {
         }
 
         String method = exchange.getRequestMethod();
+        String path = exchange.getRequestURI().getPath();
         try {
-            if("POST".equalsIgnoreCase(method)){
+            if ("POST".equalsIgnoreCase(method) && path.endsWith("/checkout")) {
+                handleCheckout(exchange);
+            } else if("POST".equalsIgnoreCase(method)){
                 handlePost(exchange);
             } else if("GET".equalsIgnoreCase(method)){
                 handleGet(exchange);
@@ -191,5 +203,63 @@ public class OrdersHandler implements HttpHandler {
         try (OutputStream os = exchange.getResponseBody()) {
             os.write(responseBytes);
         }
+    }
+
+    /**
+     * Maneja el checkout de una orden: crea la orden, los productos y descuenta inventario.
+     */
+    private void handleCheckout(HttpExchange exchange) throws IOException {
+        String requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            CheckoutRequest checkout = mapper.readValue(requestBody, CheckoutRequest.class);
+            if (checkout.userId == null || checkout.productos == null || checkout.productos.isEmpty()) {
+                sendResponse(exchange, 400, "{\"error\": \"userId y productos son requeridos\"}");
+                return;
+            }
+            // 1. Crear la orden
+            Orders order = ordersDAO.create("Pagado", checkout.userId);
+            if (order == null) {
+                sendResponse(exchange, 500, "{\"error\": \"No se pudo crear la orden\"}");
+                return;
+            }
+            // 2. Crear los registros en OrderMedicine y descontar inventario
+            for (ProductoCompra prod : checkout.productos) {
+                Medicine med = medicineDAO.getById(prod.idMedicine);
+                if (med == null) {
+                    sendResponse(exchange, 400, "{\"error\": \"Producto no encontrado: " + prod.idMedicine + "\"}");
+                    return;
+                }
+                if (med.getStock() < prod.quantity) {
+                    sendResponse(exchange, 400, "{\"error\": \"Stock insuficiente para: " + med.getName() + "\"}");
+                    return;
+                }
+                // Descontar inventario
+                med.setStock(med.getStock() - prod.quantity);
+                medicineDAO.update(med);
+                // Crear OrderMedicine
+                orderMedicineDAO.create(order, med, prod.quantity, med.getPrice(), String.valueOf(med.getPrice() * prod.quantity));
+            }
+            sendResponse(exchange, 201, "{\"success\": true, \"orderId\": " + order.getIdOrder() + "}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            sendResponse(exchange, 500, "{\"error\": \"Error procesando el checkout\"}");
+        }
+    }
+
+    private static class CheckoutRequest {
+        public Long userId;
+        public java.util.List<ProductoCompra> productos;
+        public Pago pago;
+    }
+    private static class ProductoCompra {
+        public Long idMedicine;
+        public Integer quantity;
+    }
+    private static class Pago {
+        public String cardName;
+        public String cardNumber;
+        public String expDate;
+        public String cvc;
     }
 }

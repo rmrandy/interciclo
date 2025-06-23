@@ -153,18 +153,60 @@ const total = computed(() => {
   return subtotal.value + tax.value;
 });
 
-const increaseQuantity = (item) => {
-  item.quantity++;
-};
-
-const decreaseQuantity = (item) => {
-  if (item.quantity > 1) {
-    item.quantity--;
+const increaseQuantity = async (item) => {
+  try {
+    const newQuantity = item.quantity + 1;
+    await axios.put(ApiService.getPharmacyApiUrl("/order_medicines"), {
+      id: item.id,
+      orders: item.orders,
+      medicine: item.medicine,
+      quantity: newQuantity,
+      cost: item.price,
+      total: item.price * newQuantity
+    });
+    item.quantity = newQuantity;
+  } catch (error) {
+    console.error('Error updating quantity:', error);
+    alert('Error al actualizar la cantidad.');
   }
 };
 
-const clearCart = () => {
-  cartItems.value = [];
+const decreaseQuantity = async (item) => {
+  if (item.quantity <= 1) return;
+  
+  try {
+    const newQuantity = item.quantity - 1;
+    await axios.put(ApiService.getPharmacyApiUrl("/order_medicines"), {
+      id: item.id,
+      orders: item.orders,
+      medicine: item.medicine,
+      quantity: newQuantity,
+      cost: item.price,
+      total: item.price * newQuantity
+    });
+    item.quantity = newQuantity;
+  } catch (error) {
+    console.error('Error updating quantity:', error);
+    alert('Error al actualizar la cantidad.');
+  }
+};
+
+const clearCart = async () => {
+  if (!confirm('¿Estás seguro de que quieres vaciar el carrito?')) {
+    return;
+  }
+  
+  try {
+    // Eliminar todos los items del carrito
+    for (const item of cartItems.value) {
+      await axios.delete(ApiService.getPharmacyApiUrl(`/order_medicines?id=${item.orders.idOrder},${item.medicine.idMedicine}`));
+    }
+    cartItems.value = [];
+    alert('Carrito vaciado exitosamente.');
+  } catch (error) {
+    console.error('Error clearing cart:', error);
+    alert('Error al vaciar el carrito.');
+  }
 };
 
 const checkout = () => {
@@ -172,6 +214,14 @@ const checkout = () => {
 };
 
 onMounted(async () => {
+  // Verificar si el usuario está autenticado
+  const user = userStore.getUser();
+  if (!user || !user.idUser) {
+    alert('Debes iniciar sesión para ver tu carrito.');
+    router.push('/login');
+    return;
+  }
+
   await fetchCurrentOrder()
   if (currentOrder.value) {
     await fetchCartItems(currentOrder.value.idOrder)

@@ -15,7 +15,9 @@ import { authService } from '@/services/authService';
 import Cart from "@/components/Cart.vue";
 import AdminDash from '@/pages/AdminDash.vue'; // Importar el dashboard administrativo
 import DetalleReceta from '@/pages/DetalleReceta.vue'
-import CheckoutPage from '../pages/CheckoutPage.vue';
+import Checkout from '../pages/Checkout.vue';
+import Categoria from '../pages/Categoria.vue'; // Nueva página de categoría
+import Perfil from '../pages/Perfil.vue'; // Nueva página de perfil
 
 // Rutas para usuarios públicos y autenticados
 const userRoutes = [
@@ -23,6 +25,7 @@ const userRoutes = [
   { path: '/login', component: Login },
   { path: '/register', component: Register },
   { path: '/catalogo', component: Catalogo },
+  { path: '/categoria/:category', name: 'Categoria', component: Categoria }, // Nueva ruta de categoría
   { path: '/aseguradoras', component: Aseguradoras },
   { path: '/ofertas', component: Ofertas },
   { path: '/producto/:id', name: 'ProductoDetalle', component: ProductoDetalle },
@@ -31,6 +34,7 @@ const userRoutes = [
   { path: '/create-product', name: 'CreateProduct', component: CreateProduct },
   { path: '/prescriptions', name: 'Prescriptions', component: Prescriptions },
   { path: '/dashboard', component: Dashboard, meta: { requiresAuth: true } },
+  { path: '/perfil', name: 'Perfil', component: Perfil, meta: { requiresAuth: true } }, // Nueva ruta de perfil
   {path: '/cart', name: 'Cart', component: Cart},
   {
     path: '/detalle-receta/:id',
@@ -44,7 +48,7 @@ const userRoutes = [
     component: () => import('../pages/GestionProductos.vue'),
     meta: { requiresAuth: true, allowedRoles: ['admin', 'employee'] }
   },
-  { path: '/checkout', name: 'Checkout', component: CheckoutPage, meta: { requiresAuth: true } },
+  { path: '/checkout', name: 'Checkout', component: Checkout, meta: { requiresAuth: true } },
 ];
 
 // Rutas exclusivas para administradores
