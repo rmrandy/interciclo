@@ -32,6 +32,10 @@ public class Comments {
     @Column(name = "COMMENT_TEXT")
     private String commentText;
 
+    /** Calificación (rating) del 1 al 5 asociada al comentario. Puede ser nulo. */
+    @Column(name = "RATING")
+    private Integer rating;
+
     /** Medicamento sobre el cual se realiza el comentario. */
     @ManyToOne
     @JoinColumn(name = "ID_MEDICINE", referencedColumnName = "ID_MEDICINE")
@@ -88,6 +92,14 @@ public class Comments {
 
     public void setCommentText(String commentText) {
         this.commentText = commentText;
+    }
+
+    public Integer getRating() {
+        return rating;
+    }
+
+    public void setRating(Integer rating) {
+        this.rating = rating;
     }
 
     public Medicine getMedicine() {

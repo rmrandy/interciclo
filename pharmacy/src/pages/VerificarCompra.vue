@@ -266,6 +266,7 @@ const hasInsurance = ref(false);
 const coveragePercentage = ref(0);
 const showConfirmationModal = ref(false);
 const showDetailModal = ref(false);
+const activeOrder = ref(null);
 
 // Nuevos estados para tarjeta y seguro
 const cardNumber = ref('');
@@ -273,29 +274,11 @@ const cardName = ref('');
 const cardExpiry = ref('');
 const cardCVC = ref('');
 const isCardValid = ref(false);
-const isCheckingInsurance = ref(false);
-const insuranceDetails = ref(null);
 
 // Verificar si el usuario puede realizar la compra
 const canConfirmPurchase = computed(() => {
   return hasStock.value && isCardValid.value;
 });
-
-// Verificar stock disponible
-function verificarStock() {
-  if (!medicine.value) {
-    console.error('No hay un medicamento para verificar stock');
-    hasStock.value = false;
-    return false;
-  }
-  
-  // Verificar si hay suficiente stock para la cantidad solicitada
-  hasStock.value = medicine.value.stock >= quantity.value;
-  
-  console.log(`Verificación de stock: ${medicine.value.stock} disponibles, cantidad solicitada: ${quantity.value}, resultado: ${hasStock.value ? 'Disponible' : 'No disponible'}`);
-  
-  return hasStock.value;
-}
 
 // Calcular total a pagar
 function calculateTotalToPay() {
@@ -439,233 +422,35 @@ function validateAllCardFields() {
   return isCardValid.value;
 }
 
-// Verificar seguro médico del usuario
-async function checkInsurance() {
-  if (!userStore.user || !userStore.user.email) {
-    console.warn('No hay email de usuario para verificar seguro');
-    hasInsurance.value = false;
-    coveragePercentage.value = 0;
-    return;
-  }
-  
-  isCheckingInsurance.value = true;
-  
-  try {
-    const emailPaciente = userStore.user.email;
-    console.log(`Verificando seguro para: ${emailPaciente}`);
-    
-    const insuranceResponse = await axios.get(ApiService.getInsuranceApiUrl(`/users/by-email/${encodeURIComponent(emailPaciente)}`));
-    console.log('Respuesta de API de seguros:', insuranceResponse.data);
-    
-    if (insuranceResponse.data && insuranceResponse.data.policy) {
-      // Usuario tiene seguro
-      hasInsurance.value = true;
-      insuranceDetails.value = insuranceResponse.data;
-      
-      // Verificar si cubre el medicamento actual
-      if (medicine.value && medicine.value.activeMedicament) {
-        // Simulación: validar que el medicamento está cubierto
-        const isCovered = true; // En producción, esto vendría desde la API
-        
-        if (isCovered) {
-          coveragePercentage.value = 70; // Porcentaje de cobertura (podría venir de la API)
-          console.log(`Medicamento cubierto al ${coveragePercentage.value}%`);
-        } else {
-          coveragePercentage.value = 0;
-          console.log('Medicamento no cubierto por el seguro');
-        }
-      }
-    } else {
-      hasInsurance.value = false;
-      coveragePercentage.value = 0;
-      insuranceDetails.value = null;
-      console.log('Usuario no tiene seguro médico');
-    }
-  } catch (error) {
-    console.error('Error al verificar seguro:', error);
-    hasInsurance.value = false;
-    coveragePercentage.value = 0;
-  } finally {
-    isCheckingInsurance.value = false;
-  }
-}
-
 // Función para confirmar la compra
 async function confirmPurchase() {
-  console.log('[VerificarCompra] Iniciando confirmPurchase...');
-  
-  // Validar tarjeta de nuevo antes de procesar
-  if (!validateAllCardFields()) {
-    alert('Por favor, ingrese una tarjeta válida para continuar con la compra.');
-    return;
-  }
-  
+  if (!canConfirmPurchase.value) return;
+
   try {
-    isLoading.value = true;
-    
-    if (!medicine.value || !medicine.value.idMedicine) {
-      console.error('No hay un medicamento válido para la compra');
-      alert('No se pudo completar la compra: datos de medicamento incompletos');
-      isLoading.value = false;
-      return;
+    // 1. Marcar la orden como "Completado"
+    if (activeOrder.value) {
+      const updatedOrder = { ...activeOrder.value, status: 'Completado' };
+      await axios.put(ApiService.getPharmacyApiUrl(`/orders/${activeOrder.value.idOrder}`), updatedOrder);
     }
     
-    if (!userStore.user || !userStore.user.idUser) {
-      console.error('No hay información del usuario para la compra');
-      alert('Debe iniciar sesión para completar la compra');
-      isLoading.value = false;
-      return;
-    }
-    
-    // Verificar stock nuevamente antes de procesar
-    if (!verificarStock()) {
-      alert('No hay suficiente stock para completar la compra');
-      isLoading.value = false;
-      return;
-    }
-    
-    // Verificar que la cantidad solicitada no sea mayor al stock disponible
-    if (quantity.value > medicine.value.stock) {
-      alert(`Solo hay ${medicine.value.stock} unidades disponibles. Ajuste la cantidad.`);
-      quantity.value = medicine.value.stock;
-      isLoading.value = false;
-      return;
-    }
-    
-    console.log('Iniciando proceso de compra:', {
-      medicineId: medicine.value.idMedicine,
-      userId: userStore.user.idUser,
-      quantity: quantity.value,
-      stockActual: medicine.value.stock
-    });
-    
-    // Simulación de procesamiento de pago
-    console.log('Procesando pago con tarjeta:', cardNumber.value.slice(-4));
-    // En un entorno real, aquí iría la llamada a un servicio de pago
-    
-    // PROCESO DE COMPRA
-    
-    // 1. Actualizar primero el stock del medicamento para reservar el inventario
-    try {
-      console.log('Paso 1: Actualizando stock del medicamento...');
-      const updatedMedicine = { ...medicine.value };
-      const nuevoStock = updatedMedicine.stock - quantity.value;
-      
-      if (nuevoStock < 0) {
-        throw new Error('Stock insuficiente');
-      }
-      
-      updatedMedicine.stock = nuevoStock;
-      
-      await axios.put(
-        ApiService.getPharmacyApiUrl(`/medicines/${medicine.value.idMedicine}`), 
-        updatedMedicine
-      );
-      
-      console.log(`Stock actualizado correctamente. Nuevo stock: ${nuevoStock}`);
-      
-      // 2. Crear orden de compra
-      console.log('Paso 2: Creando orden de compra...');
-      const orderData = {
-        user: { idUser: userStore.user.idUser },
-        status: 'Completado'
-      };
-      
-      const orderResponse = await axios.post(ApiService.getPharmacyApiUrl("/orders"), orderData);
-      const order = orderResponse.data;
-      console.log('Orden creada:', order);
-      
-      // 3. Añadir medicamento a la orden
-      console.log('Paso 3: Añadiendo medicamento a la orden...');
-      const orderMedicineData = {
-        orders: order,
-        medicine: { idMedicine: medicine.value.idMedicine },
-        quantity: quantity.value,
-        cost: medicine.value.price,
-        total: medicine.value.price * quantity.value
-      };
-      
-      await axios.post(ApiService.getPharmacyApiUrl("/order_medicines"), orderMedicineData);
-      console.log('Medicamento añadido a la orden con éxito');
-      
-      // 4. Si hay seguro o receta, generar registro de factura
-      if (hasInsurance.value) {
-        console.log('Paso 4: Generando factura...');
-        const insuranceAmount = (medicine.value.price * quantity.value) * (coveragePercentage.value / 100);
-        
-        const patientAmount = (medicine.value.price * quantity.value) - insuranceAmount;
-        
-        const billData = {
-          prescription: null,
-          total: medicine.value.price * quantity.value,
-          subtotal: medicine.value.price * quantity.value,
-          taxes: 0,
-          coveredAmount: insuranceAmount,
-          patientAmount: patientAmount,
-          copay: coveragePercentage.value,
-          status: 'Pagado',
-          insuranceApprovalCode: hasInsurance.value ? 'AP' + Math.floor(Math.random() * 100000) : null
-        };
-        
-        console.log('Datos de factura:', billData);
-        await axios.post(ApiService.getPharmacyApiUrl("/bills"), billData);
-        console.log('Factura creada con éxito');
-      }
-      
-      console.log('Compra completada exitosamente');
-      
-      // Actualizamos la referencia local del medicamento para reflejar el nuevo stock
-      medicine.value.stock = nuevoStock;
-      
-      // Cerrar cualquier modal abierto
-      closeDetailModal();
-      
-      // Mostrar confirmación
-      showConfirmationModal.value = true;
-      
-    } catch (stockError) {
-      console.error('Error al actualizar el stock:', stockError);
-      
-      // Si falló la actualización del stock, intentamos revertir si ya se había actualizado
-      if (stockError.message !== 'Stock insuficiente') {
-        try {
-          console.warn('Intentando verificar estado actual del stock...');
-          const checkResponse = await axios.get(ApiService.getPharmacyApiUrl(`/medicines/${medicine.value.idMedicine}`));
-          
-          // Si el stock ya fue actualizado erróneamente, intentamos restaurarlo
-          if (checkResponse.data.stock !== medicine.value.stock) {
-            console.warn('Detectado cambio de stock, intentando restaurar...');
-            await axios.put(ApiService.getPharmacyApiUrl(`/medicines/${medicine.value.idMedicine}`), medicine.value);
-            console.log('Stock restaurado al valor original');
-          }
-        } catch (restoreError) {
-          console.error('Error al restaurar stock:', restoreError);
-        }
-      }
-      
-      if (stockError.message === 'Stock insuficiente') {
-        alert('No hay suficiente stock para completar la compra.');
-      } else {
-        alert('Error al actualizar el inventario. Inténtelo nuevamente.');
-      }
-    }
-    
+    // 2. Actualizar el stock del producto
+    const updatedStock = medicine.value.stock - quantity.value;
+    await axios.put(ApiService.getPharmacyApiUrl(`/medicines/${medicine.value.idMedicine}`), { ...medicine.value, stock: updatedStock });
+
+
+    // 3. Mostrar modal de confirmación (opcional) o redirigir directamente
+    showConfirmationModal.value = true;
+
   } catch (error) {
-    console.error('Error general procesando la compra:', error);
-    alert('Ocurrió un error al procesar su compra. Por favor, inténtelo de nuevo.');
-  } finally {
-    isLoading.value = false;
+    console.error("Error al confirmar la compra:", error);
+    alert("Hubo un error al procesar tu compra. Por favor, inténtalo de nuevo.");
   }
 }
 
 // Finalizar proceso y redirigir
 function finishPurchase() {
-  // Cerrar todos los modales
   showConfirmationModal.value = false;
-  showDetailModal.value = false;
-  
-  // Redireccionar al catálogo
-  router.push('/catalogo');
+  router.push({ name: 'Gracias', query: { orderId: activeOrder.value?.idOrder || 'desconocido' } });
 }
 
 // Volver atrás
@@ -675,71 +460,30 @@ function goBack() {
 
 // Cargar datos del medicamento
 onMounted(async () => {
-  isLoading.value = true;
+  const medicineId = route.params.id;
+  quantity.value = Number(route.query.quantity) || 1;
+  
+  if (!userStore.user?.idUser) {
+      alert("Debes iniciar sesión para comprar.");
+      router.push('/login');
+      return;
+  }
+
   try {
-    const medicineId = route.params.id;
-    console.log('Buscando medicamento con ID:', medicineId);
+    // Obtener la orden activa del usuario
+    const ordersResponse = await axios.get(ApiService.getPharmacyApiUrl(`/orders?userId=${userStore.user.idUser}&status=En progreso`));
+    activeOrder.value = ordersResponse.data.length > 0 ? ordersResponse.data[0] : null;
+
+    const medicineResponse = await axios.get(ApiService.getPharmacyApiUrl(`/medicines/${medicineId}`));
+    medicine.value = medicineResponse.data;
     
-    // Modificamos la URL para buscar directamente por ID en lugar de principio activo
-    const searchUrl = ApiService.getPharmacyApiUrl(`/medicines/${medicineId}`);
-    console.log('URL de búsqueda directa:', searchUrl);
-    
-    const response = await axios.get(searchUrl);
-    console.log('Respuesta de búsqueda:', response.data);
-    
-    // La respuesta debería ser el objeto medicina directamente, no un array
-    if (response.data && response.data.idMedicine) {
-      medicine.value = response.data;
-      console.log('Medicamento encontrado:', medicine.value);
-      
-      // Verificar stock
-      verificarStock();
-      
-      // Verificar seguro médico
-      await checkInsurance();
-    } else {
-      // Si no encuentra por ID directo, intentamos buscar por principio activo como fallback
-      try {
-        const fallbackUrl = ApiService.getPharmacyApiUrl(`/medicines/search?activeMedicament=${medicineId}`);
-        console.log('Intentando URL alternativa:', fallbackUrl);
-        
-        const fallbackResponse = await axios.get(fallbackUrl);
-        
-        if (fallbackResponse.data && fallbackResponse.data.length > 0) {
-          medicine.value = fallbackResponse.data[0];
-          console.log('Medicamento encontrado con búsqueda alternativa:', medicine.value);
-          verificarStock();
-          await checkInsurance();
-        } else {
-          console.warn('No se encontró el medicamento con ningún método');
-          medicine.value = null;
-        }
-      } catch (fallbackError) {
-        console.error('Error en búsqueda alternativa:', fallbackError);
-        medicine.value = null;
-      }
+    // Verificar stock aquí
+    if (medicine.value) {
+      hasStock.value = medicine.value.stock >= quantity.value;
     }
+
   } catch (error) {
-    console.error('Error al buscar el medicamento:', error);
-    // Intentar con otro método si el primero falla
-    try {
-      const fallbackUrl = ApiService.getPharmacyApiUrl(`/medicines/search?query=${route.params.id}`);
-      console.log('Intentando URL de respaldo general:', fallbackUrl);
-      
-      const generalSearchResponse = await axios.get(fallbackUrl);
-      
-      if (generalSearchResponse.data && generalSearchResponse.data.length > 0) {
-        medicine.value = generalSearchResponse.data[0];
-        console.log('Medicamento encontrado con búsqueda general:', medicine.value);
-        verificarStock();
-        await checkInsurance();
-      } else {
-        medicine.value = null;
-      }
-    } catch (backupError) {
-      console.error('Error en la búsqueda de respaldo:', backupError);
-      medicine.value = null;
-    }
+    console.error("Error al cargar datos de compra:", error);
   } finally {
     isLoading.value = false;
   }

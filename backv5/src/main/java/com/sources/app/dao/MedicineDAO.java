@@ -8,6 +8,7 @@ import org.hibernate.query.Query;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.Persistence;
+import jakarta.persistence.Tuple;
 
 import java.util.List;
 

@@ -34,7 +34,7 @@
       <div class="input-container">
         <textarea 
           v-model="newCommentText" 
-          placeholder="Escribe un comentario..." 
+          :placeholder="replyComment ? `Respondiendo a ${replyComment.user.name}...` : 'Escribe un comentario...'" 
           rows="2"
           @keyup.ctrl.enter="addComment"
         ></textarea>
@@ -266,12 +266,18 @@ export default {
 }
 
 .comment-form {
-  margin-top: 1.5rem;
+  margin-top: 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
   border-top: 1px solid #eaeaea;
   padding-top: 1.5rem;
 }
 
 .input-container {
+  flex-grow: 1;
+  display: flex;
   position: relative;
   margin-bottom: 1rem;
 }

@@ -7,6 +7,7 @@ import com.sources.app.util.HibernateUtil;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 import org.hibernate.query.Query;
+import jakarta.persistence.Tuple;
 
 import java.util.List;
 
@@ -24,10 +25,11 @@ public class CommentsDAO {
      * @param user        El {@link User} que publicó el comentario.
      * @param prevComment El {@link Comments} precedente al que este comentario responde (puede ser null).
      * @param commentText El contenido textual del comentario.
+     * @param rating      La calificación del comentario.
      * @param medicine    El {@link Medicine} con el que está asociado el comentario.
      * @return La entidad {@link Comments} recién creada, o null si ocurrió un error.
      */
-    public Comments create(User user, Comments prevComment, String commentText, Medicine medicine) {
+    public Comments create(User user, Comments prevComment, String commentText, Integer rating, Medicine medicine) {
         Transaction tx = null;
         Comments comments = null;
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
@@ -37,9 +39,33 @@ public class CommentsDAO {
             comments.setUser(user);
             comments.setPrevComment(prevComment);
             comments.setCommentText(commentText);
+            comments.setRating(rating);
             comments.setMedicine(medicine);
 
             session.save(comments);
+
+            // Actualizar el rating en la misma transacción
+            if (rating != null) {
+                // Calcular el nuevo promedio y contador
+                Query<Tuple> query = session.createQuery(
+                    "SELECT COUNT(c.rating), AVG(c.rating) FROM Comments c WHERE c.medicine.idMedicine = :medicineId AND c.rating IS NOT NULL", 
+                    Tuple.class
+                );
+                query.setParameter("medicineId", medicine.getIdMedicine());
+                Tuple result = query.getSingleResult();
+                
+                Long count = result.get(0, Long.class);
+                Double average = result.get(1, Double.class);
+        
+                // Actualizar el medicamento
+                Medicine medicineToUpdate = session.get(Medicine.class, medicine.getIdMedicine());
+                if (medicineToUpdate != null) {
+                    medicineToUpdate.setRatingCount(count != null ? count.intValue() : 0);
+                    medicineToUpdate.setAverageRating(average != null ? average : 0.0);
+                    session.update(medicineToUpdate);
+                }
+            }
+            
             tx.commit();
         } catch (Exception e) {
             if (tx != null) tx.rollback();

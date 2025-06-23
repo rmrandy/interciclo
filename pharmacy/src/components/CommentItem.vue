@@ -15,6 +15,11 @@
           </button>
         </div>
       </div>
+      <div v-if="comment.rating" class="comment-rating">
+        <span v-for="star in 5" :key="star" class="star" :class="{ 'filled': star <= comment.rating }">
+          {{ star <= comment.rating ? '★' : '☆' }}
+        </span>
+      </div>
       <div class="comment-text">
         {{ comment.commentText }}
       </div>
@@ -141,6 +146,19 @@ export default {
 
 .reply-btn i {
   font-size: 0.8rem;
+}
+
+.comment-rating {
+  margin-bottom: 0.8rem;
+}
+
+.comment-rating .star {
+  font-size: 1rem;
+  color: #e0e0e0;
+}
+
+.comment-rating .star.filled {
+  color: #fbbc05;
 }
 
 .comment-text {

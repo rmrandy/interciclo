@@ -18,6 +18,7 @@ import DetalleReceta from '@/pages/DetalleReceta.vue'
 import Checkout from '../pages/Checkout.vue';
 import Categoria from '../pages/Categoria.vue'; // Nueva página de categoría
 import Perfil from '../pages/Perfil.vue'; // Nueva página de perfil
+import Gracias from '../pages/Gracias.vue'; // Nueva página de gracias
 
 // Rutas para usuarios públicos y autenticados
 const userRoutes = [
@@ -35,6 +36,7 @@ const userRoutes = [
   { path: '/prescriptions', name: 'Prescriptions', component: Prescriptions },
   { path: '/dashboard', component: Dashboard, meta: { requiresAuth: true } },
   { path: '/perfil', name: 'Perfil', component: Perfil, meta: { requiresAuth: true } }, // Nueva ruta de perfil
+  { path: '/gracias', name: 'Gracias', component: Gracias, meta: { requiresAuth: true } },
   {path: '/cart', name: 'Cart', component: Cart},
   {
     path: '/detalle-receta/:id',

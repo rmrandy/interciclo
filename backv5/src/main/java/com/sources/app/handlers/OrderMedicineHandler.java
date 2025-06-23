@@ -118,10 +118,33 @@ public class OrderMedicineHandler implements HttpHandler {
      */
     private void handleGet(HttpExchange exchange) throws IOException {
         String query = exchange.getRequestURI().getQuery();
-        if(query != null && query.startsWith("id=")){
+        if (query != null && query.startsWith("id=")) {
             handleGetById(exchange, query);
+        } else if (query != null && query.startsWith("orderId=")) {
+            handleGetByOrderId(exchange, query);
         } else {
             handleGetAll(exchange);
+        }
+    }
+
+    /**
+     * Maneja la obtención de todas las asociaciones para un ID de orden específico.
+     *
+     * @param exchange El objeto HttpExchange.
+     * @param query La cadena de consulta con el ID de la orden (formato: orderId=123).
+     * @throws IOException Si ocurre un error de entrada/salida.
+     */
+    private void handleGetByOrderId(HttpExchange exchange, String query) throws IOException {
+        try {
+            Long orderId = Long.parseLong(query.substring(8)); // "orderId=".length() == 8
+            List<OrderMedicine> list = orderMedicineDAO.getByOrderId(orderId); // Necesita implementarse en DAO
+            if (list != null) {
+                sendResponse(exchange, 200, objectMapper.writeValueAsString(list));
+            } else {
+                exchange.sendResponseHeaders(404, -1); // O devolver lista vacía []
+            }
+        } catch (NumberFormatException e) {
+            sendResponse(exchange, 400, "{\"error\": \"Invalid orderId format\"}");
         }
     }
 

@@ -124,4 +124,21 @@ public class OrderMedicineDAO {
             return null;
         }
     }
+
+    /**
+     * Recupera todos los registros de OrderMedicine para un ID de orden específico.
+     *
+     * @param orderId El ID de la orden.
+     * @return Una lista de entidades {@link OrderMedicine} para la orden dada, o null si ocurrió un error.
+     */
+    public List<OrderMedicine> getByOrderId(Long orderId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Query<OrderMedicine> query = session.createQuery("FROM OrderMedicine WHERE orders.idOrder = :orderId", OrderMedicine.class);
+            query.setParameter("orderId", orderId);
+            return query.list();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
 }

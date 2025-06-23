@@ -53,6 +53,17 @@
             <div class="product-info">
               <h3 class="product-name">{{ product.name }}</h3>
               <p class="product-active">{{ product.activeMedicament }}</p>
+              
+              <!-- Product Rating -->
+              <div class="product-rating">
+                <span v-for="star in 5" :key="star" class="star" :class="{ 'filled': star <= (product.averageRating || 0) }">
+                  {{ star <= (product.averageRating || 0) ? '★' : '☆' }}
+                </span>
+                <span class="rating-text">
+                  {{ (product.averageRating || 0).toFixed(1) }} ({{ product.ratingCount || 0 }})
+                </span>
+              </div>
+
               <div class="product-price-container">
                 <span class="product-price">Q{{ product.price.toFixed(2) }}</span>
                 <button class="add-cart-btn" @click.stop="addToCart(product)">
@@ -88,6 +99,17 @@
             <div class="recommended-info">
               <h3 class="recommended-name">{{ product.name }}</h3>
               <p class="recommended-active">{{ product.activeMedicament }}</p>
+              
+              <!-- Product Rating -->
+              <div class="product-rating">
+                <span v-for="star in 5" :key="star" class="star" :class="{ 'filled': star <= (product.averageRating || 0) }">
+                  {{ star <= (product.averageRating || 0) ? '★' : '☆' }}
+                </span>
+                <span class="rating-text">
+                  {{ (product.averageRating || 0).toFixed(1) }} ({{ product.ratingCount || 0 }})
+                </span>
+              </div>
+              
               <span class="recommended-price">Q{{ product.price?.toFixed(2) || '0.00' }}</span>
             </div>
           </div>
@@ -111,6 +133,17 @@
             <div class="bestseller-info">
               <h3 class="bestseller-name">{{ product.name }}</h3>
               <p class="bestseller-active">{{ product.activeMedicament }}</p>
+
+              <!-- Product Rating -->
+              <div class="product-rating">
+                <span v-for="star in 5" :key="star" class="star" :class="{ 'filled': star <= (product.averageRating || 0) }">
+                  {{ star <= (product.averageRating || 0) ? '★' : '☆' }}
+                </span>
+                <span class="rating-text">
+                  {{ (product.averageRating || 0).toFixed(1) }} ({{ product.ratingCount || 0 }})
+                </span>
+              </div>
+
               <div class="bestseller-stats">
                 <span class="sold-units">Vendidos: {{ product.soldUnits || 0 }}</span>
                 <span class="bestseller-price">Q{{ product.price?.toFixed(2) || '0.00' }}</span>
@@ -477,7 +510,27 @@ function addToCart(product) {
 .product-active {
   color: #64748b;
   font-size: 14px;
-  margin: 0 0 16px 0;
+  margin-bottom: 8px;
+  height: 20px;
+  overflow: hidden;
+}
+
+.product-rating {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.product-rating .star {
+  color: #e2e8f0;
+  font-size: 14px;
+}
+
+.product-rating .star.filled {
+  color: #fbbf24;
 }
 
 .product-price-container {

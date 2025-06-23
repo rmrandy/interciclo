@@ -8,14 +8,10 @@
         <span class="badge out-of-stock" v-else>Agotado</span>
       </div>
 
-      <!-- Rating Section -->
-      <div class="rating-section">
-        <ProductRating 
-          :product-id="product.idMedicine" 
-          :average-rating="product.averageRating" 
-          :rating-count="product.ratingCount"
-          @rating-updated="fetchProductDetails"
-        />
+      <!-- Sección de Rating -->
+      <div class="rating-section" v-if="product.averageRating > 0">
+        <ProductRating :rating="product.averageRating" :read-only="true" />
+        <span class="rating-count">({{ product.ratingCount }} reseñas)</span>
       </div>
 
       <div class="producto-content">
@@ -107,10 +103,10 @@
 
 <script>
 import Comentarios from '@/components/Comentarios.vue';
-import ProductRating from '@/components/ProductRating.vue';
 import axios from "axios";
 import { useUserStore } from '@/stores/userStore';
 import ApiService from '../services/ApiService';
+import ProductRating from '@/components/ProductRating.vue';
 
 export default {
   name: "ProductoDetalle",
@@ -191,29 +187,27 @@ export default {
           }
         })
         .then(order => {
-          return axios.get(ApiService.getPharmacyApiUrl(`/order_medicines?id=${order.idOrder}%2C${this.product.idMedicine}`))
+          // Usar el nuevo endpoint para obtener todos los items de la orden
+          return axios.get(ApiService.getPharmacyApiUrl(`/order_medicines?orderId=${order.idOrder}`))
               .then(response => {
-                let items = response.data;
-                if (!Array.isArray(items)) items = items ? [items] : [];
-                return items;
-              })
-              .catch(error => {
-                if (error.response?.status === 404) return [];
-                throw error;
-              })
-              .then(orderMedicines => {
+                const orderMedicines = response.data || [];
                 const existing = orderMedicines.find(om => om.medicine.idMedicine === this.product.idMedicine);
+                
                 const payload = {
                   orders: order,
                   medicine: { idMedicine: this.product.idMedicine },
                   quantity: this.quantity,
                   cost: this.product.price,
-                  total: this.product.price * this.quantity
+                  total: (this.product.price * this.quantity).toFixed(2)
                 };
+
                 if (existing) {
                   // Actualizar cantidad sumando la nueva cantidad seleccionada
                   payload.quantity += existing.quantity;
-                  return axios.put(ApiService.getPharmacyApiUrl("/order_medicines"), { ...payload, id: existing.id });
+                  payload.total = (this.product.price * payload.quantity).toFixed(2);
+                  // El PUT requiere el ID compuesto
+                  payload.id = existing.id; 
+                  return axios.put(ApiService.getPharmacyApiUrl("/order_medicines"), payload);
                 } else {
                   return axios.post(ApiService.getPharmacyApiUrl("/order_medicines"), payload);
                 }
@@ -277,7 +271,8 @@ export default {
 }
 
 .producto-content {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
   gap: 2rem;
   margin-bottom: 2rem;
 }
@@ -524,9 +519,15 @@ export default {
 }
 
 .rating-section {
-  margin-bottom: 2rem;
-  padding: 1rem;
-  background-color: #f8f9fa;
-  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  margin-top: -1rem; /* Acercar al título */
+}
+
+.rating-count {
+  margin-left: 0.5rem;
+  font-size: 0.9rem;
+  color: #555;
 }
 </style>

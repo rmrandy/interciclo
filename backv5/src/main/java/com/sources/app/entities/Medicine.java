@@ -60,6 +60,14 @@ public class Medicine {
     @Column(name = "SOLD_UNITS")
     private Integer soldUnits;
 
+    /** Calificación promedio del medicamento. */
+    @Column(name = "AVERAGE_RATING")
+    private Double averageRating;
+
+    /** Número total de calificaciones recibidas. */
+    @Column(name = "RATING_COUNT")
+    private Integer ratingCount;
+
     /**
      * Constructor por defecto requerido por JPA.
      */
@@ -192,5 +200,21 @@ public class Medicine {
 
     public void setSoldUnits(Integer soldUnits) {
         this.soldUnits = soldUnits;
+    }
+
+    public Double getAverageRating() {
+        return averageRating;
+    }
+
+    public void setAverageRating(Double averageRating) {
+        this.averageRating = averageRating;
+    }
+
+    public Integer getRatingCount() {
+        return ratingCount;
+    }
+
+    public void setRatingCount(Integer ratingCount) {
+        this.ratingCount = ratingCount;
     }
 }

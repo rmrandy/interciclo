@@ -90,8 +90,8 @@ public class CommentsHandler implements HttpHandler {
             sendResponse(exchange, 400, "{\"error\": \"Medicine ID is required\"}");
             return;
         }
-        if (createComment.getCommentText() == null || createComment.getCommentText().trim().isEmpty()) {
-            sendResponse(exchange, 400, "{\"error\": \"Comment text is required\"}");
+        if ((createComment.getCommentText() == null || createComment.getCommentText().trim().isEmpty()) && createComment.getRating() == null) {
+            sendResponse(exchange, 400, "{\"error\": \"Comment text or a rating is required\"}");
             return;
         }
         
@@ -99,6 +99,7 @@ public class CommentsHandler implements HttpHandler {
                 createComment.getUser(),
                 createComment.getPrevComment(), // Puede ser null
                 createComment.getCommentText(),
+                createComment.getRating(),
                 createComment.getMedicine()
         );
         if(comment != null){

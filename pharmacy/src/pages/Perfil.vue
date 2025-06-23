@@ -303,268 +303,152 @@
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted, computed } from 'vue';
+<script>
 import { useUserStore } from '@/stores/userStore';
-import ApiService from '../services/ApiService';
-import axios from 'axios';
 
-const userStore = useUserStore();
-
-// Estado reactivo
-const savingPersonal = ref(false);
-const savingAddress = ref(false);
-const savingCard = ref(false);
-const changingPassword = ref(false);
-
-// Información personal
-const personalInfo = ref({
-  firstName: '',
-  lastName: '',
-  email: '',
-  phone: '',
-  dateOfBirth: ''
-});
-
-// Dirección de envío
-const shippingAddress = ref({
-  street: '',
-  city: '',
-  state: '',
-  zipCode: '',
-  country: 'Guatemala',
-  additionalInfo: ''
-});
-
-// Tarjetas guardadas
-const savedCards = ref([]);
-
-// Nueva tarjeta
-const newCard = ref({
-  number: '',
-  name: '',
-  cvv: '',
-  expiryMonth: '',
-  expiryYear: '',
-  isDefault: false
-});
-
-// Cambio de contraseña
-const passwordChange = ref({
-  currentPassword: '',
-  newPassword: '',
-  confirmPassword: ''
-});
-
-// Años de expiración (próximos 10 años)
-const expiryYears = computed(() => {
-  const currentYear = new Date().getFullYear();
-  return Array.from({ length: 10 }, (_, i) => currentYear + i);
-});
-
-// Cargar información del usuario
-const loadUserInfo = async () => {
-  try {
-    const user = userStore.getUser();
-    if (!user || !user.idUser) {
-      alert('Debes iniciar sesión para ver tu perfil.');
-      return;
-    }
-
-    // Cargar información personal
-    const userResponse = await axios.get(ApiService.getPharmacyApiUrl(`/users/${user.idUser}`));
-    const userData = userResponse.data;
-    
-    personalInfo.value = {
-      firstName: userData.firstName || userData.name || '',
-      lastName: userData.lastName || '',
-      email: userData.email || '',
-      phone: userData.phone || '',
-      dateOfBirth: userData.dateOfBirth || ''
+export default {
+  data() {
+    return {
+      personalInfo: {
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        dateOfBirth: ''
+      },
+      shippingAddress: {
+        street: '',
+        city: '',
+        state: '',
+        zipCode: '',
+        country: 'Guatemala',
+        additionalInfo: ''
+      },
+      savedCards: [],
+      newCard: {
+        number: '',
+        name: '',
+        cvv: '',
+        expiryMonth: '',
+        expiryYear: '',
+        isDefault: false
+      },
+      passwordChange: {
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      },
+      expiryYears: [],
+      savingPersonal: false,
+      savingAddress: false,
+      savingCard: false,
     };
+  },
+  
+  computed: {
+    userStore() {
+      return useUserStore();
+    }
+  },
 
-    // Cargar dirección de envío (si existe)
-    try {
-      const addressResponse = await axios.get(ApiService.getPharmacyApiUrl(`/users/${user.idUser}/address`));
-      const addressData = addressResponse.data;
-      if (addressData) {
-        shippingAddress.value = { ...shippingAddress.value, ...addressData };
+  mounted() {
+    this.populateExpiryYears();
+    this.loadUserData();
+  },
+
+  methods: {
+    populateExpiryYears() {
+      const currentYear = new Date().getFullYear();
+      const years = Array.from({ length: 10 }, (_, i) => currentYear + i);
+      this.expiryYears = years;
+    },
+
+    loadUserData() {
+      const user = this.userStore.user;
+      if (user) {
+        // Asumiendo que `user.name` es el nombre completo
+        const nameParts = user.name ? user.name.split(' ') : ['', ''];
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+
+        this.personalInfo = {
+          firstName: firstName,
+          lastName: lastName,
+          email: user.email || '',
+          phone: user.phone || '',
+          dateOfBirth: user.birthDate ? user.birthDate.split('T')[0] : '', // Formatear fecha
+        };
+
+        // Cargar dirección y tarjetas (si estuvieran en el store)
+        this.shippingAddress.street = user.address || '';
       }
-    } catch (error) {
-      console.log('No se encontró dirección guardada');
-    }
+    },
 
-    // Cargar tarjetas guardadas
-    try {
-      const cardsResponse = await axios.get(ApiService.getPharmacyApiUrl(`/users/${user.idUser}/cards`));
-      savedCards.value = cardsResponse.data || [];
-    } catch (error) {
-      console.log('No se encontraron tarjetas guardadas');
-      savedCards.value = [];
-    }
+    savePersonalInfo() {
+      this.savingPersonal = true;
+      console.log('Guardando información personal:', this.personalInfo);
+      // Lógica para guardar la información personal
+    },
 
-  } catch (error) {
-    console.error('Error loading user info:', error);
-    alert('Error al cargar la información del usuario.');
+    saveShippingAddress() {
+      this.savingAddress = true;
+      console.log('Guardando dirección de envío:', this.shippingAddress);
+      // Lógica para guardar la dirección de envío
+    },
+
+    formatCardNumber(event) {
+      let value = event.target.value.replace(/\D/g, '');
+      value = value.replace(/(\d{4})(?=\d)/g, '$1 ');
+      this.newCard.number = value;
+    },
+
+    saveCard() {
+      if (this.passwordChange.newPassword !== this.passwordChange.confirmPassword) {
+        alert('Las contraseñas no coinciden.');
+        return;
+      }
+
+      this.savingCard = true;
+      console.log('Guardando nueva tarjeta:', this.newCard);
+      // Lógica para guardar la nueva tarjeta
+    },
+
+    deleteCard(cardId) {
+      if (!confirm('¿Estás seguro de que quieres eliminar esta tarjeta?')) {
+        return;
+      }
+
+      console.log('Eliminando tarjeta con ID:', cardId);
+      // Lógica para eliminar la tarjeta
+    },
+
+    changePassword() {
+      if (this.passwordChange.newPassword !== this.passwordChange.confirmPassword) {
+        alert('Las contraseñas no coinciden.');
+        return;
+      }
+
+      if (this.passwordChange.newPassword.length < 8) {
+        alert('La nueva contraseña debe tener al menos 8 caracteres.');
+        return;
+      }
+
+      console.log('Cambiando contraseña:', this.passwordChange);
+      // Lógica para cambiar la contraseña
+    },
+
+    getCardBrand(number) {
+      const cleanNumber = number.replace(/\s/g, '');
+      
+      if (/^4/.test(cleanNumber)) return 'Visa';
+      if (/^5[1-5]/.test(cleanNumber)) return 'Mastercard';
+      if (/^3[47]/.test(cleanNumber)) return 'American Express';
+      if (/^6/.test(cleanNumber)) return 'Discover';
+      
+      return 'Tarjeta';
+    },
   }
-};
-
-// Guardar información personal
-const savePersonalInfo = async () => {
-  savingPersonal.value = true;
-  try {
-    const user = userStore.getUser();
-    await axios.put(ApiService.getPharmacyApiUrl(`/users/${user.idUser}`), {
-      firstName: personalInfo.value.firstName,
-      lastName: personalInfo.value.lastName,
-      email: personalInfo.value.email,
-      phone: personalInfo.value.phone,
-      dateOfBirth: personalInfo.value.dateOfBirth
-    });
-    
-    alert('Información personal guardada exitosamente.');
-  } catch (error) {
-    console.error('Error saving personal info:', error);
-    alert('Error al guardar la información personal.');
-  } finally {
-    savingPersonal.value = false;
-  }
-};
-
-// Guardar dirección de envío
-const saveShippingAddress = async () => {
-  savingAddress.value = true;
-  try {
-    const user = userStore.getUser();
-    await axios.post(ApiService.getPharmacyApiUrl(`/users/${user.idUser}/address`), shippingAddress.value);
-    
-    alert('Dirección guardada exitosamente.');
-  } catch (error) {
-    console.error('Error saving address:', error);
-    alert('Error al guardar la dirección.');
-  } finally {
-    savingAddress.value = false;
-  }
-};
-
-// Formatear número de tarjeta
-const formatCardNumber = (event) => {
-  let value = event.target.value.replace(/\D/g, '');
-  value = value.replace(/(\d{4})(?=\d)/g, '$1 ');
-  newCard.value.number = value;
-};
-
-// Guardar nueva tarjeta
-const saveCard = async () => {
-  if (passwordChange.value.newPassword !== passwordChange.value.confirmPassword) {
-    alert('Las contraseñas no coinciden.');
-    return;
-  }
-
-  savingCard.value = true;
-  try {
-    const user = userStore.getUser();
-    const cardData = {
-      ...newCard.value,
-      lastFour: newCard.value.number.slice(-4),
-      brand: getCardBrand(newCard.value.number)
-    };
-    
-    await axios.post(ApiService.getPharmacyApiUrl(`/users/${user.idUser}/cards`), cardData);
-    
-    // Limpiar formulario
-    newCard.value = {
-      number: '',
-      name: '',
-      cvv: '',
-      expiryMonth: '',
-      expiryYear: '',
-      isDefault: false
-    };
-    
-    // Recargar tarjetas
-    await loadUserInfo();
-    
-    alert('Tarjeta guardada exitosamente.');
-  } catch (error) {
-    console.error('Error saving card:', error);
-    alert('Error al guardar la tarjeta.');
-  } finally {
-    savingCard.value = false;
-  }
-};
-
-// Eliminar tarjeta
-const deleteCard = async (cardId) => {
-  if (!confirm('¿Estás seguro de que quieres eliminar esta tarjeta?')) {
-    return;
-  }
-
-  try {
-    const user = userStore.getUser();
-    await axios.delete(ApiService.getPharmacyApiUrl(`/users/${user.idUser}/cards/${cardId}`));
-    
-    // Recargar tarjetas
-    await loadUserInfo();
-    
-    alert('Tarjeta eliminada exitosamente.');
-  } catch (error) {
-    console.error('Error deleting card:', error);
-    alert('Error al eliminar la tarjeta.');
-  }
-};
-
-// Cambiar contraseña
-const changePassword = async () => {
-  if (passwordChange.value.newPassword !== passwordChange.value.confirmPassword) {
-    alert('Las contraseñas no coinciden.');
-    return;
-  }
-
-  if (passwordChange.value.newPassword.length < 8) {
-    alert('La nueva contraseña debe tener al menos 8 caracteres.');
-    return;
-  }
-
-  changingPassword.value = true;
-  try {
-    const user = userStore.getUser();
-    await axios.put(ApiService.getPharmacyApiUrl(`/users/${user.idUser}/password`), {
-      currentPassword: passwordChange.value.currentPassword,
-      newPassword: passwordChange.value.newPassword
-    });
-    
-    // Limpiar formulario
-    passwordChange.value = {
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: ''
-    };
-    
-    alert('Contraseña cambiada exitosamente.');
-  } catch (error) {
-    console.error('Error changing password:', error);
-    alert('Error al cambiar la contraseña. Verifica que la contraseña actual sea correcta.');
-  } finally {
-    changingPassword.value = false;
-  }
-};
-
-// Detectar marca de tarjeta
-const getCardBrand = (number) => {
-  const cleanNumber = number.replace(/\s/g, '');
-  
-  if (/^4/.test(cleanNumber)) return 'Visa';
-  if (/^5[1-5]/.test(cleanNumber)) return 'Mastercard';
-  if (/^3[47]/.test(cleanNumber)) return 'American Express';
-  if (/^6/.test(cleanNumber)) return 'Discover';
-  
-  return 'Tarjeta';
-};
-
-onMounted(() => {
-  loadUserInfo();
-});
+}
 </script>
 
 <style scoped>
