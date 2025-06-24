@@ -1,6 +1,7 @@
 package com.sources.app.entities;
 
 import jakarta.persistence.*;
+import java.util.Date;
 
 /**
  * Entidad que representa un pedido realizado en el sistema.
@@ -24,6 +25,16 @@ public class Orders {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "ID_USER", nullable = false)
     private User user;
+
+    /** Fecha y hora de creación del pedido. */
+    @Column(name = "CREATED_AT")
+    @Temporal(TemporalType.TIMESTAMP)
+    private Date createdAt;
+
+    /** Fecha y hora de última actualización del pedido. */
+    @Column(name = "UPDATED_AT")
+    @Temporal(TemporalType.TIMESTAMP)
+    private Date updatedAt;
 
     /**
      * Constructor por defecto requerido por JPA.
@@ -64,5 +75,21 @@ public class Orders {
 
     public void setUser(User user) {
         this.user = user;
+    }
+
+    public Date getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Date createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public Date getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(Date updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }

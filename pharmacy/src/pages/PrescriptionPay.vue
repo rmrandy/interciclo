@@ -189,9 +189,9 @@ const closeModal = () => {
 const completePurchase = async () => {
   if (!isCardValid.value) return;
   try {
-    // Create order with status 'Completado' and user id from prescription
+    // Create order with status 'recibido' and user id from prescription
     const orderResponse = await axios.post(ApiService.getPharmacyApiUrl("/orders"), {
-      status: "Completado",
+      status: "recibido",
       user: { idUser: prescription.value.prescription.user.idUser }
     });
     const order = orderResponse.data;

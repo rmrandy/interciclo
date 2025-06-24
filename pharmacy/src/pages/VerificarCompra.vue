@@ -439,8 +439,8 @@ async function confirmPurchase() {
 
 
     // 3. Mostrar modal de confirmación (opcional) o redirigir directamente
-    showConfirmationModal.value = true;
-
+      showConfirmationModal.value = true;
+    
   } catch (error) {
     console.error("Error al confirmar la compra:", error);
     alert("Hubo un error al procesar tu compra. Por favor, inténtalo de nuevo.");
@@ -460,7 +460,7 @@ function goBack() {
 
 // Cargar datos del medicamento
 onMounted(async () => {
-  const medicineId = route.params.id;
+    const medicineId = route.params.id;
   quantity.value = Number(route.query.quantity) || 1;
   
   if (!userStore.user?.idUser) {
@@ -480,7 +480,7 @@ onMounted(async () => {
     // Verificar stock aquí
     if (medicine.value) {
       hasStock.value = medicine.value.stock >= quantity.value;
-    }
+      }
 
   } catch (error) {
     console.error("Error al cargar datos de compra:", error);

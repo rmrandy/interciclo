@@ -86,12 +86,22 @@
 
         <!-- Enlace para gestión de productos -->
         <router-link
-          v-if="isLoggedIn && (userStore.getUser().role === 'admin' || userStore.getUser().role === 'employee')"
+          v-if="isLoggedIn && (['admin','administrador','employee','empleado'].includes(userStore.getUser().role))"
           to="/gestion-productos"
           class="nav-item"
         >
           <span class="nav-icon">✏️</span>
           Gestión de Productos
+        </router-link>
+
+        <!-- Enlace para gestión de pedidos -->
+        <router-link
+          v-if="isLoggedIn && (['admin','administrador','employee','empleado'].includes(userStore.getUser().role))"
+          to="/admin/pedidos"
+          class="nav-item"
+        >
+          <span class="nav-icon">📦</span>
+          Gestión de Pedidos
         </router-link>
       </nav>
 
@@ -151,13 +161,24 @@
 
       <!-- Enlace para gestión de productos -->
       <router-link
-        v-if="isLoggedIn && (userStore.getUser().role === 'admin' || userStore.getUser().role === 'employee')"
+        v-if="isLoggedIn && (['admin','administrador','employee','empleado'].includes(userStore.getUser().role))"
         to="/gestion-productos"
         class="mobile-item"
         @click="toggleMenu"
       >
         <span class="mobile-icon">✏️</span>
         Gestión de Productos
+      </router-link>
+
+      <!-- Enlace para gestión de pedidos -->
+      <router-link
+        v-if="isLoggedIn && (['admin','administrador','employee','empleado'].includes(userStore.getUser().role))"
+        to="/admin/pedidos"
+        class="mobile-item"
+        @click="toggleMenu"
+      >
+        <span class="mobile-icon">📦</span>
+        Gestión de Pedidos
       </router-link>
 
       <!-- Si está loggeado, muestra rol y logout (móvil) -->

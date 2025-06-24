@@ -48,7 +48,7 @@
         </div>
       </div>
     </div>
-
+  
     <!-- Categorías destacadas -->
     <div class="categories-section">
       <h3>Explorar por Categoría</h3>
@@ -257,11 +257,11 @@ const addToCartFromModal = async () => {
     // Buscar o crear orden en progreso
     const ordersResponse = await axios.get(ApiService.getPharmacyApiUrl("/orders"));
     const orders = ordersResponse.data;
-    let order = orders.find(o => o.user.idUser === userId && o.status === 'En progreso');
+    let order = orders.find(o => o.user.idUser === userId && o.status === 'recibido');
     if (!order) {
       const newOrderResp = await axios.post(ApiService.getPharmacyApiUrl("/orders"), {
         user: { idUser: userId },
-        status: 'En progreso'
+        status: 'recibido'
       });
       order = newOrderResp.data;
     }
@@ -339,11 +339,11 @@ const addToCart = async (product) => {
     // Buscar o crear orden en progreso
     const ordersResponse = await axios.get(ApiService.getPharmacyApiUrl("/orders"));
     const orders = ordersResponse.data;
-    let order = orders.find(o => o.user.idUser === userId && o.status === 'En progreso');
+    let order = orders.find(o => o.user.idUser === userId && o.status === 'recibido');
     if (!order) {
       const newOrderResp = await axios.post(ApiService.getPharmacyApiUrl("/orders"), {
         user: { idUser: userId },
-        status: 'En progreso'
+        status: 'recibido'
       });
       order = newOrderResp.data;
     }

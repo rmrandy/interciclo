@@ -10,8 +10,8 @@ com/sources/app/dao/PrescriptionDAO.class
 com/sources/app/handlers/LoginHandler.class
 com/sources/app/util/ExternalServiceClient.class
 com/sources/app/entities/PrescriptionMedicine.class
+com/sources/app/handlers/OrdersHandler$ProductoCompra.class
 com/sources/app/handlers/PrescriptionHandler.class
-com/sources/app/entities/Order.class
 com/sources/app/handlers/StaticXMLMedicineHandler.class
 com/sources/app/handlers/BestSellersHandler.class
 com/sources/app/entities/Bill.class
@@ -37,8 +37,6 @@ com/sources/app/handlers/OrderMedicineHandler.class
 com/sources/app/dao/MedicineDAO.class
 com/sources/app/handlers/SubcategoryHandler.class
 com/sources/app/handlers/CategoryHandler.class
-com/sources/app/handlers/OrderHandler.class
-com/sources/app/dao/OrderDAO.class
 com/sources/app/entities/Comments.class
 com/sources/app/handlers/HospitalHandler.class
 com/sources/app/entities/Prescription.class
@@ -52,7 +50,6 @@ com/sources/app/entities/ProveedorInternacional.class
 com/sources/app/entities/Policy.class
 com/sources/app/entities/Medicine.class
 com/sources/app/controllers/ServiceApprovalController.class
-com/sources/app/entities/Order$OrderItem.class
 com/sources/app/handlers/ExternalMedicineHandler.class
 com/sources/app/dao/CommentsDAO.class
 com/sources/app/handlers/PrescriptionMedicineHandler.class
@@ -60,6 +57,7 @@ com/sources/app/handlers/UserHandler.class
 com/sources/app/dao/PrescriptionMedicineDAO.class
 com/sources/app/entities/Hospital.class
 com/sources/app/entities/OrderMedicineId.class
+com/sources/app/handlers/OrdersHandler$CheckoutRequest.class
 com/sources/app/entities/Orders.class
 com/sources/app/entities/BillMedicine.class
 com/sources/app/dao/BillMedicineDAO.class
@@ -70,5 +68,6 @@ com/sources/app/handlers/PolicyHandler.class
 com/sources/app/util/HospitalClient.class
 com/sources/app/dao/OrderMedicineDAO.class
 com/sources/app/dao/VerificationDAO.class
+com/sources/app/handlers/OrdersHandler$Pago.class
 com/sources/app/dao/ExternalPrescriptionDAO.class
 com/sources/app/entities/User.class

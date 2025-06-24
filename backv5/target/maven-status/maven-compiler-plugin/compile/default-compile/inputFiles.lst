@@ -24,7 +24,6 @@
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/dao/PolicyDAO.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/handlers/UserHandler.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/entities/Category.java
-/Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/dao/OrderDAO.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/entities/Orders.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/dao/ExternalPrescriptionDAO.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/dao/CategoryDAO.java
@@ -42,7 +41,6 @@
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/dao/VerificationDAO.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/dao/SystemConfigDAO.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/entities/User.java
-/Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/handlers/OrderHandler.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/handlers/RecommendedMedicinesHandler.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/handlers/MedicineHandler.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/App.java
@@ -61,7 +59,6 @@
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/entities/OrderMedicine.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/entities/Policy.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/dao/PrescriptionMedicineDAO.java
-/Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/entities/Order.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/dao/OrderMedicineDAO.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/handlers/HospitalHandler.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/handlers/BillHandler.java

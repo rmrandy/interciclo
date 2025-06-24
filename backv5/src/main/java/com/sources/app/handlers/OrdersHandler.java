@@ -91,22 +91,18 @@ public class OrdersHandler implements HttpHandler {
     private void handlePost(HttpExchange exchange) throws IOException {
         String requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
         Orders createOrder = objectMapper.readValue(requestBody, Orders.class);
-        
         // Validar datos requeridos
         User user = createOrder.getUser();
         if (user == null || user.getIdUser() == null) {
             sendResponse(exchange, 400, "{\"error\": \"User ID is required\"}");
             return;
         }
-        if (createOrder.getStatus() == null || createOrder.getStatus().trim().isEmpty()) {
-            // Asignar un estado por defecto si no se provee? O requerirlo?
-            // Por ahora, lo requerimos:
-            sendResponse(exchange, 400, "{\"error\": \"Order status is required\"}");
-            return;
+        String status = createOrder.getStatus();
+        if (status == null || status.trim().isEmpty()) {
+            status = "recibido";
         }
-        
         // Llamar al DAO con status y userId
-        Orders order = ordersDAO.create(createOrder.getStatus(), user.getIdUser()); 
+        Orders order = ordersDAO.create(status, user.getIdUser()); 
         if(order != null) {
             sendResponse(exchange, 201, objectMapper.writeValueAsString(order));
         } else {
@@ -117,6 +113,8 @@ public class OrdersHandler implements HttpHandler {
     /**
      * Maneja las solicitudes GET para obtener pedidos.
      * Si se proporciona un parámetro de consulta 'id', devuelve el pedido específico.
+     * Si se proporciona 'status', filtra por estado.
+     * Si se proporciona 'userId', filtra por usuario.
      * De lo contrario, devuelve todos los pedidos.
      *
      * @param exchange El objeto HttpExchange.
@@ -126,6 +124,12 @@ public class OrdersHandler implements HttpHandler {
         String query = exchange.getRequestURI().getQuery();
         if(query != null && query.startsWith("id=")) {
             handleGetById(exchange, query);
+        } else if(query != null && query.startsWith("status=")) {
+            handleGetByStatus(exchange, query);
+        } else if(query != null && query.startsWith("userId=")) {
+            handleGetByUserId(exchange, query);
+        } else if(query != null && query.contains("userId=") && query.contains("status=")) {
+            handleGetByUserIdAndStatus(exchange, query);
         } else {
             handleGetAll(exchange);
         }
@@ -153,6 +157,85 @@ public class OrdersHandler implements HttpHandler {
     }
 
     /**
+     * Maneja la obtención de pedidos filtrados por estado.
+     *
+     * @param exchange El objeto HttpExchange.
+     * @param query La cadena de consulta que contiene el estado (formato: status=estado).
+     * @throws IOException Si ocurre un error de entrada/salida.
+     */
+    private void handleGetByStatus(HttpExchange exchange, String query) throws IOException {
+        try {
+            String status = query.substring(7); // "status=".length() == 7
+            List<Orders> list = ordersDAO.getByStatus(status);
+            if (list != null) {
+                sendResponse(exchange, 200, objectMapper.writeValueAsString(list));
+            } else {
+                sendResponse(exchange, 500, "{\"error\": \"Error retrieving orders by status\"}");
+            }
+        } catch (Exception e) {
+            sendResponse(exchange, 400, "{\"error\": \"Invalid status parameter\"}");
+        }
+    }
+
+    /**
+     * Maneja la obtención de pedidos filtrados por usuario.
+     *
+     * @param exchange El objeto HttpExchange.
+     * @param query La cadena de consulta que contiene el ID del usuario (formato: userId=123).
+     * @throws IOException Si ocurre un error de entrada/salida.
+     */
+    private void handleGetByUserId(HttpExchange exchange, String query) throws IOException {
+        try {
+            Long userId = Long.parseLong(query.substring(7)); // "userId=".length() == 7
+            List<Orders> list = ordersDAO.getByUserId(userId);
+            if (list != null) {
+                sendResponse(exchange, 200, objectMapper.writeValueAsString(list));
+            } else {
+                sendResponse(exchange, 500, "{\"error\": \"Error retrieving orders by user\"}");
+            }
+        } catch (NumberFormatException e) {
+            sendResponse(exchange, 400, "{\"error\": \"Invalid userId format\"}");
+        }
+    }
+
+    /**
+     * Maneja la obtención de pedidos filtrados por usuario y estado.
+     *
+     * @param exchange El objeto HttpExchange.
+     * @param query La cadena de consulta que contiene el ID del usuario y estado.
+     * @throws IOException Si ocurre un error de entrada/salida.
+     */
+    private void handleGetByUserIdAndStatus(HttpExchange exchange, String query) throws IOException {
+        try {
+            // Parsear userId y status de la query string
+            String[] params = query.split("&");
+            Long userId = null;
+            String status = null;
+            
+            for (String param : params) {
+                if (param.startsWith("userId=")) {
+                    userId = Long.parseLong(param.substring(7));
+                } else if (param.startsWith("status=")) {
+                    status = param.substring(7);
+                }
+            }
+            
+            if (userId != null && status != null) {
+                List<Orders> list = ordersDAO.getByUserIdAndStatus(userId, status);
+                if (list != null) {
+                    sendResponse(exchange, 200, objectMapper.writeValueAsString(list));
+                } else {
+                    sendResponse(exchange, 500, "{\"error\": \"Error retrieving orders by user and status\"}");
+                }
+            } else {
+                sendResponse(exchange, 400, "{\"error\": \"Both userId and status parameters are required\"}");
+            }
+        } catch (NumberFormatException e) {
+            sendResponse(exchange, 400, "{\"error\": \"Invalid userId format\"}");
+        }
+    }
+
+    /**
      * Maneja la obtención de todos los pedidos.
      *
      * @param exchange El objeto HttpExchange.
@@ -165,12 +248,78 @@ public class OrdersHandler implements HttpHandler {
 
     /**
      * Maneja las solicitudes PUT para actualizar un pedido existente.
-     * Espera un cuerpo JSON con los datos completos del pedido, incluyendo su ID.
+     * Si la ruta termina en /status, actualiza solo el estado del pedido.
+     * De lo contrario, actualiza el pedido completo.
      *
      * @param exchange El objeto HttpExchange.
      * @throws IOException Si ocurre un error de entrada/salida.
      */
     private void handlePut(HttpExchange exchange) throws IOException {
+        String path = exchange.getRequestURI().getPath();
+        
+        if (path.endsWith("/status")) {
+            handleUpdateStatus(exchange);
+        } else {
+            handleUpdateOrder(exchange);
+        }
+    }
+
+    /**
+     * Maneja la actualización del estado de un pedido específico.
+     *
+     * @param exchange El objeto HttpExchange.
+     * @throws IOException Si ocurre un error de entrada/salida.
+     */
+    private void handleUpdateStatus(HttpExchange exchange) throws IOException {
+        String path = exchange.getRequestURI().getPath();
+        
+        // Verificar que la ruta tenga el formato correcto: /api2/orders/{id}/status
+        if (!path.endsWith("/status")) {
+            sendResponse(exchange, 400, "{\"error\": \"Invalid endpoint for status update. Expected: /api2/orders/{id}/status\"}");
+            return;
+        }
+        
+        String[] pathParts = path.split("/");
+        
+        // La ruta debe tener al menos 5 partes: ["", "api2", "orders", "{id}", "status"]
+        if (pathParts.length < 5) {
+            sendResponse(exchange, 400, "{\"error\": \"Order ID is required for status update\"}");
+            return;
+        }
+        
+        try {
+            // El ID está en la posición 3 (índice 3) cuando la ruta es /api2/orders/{id}/status
+            Long orderId = Long.parseLong(pathParts[3]);
+            String requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            
+            // Esperar un JSON simple con el nuevo estado
+            String newStatus = objectMapper.readTree(requestBody).get("status").asText();
+            
+            if (newStatus == null || newStatus.trim().isEmpty()) {
+                sendResponse(exchange, 400, "{\"error\": \"Status is required\"}");
+                return;
+            }
+            
+            Orders updatedOrder = ordersDAO.updateStatus(orderId, newStatus);
+            if (updatedOrder != null) {
+                sendResponse(exchange, 200, objectMapper.writeValueAsString(updatedOrder));
+            } else {
+                sendResponse(exchange, 404, "{\"error\": \"Order not found or update failed\"}");
+            }
+        } catch (NumberFormatException e) {
+            sendResponse(exchange, 400, "{\"error\": \"Invalid order ID format\"}");
+        } catch (Exception e) {
+            sendResponse(exchange, 400, "{\"error\": \"Invalid request body format\"}");
+        }
+    }
+
+    /**
+     * Maneja la actualización completa de un pedido existente.
+     *
+     * @param exchange El objeto HttpExchange.
+     * @throws IOException Si ocurre un error de entrada/salida.
+     */
+    private void handleUpdateOrder(HttpExchange exchange) throws IOException {
         String requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
         Orders updateOrder = objectMapper.readValue(requestBody, Orders.class);
         

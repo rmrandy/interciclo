@@ -18,7 +18,7 @@
         <property name="show_sql">true</property>
         
         <!-- Automatically update the schema (use with caution in production) -->
-        <property name="hibernate.hbm2ddl.auto">update</property>
+        <property name="hibernate.hbm2ddl.auto">validate</property>
 
         <!-- Optionally, configure a c3p0 connection pool -->
         <property name="hibernate.c3p0.min_size">5</property>

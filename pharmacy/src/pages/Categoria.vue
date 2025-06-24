@@ -361,7 +361,7 @@ const addProductToCart = async (product, quantity) => {
     if (!order) {
       const newOrderResp = await axios.post(ApiService.getPharmacyApiUrl("/orders"), {
         user: { idUser: userId },
-        status: 'En progreso'
+        status: 'recibido'
       });
       order = newOrderResp.data;
     }

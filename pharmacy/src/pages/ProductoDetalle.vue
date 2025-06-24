@@ -182,7 +182,7 @@ export default {
           } else {
             return axios.post(ApiService.getPharmacyApiUrl("/orders"), {
               user: { idUser: userId },
-              status: 'En progreso'
+              status: 'recibido'
             }).then(response => response.data);
           }
         })

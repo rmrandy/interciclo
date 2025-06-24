@@ -66,6 +66,12 @@ const adminRoutes = [
     name: 'AdminDash',
     component: AdminDash,
     meta: { admin: true }
+  },
+  {
+    path: '/admin/pedidos',
+    name: 'AdminPedidos',
+    component: () => import('../pages/admin/Pedidos.vue'),
+    meta: { admin: true }
   }
 ];
 
@@ -90,37 +96,28 @@ router.beforeEach((to, from, next) => {
   // Para rutas administrativas, verificar también en localStorage
   if (adminOnly) {
     console.log("Ruta protegida para admin:", to.path);
-    
-    // Verificar en el servicio de autenticación
-    if (currentUser && currentUser.role === 'admin') {
+    if (currentUser && ['admin','administrador','employee','empleado'].includes(currentUser.role)) {
       console.log("Acceso permitido por authService");
       return next();
     }
-    
-    // Verificar en localStorage como respaldo
     try {
-      // Verificar por el campo role directamente
       const storedRole = localStorage.getItem('role');
-      if (storedRole === 'admin') {
+      if (['admin','administrador','employee','empleado'].includes(storedRole)) {
         console.log("Acceso permitido por localStorage.role");
         return next();
       }
-      
-      // Verificar en el objeto user
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
         const user = JSON.parse(storedUser);
-        if (user.role === 'admin') {
+        if (['admin','administrador','employee','empleado'].includes(user.role)) {
           console.log("Acceso permitido por localStorage.user");
           return next();
         }
       }
-      
-      // Verificar en session
       const storedSession = localStorage.getItem('session');
       if (storedSession) {
         const session = JSON.parse(storedSession);
-        if (session.role === 'admin') {
+        if (['admin','administrador','employee','empleado'].includes(session.role)) {
           console.log("Acceso permitido por localStorage.session");
           return next();
         }
@@ -128,8 +125,6 @@ router.beforeEach((to, from, next) => {
     } catch (e) {
       console.error("Error verificando el rol en localStorage:", e);
     }
-    
-    // Si ninguna verificación funcionó, redirigir
     console.log("Acceso denegado a ruta admin");
     return next('/');
   }

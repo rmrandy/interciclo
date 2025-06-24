@@ -201,7 +201,7 @@ const clearCart = async () => {
     for (const item of cartItems.value) {
       await axios.delete(ApiService.getPharmacyApiUrl(`/order_medicines?id=${item.orders.idOrder},${item.medicine.idMedicine}`));
     }
-    cartItems.value = [];
+  cartItems.value = [];
     alert('Carrito vaciado exitosamente.');
   } catch (error) {
     console.error('Error clearing cart:', error);
