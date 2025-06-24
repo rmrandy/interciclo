@@ -45,7 +45,7 @@ public class CommentsDAOTest {
         Comments commentFromJson = mapper.readValue(comIs, Comments.class);
 
         // Crear el comentario usando los objetos persistidos
-        Comments created = commentsDAO.create(persistedUser, null, commentFromJson.getCommentText(), persistedMedicine);
+        Comments created = commentsDAO.create(persistedUser, null, commentFromJson.getCommentText(), commentFromJson.getRating(), persistedMedicine);
         assertNotNull(created);
         assertNotNull(created.getIdComments());
         assertEquals(commentFromJson.getCommentText(), created.getCommentText());

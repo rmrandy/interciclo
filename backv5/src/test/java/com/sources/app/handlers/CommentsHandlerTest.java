@@ -16,7 +16,7 @@ public class CommentsHandlerTest {
     private static class MockCommentsDAO extends CommentsDAO {
         // Corrected mock based on CommentsDAO methods
         @Override
-        public Comments create(User user, Comments prevComment, String commentText, Medicine medicine) { // Corrected signature
+        public Comments create(User user, Comments prevComment, String commentText, Integer rating, Medicine medicine) { // Corrected signature
             return null;
         }
         @Override
