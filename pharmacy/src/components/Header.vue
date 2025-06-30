@@ -5,7 +5,19 @@
       <!-- Logo -->
       <div class="logo-container">
         <img src="@/assets/logo.png" alt="Logo" class="logo" />
-        <span class="logo-text">Farmacia</span>
+        <span class="logo-text" @click="editHeaderTitle" v-if="!isEditingTitle">
+          {{ headerTitle }}
+        </span>
+        <input 
+          v-if="isEditingTitle" 
+          v-model="editingTitle" 
+          @blur="saveHeaderTitle" 
+          @keyup.enter="saveHeaderTitle"
+          @keyup.esc="cancelEditTitle"
+          class="edit-title-input"
+          ref="titleInput"
+        />
+        <span class="edit-icon" v-if="isAdmin && !isEditingTitle" @click="editHeaderTitle">✏️</span>
       </div>
 
       <!-- Menú de Navegación (versión desktop) -->
@@ -17,6 +29,14 @@
         <router-link to="/catalogo" class="nav-item">
           <span class="nav-icon">📋</span>
           Catálogo
+        </router-link>
+        <router-link to="/catalogo-alt" class="nav-item">
+          <span class="nav-icon">🗂️</span>
+          Catálogo ALT
+        </router-link>
+        <router-link to="/catalogo-alt-2" class="nav-item">
+          <span class="nav-icon">🗂️</span>
+          Catálogo ALT 2
         </router-link>
         <router-link to="/contact" class="nav-item">
           <span class="nav-icon">📞</span>
@@ -55,6 +75,16 @@
           <span class="nav-icon">⚙️</span>
           Puertos
         </button>
+
+        <!-- Enlace para administración de contenido del sitio -->
+        <router-link
+          v-if="isLoggedIn && (['admin','administrador'].includes(userStore.getUser().role))"
+          to="/admin/site-content"
+          class="nav-item"
+        >
+          <span class="nav-icon">📝</span>
+          Contenido del Sitio
+        </router-link>
 
         <!-- Si el usuario está loggeado -->
         <template v-if="isLoggedIn">
@@ -128,6 +158,16 @@
         Catálogo de Productos
       </router-link>
       
+      <router-link to="/catalogo-alt" class="mobile-item" @click="toggleMenu">
+        <span class="mobile-icon">🗂️</span>
+        Catálogo ALT
+      </router-link>
+      
+      <router-link to="/catalogo-alt-2" class="mobile-item" @click="toggleMenu">
+        <span class="mobile-icon">🗂️</span>
+        Catálogo ALT 2
+      </router-link>
+      
       <router-link to="/contact" class="mobile-item" @click="toggleMenu">
         <span class="mobile-icon">📞</span>
         Contacto
@@ -181,6 +221,17 @@
         Gestión de Pedidos
       </router-link>
 
+      <!-- Enlace para administración de contenido del sitio -->
+      <router-link
+        v-if="isLoggedIn && (['admin','administrador'].includes(userStore.getUser().role))"
+        to="/admin/site-content"
+        class="mobile-item"
+        @click="toggleMenu"
+      >
+        <span class="mobile-icon">📝</span>
+        Contenido del Sitio
+      </router-link>
+
       <!-- Si está loggeado, muestra rol y logout (móvil) -->
       <template v-if="isLoggedIn">
         <router-link to="/perfil" class="mobile-item" @click="toggleMenu">
@@ -214,9 +265,11 @@
 </template>
 
 <script>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useUserStore } from "@/stores/userStore";
+import SiteContentService from "@/services/SiteContentService";
+import { getPharmacyApiUrl } from '@/services/ApiService';
 
 export default {
   name: 'AppHeader',
@@ -234,9 +287,21 @@ export default {
     const userStore = useUserStore();
     const router = useRouter();
     
+    // Contenido dinámico
+    const headerTitle = ref("");
+    const headerSubtitle = ref("");
+    const isEditingTitle = ref(false);
+    const editingTitle = ref('');
+    const titleInput = ref(null);
+    
     const isLoggedIn = computed(() => {
       const user = userStore.getUser();
       return Object.keys(user).length !== 0;
+    });
+    
+    const isAdmin = computed(() => {
+      const user = userStore.getUser();
+      return user && (user.role === 'admin' || user.role === 'administrador');
     });
     
     // Función para abrir el selector de puertos
@@ -260,13 +325,68 @@ export default {
       }, 100);
     };
     
+    // Funciones para editar título
+    const editHeaderTitle = () => {
+      if (!isAdmin.value) return;
+      
+      editingTitle.value = headerTitle.value;
+      isEditingTitle.value = true;
+      
+      // Enfocar el input en el siguiente tick
+      setTimeout(() => {
+        if (titleInput.value) {
+          titleInput.value.focus();
+          titleInput.value.select();
+        }
+      }, 0);
+    };
+    
+    const saveHeaderTitle = async () => {
+      try {
+        await SiteContentService.updateContent('header_title', editingTitle.value);
+        headerTitle.value = editingTitle.value;
+        isEditingTitle.value = false;
+      } catch (error) {
+        console.error('Error al guardar el título:', error);
+        alert('Error al guardar el título');
+      }
+    };
+    
+    const cancelEditTitle = () => {
+      isEditingTitle.value = false;
+      editingTitle.value = headerTitle.value;
+    };
+    
+    onMounted(async () => {
+      try {
+        const res = await fetch(getPharmacyApiUrl('site-content-v2'));
+        const data = await res.json();
+        const foundTitle = data.find(item => item.key === "header_title");
+        const foundSubtitle = data.find(item => item.key === "header_subtitle");
+        headerTitle.value = foundTitle && foundTitle.value ? foundTitle.value : '';
+        headerSubtitle.value = foundSubtitle && foundSubtitle.value ? foundSubtitle.value : '';
+      } catch (e) {
+        headerTitle.value = '';
+        headerSubtitle.value = '';
+      }
+    });
+    
     return {
       mobileMenuOpen,
       toggleMenu,
       userStore,
       isLoggedIn,
+      isAdmin,
       openPortSelector,
-      logout
+      logout,
+      headerTitle,
+      headerSubtitle,
+      isEditingTitle,
+      editingTitle,
+      titleInput,
+      editHeaderTitle,
+      saveHeaderTitle,
+      cancelEditTitle
     };
   }
 }
@@ -302,6 +422,7 @@ export default {
   display: flex;
   align-items: center;
   gap: 12px;
+  position: relative;
 }
 
 .logo {
@@ -314,6 +435,59 @@ export default {
   font-size: 20px;
   font-weight: 700;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.logo-text:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.edit-title-input {
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid #1e3a8a;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e3a8a;
+  outline: none;
+  min-width: 200px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.edit-title-input:focus {
+  border-color: #10b981;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.edit-icon {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.logo-container:hover .edit-icon {
+  opacity: 1;
+}
+
+.edit-icon:hover {
+  background: white;
+  transform: scale(1.1);
 }
 
 /* Navegación desktop */

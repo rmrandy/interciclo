@@ -9,22 +9,22 @@
       </div>
 
       <!-- Sección de Rating -->
-      <div class="rating-section" v-if="product.averageRating > 0">
-        <ProductRating :rating="product.averageRating" :read-only="true" />
-        <span class="rating-count">({{ product.ratingCount }} reseñas)</span>
+      <div class="rating-section">
+        <ProductRating 
+          :product-id="product.idMedicine"
+          :average-rating="product.averageRating || 0"
+          :rating-count="product.ratingCount || 0"
+          :read-only="false"
+          @rating-updated="handleRatingUpdated"
+        />
       </div>
 
       <div class="producto-content">
         <div class="producto-imagen">
-          <img
-            v-if="product.images && product.images.length"
-            :src="product.images[0]"
-            alt="Imagen principal del producto"
-            class="main-image"
+          <ProductImageGallery 
+            :images="getProductImages(product)"
+            :product-name="product.name"
           />
-          <div v-else class="placeholder-image">
-            <i class="fas fa-prescription-bottle-alt"></i>
-          </div>
         </div>
 
         <div class="producto-info">
@@ -107,12 +107,14 @@ import axios from "axios";
 import { useUserStore } from '@/stores/userStore';
 import ApiService from '../services/ApiService';
 import ProductRating from '@/components/ProductRating.vue';
+import ProductImageGallery from '@/components/ProductImageGallery.vue';
 
 export default {
   name: "ProductoDetalle",
   components: {
     Comentarios,
-    ProductRating
+    ProductRating,
+    ProductImageGallery
   },
   props: ["id"],
   data() {
@@ -127,6 +129,7 @@ export default {
   },
   mounted() {
     this.fetchProductDetails();
+    this.fetchComments();
   },
   methods: {
     fetchProductDetails() {
@@ -232,6 +235,44 @@ export default {
       
       // Usar la función purchaseProduct existente para agregar al carrito
       this.purchaseProduct();
+    },
+    handleRatingUpdated() {
+      // Recargar los datos del producto para obtener el rating actualizado
+      this.fetchProductDetails();
+      // También recargar los comentarios
+      this.fetchComments();
+    },
+    fetchComments() {
+      // Método para cargar comentarios específicos del producto
+      const routeId = this.$route.params.id;
+      axios.get(ApiService.getPharmacyApiUrl("/comments"))
+        .then(response => {
+          const allComments = response.data;
+          this.productComments = allComments.filter(comment => 
+            comment.medicine && Number(comment.medicine.idMedicine) === Number(routeId)
+          );
+        })
+        .catch(error => {
+          console.error('Error fetching comments:', error);
+        });
+    },
+    getProductImages(product) {
+      let imagesArr = [];
+      if (Array.isArray(product.images) && product.images.length > 0) {
+        imagesArr = product.images;
+      } else if (typeof product.image === 'string' && product.image.trim() !== '') {
+        imagesArr = [product.image.trim()];
+      }
+      // Recuperar imágenes extra de localStorage
+      let extraImages = [];
+      if (product.idMedicine) {
+        try {
+          extraImages = JSON.parse(localStorage.getItem(`product_extra_images_${product.idMedicine}`)) || [];
+        } catch {
+          // No hacemos nada si no hay imágenes extra
+        }
+      }
+      return imagesArr.concat(extraImages).slice(0, 5);
     }
   }
 };

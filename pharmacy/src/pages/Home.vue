@@ -45,7 +45,7 @@
         <div v-if="filteredProducts.length" class="product-grid">
           <div v-for="product in filteredProducts.slice(0, 12)" :key="product.idMedicine" class="product-card" @click="goToProduct(product)">
             <div class="product-image-container">
-              <img :src="product.image" alt="Imagen producto" class="product-img" />
+              <img :src="getProductImage(product)" alt="Imagen producto" class="product-img" />
               <div class="product-overlay">
                 <button class="view-details-btn">Ver detalles</button>
               </div>
@@ -93,7 +93,7 @@
         <div class="recommended-grid">
           <div v-for="product in recommended" :key="product.id" class="recommended-card" @click="goToProduct(product)">
             <div class="recommended-image-container">
-              <img :src="product.image" alt="Imagen recomendado" class="recommended-img" />
+              <img :src="getProductImage(product)" alt="Imagen recomendado" class="recommended-img" />
               <div class="recommended-badge">Recomendado</div>
             </div>
             <div class="recommended-info">
@@ -127,7 +127,7 @@
         <div class="bestsellers-grid">
           <div v-for="product in bestsellers.slice(0, 5)" :key="product.id" class="bestseller-card" @click="goToProduct(product)">
             <div class="bestseller-image-container">
-              <img :src="product.image" alt="Imagen más vendido" class="bestseller-img" />
+              <img :src="getProductImage(product)" alt="Imagen más vendido" class="bestseller-img" />
               <div class="bestseller-badge">Más vendido</div>
             </div>
             <div class="bestseller-info">
@@ -222,9 +222,18 @@ function goToProduct(product) {
 }
 
 function addToCart(product) {
-  // Aquí iría la lógica real de agregar al carrito
   alert(`Producto agregado al carrito: ${product.name}`);
 }
+
+// Función helper para obtener la imagen principal de un producto
+const getProductImage = (product) => {
+  if (Array.isArray(product.images) && product.images.length > 0) {
+    return product.images[0];
+  } else if (product.image) {
+    return product.image;
+  }
+  return null;
+};
 </script>
 
 <style scoped>

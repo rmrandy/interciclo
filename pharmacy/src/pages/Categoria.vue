@@ -61,7 +61,7 @@
       <div v-for="product in sortedProducts" :key="product.idMedicine" class="product-card">
         <div class="product-content">
           <div class="product-image-box">
-            <img v-if="product.image" :src="product.image" :alt="product.name" class="product-img" />
+            <img v-if="getProductImage(product)" :src="getProductImage(product)" :alt="product.name" class="product-img" />
             <div v-else class="product-img-placeholder">🛍️</div>
           </div>
           <h3 class="product-name">{{ product.name }}</h3>
@@ -257,6 +257,16 @@ const loadCategoryDescription = async (category) => {
   } catch (error) {
     console.error('Error loading category description:', error);
   }
+};
+
+// Función helper para obtener la imagen principal de un producto
+const getProductImage = (product) => {
+  if (Array.isArray(product.images) && product.images.length > 0) {
+    return product.images[0];
+  } else if (product.image) {
+    return product.image;
+  }
+  return null;
 };
 
 // Productos filtrados

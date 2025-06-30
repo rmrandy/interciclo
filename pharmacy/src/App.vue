@@ -2,6 +2,7 @@
   <div id="app">
     <Header @open-port-selector="showPortSelector = true" />
     <router-view /> <!-- Aquí se mostrarán las páginas según la ruta -->
+    <Footer />
     
     <!-- Selector de puertos -->
     <PortSelector v-if="showPortSelector" @close="showPortSelector = false" />
@@ -10,6 +11,7 @@
 
 <script>
 import Header from '@/components/Header.vue';
+import Footer from '@/components/Footer.vue';
 import PortSelector from '@/components/PortSelector.vue';
 import ApiService from '@/services/ApiService';
 
@@ -17,6 +19,7 @@ export default {
   name: "App",
   components: { 
     Header,
+    Footer,
     PortSelector
   },
   data() {

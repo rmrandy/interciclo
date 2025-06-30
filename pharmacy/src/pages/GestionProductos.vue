@@ -24,7 +24,12 @@
         <tbody>
           <tr v-for="product in products" :key="product.idMedicine">
             <td>
-              <img v-if="product.image" :src="product.image" :alt="product.name" class="table-img" />
+              <img 
+                v-if="getProductImage(product)" 
+                :src="getProductImage(product)" 
+                :alt="product.name" 
+                class="table-img" 
+              />
               <span v-else class="table-img-placeholder">🛍️</span>
             </td>
             <td>{{ product.name }}</td>
@@ -73,8 +78,12 @@
               <input v-model.number="form.stock" type="number" required class="form-input" />
             </div>
             <div class="form-group">
-              <label>Imagen (URL)</label>
-              <input v-model="form.image" type="text" class="form-input" />
+              <label>Imágenes (URLs separadas por comas)</label>
+              <div v-for="(image, index) in form.images" :key="index" class="image-input">
+                <input v-model="form.images[index]" type="text" class="form-input" placeholder="URL de la imagen" />
+                <button class="btn btn-secondary btn-sm" @click="removeImageInput(index)">Eliminar</button>
+              </div>
+              <button type="button" class="btn btn-secondary" @click="addImageInput">+ Agregar Imagen</button>
             </div>
             <div class="form-actions">
               <button type="submit" class="btn btn-primary">{{ isEditMode ? 'Actualizar' : 'Crear' }}</button>
@@ -133,6 +142,7 @@ const showCategoryModal = ref(false);
 const isEditCategoryMode = ref(false);
 const categoryForm = reactive({ name: '', oldName: '' });
 const categoryErrorMessage = ref('');
+const MAX_IMAGES = 5;
 const form = reactive({
   idMedicine: null,
   name: '',
@@ -140,7 +150,7 @@ const form = reactive({
   brand: '',
   price: 0,
   stock: 0,
-  image: ''
+  images: [''],
 });
 
 const fetchProducts = async () => {
@@ -169,14 +179,32 @@ onMounted(() => {
 function openCreateModal() {
   isEditMode.value = false;
   errorMessage.value = '';
-  Object.assign(form, { idMedicine: null, name: '', activeMedicament: '', brand: '', price: 0, stock: 0, image: '' });
+  Object.assign(form, { idMedicine: null, name: '', activeMedicament: '', brand: '', price: 0, stock: 0, images: [''] });
   showModal.value = true;
 }
 
 function openEditModal(product) {
   isEditMode.value = true;
   errorMessage.value = '';
-  Object.assign(form, { ...product });
+  let imagesArr = [];
+  // Recuperar imágenes extra de localStorage
+  let extraImages = [];
+  if (product.idMedicine) {
+    try {
+      extraImages = JSON.parse(localStorage.getItem(`product_extra_images_${product.idMedicine}`)) || [];
+    } catch {
+      // No hacemos nada si no hay imágenes extra
+    }
+  }
+  if (Array.isArray(product.images)) {
+    imagesArr = product.images;
+  } else if (typeof product.image === 'string' && product.image.trim() !== '') {
+    imagesArr = [product.image.trim()];
+  } else {
+    imagesArr = [''];
+  }
+  imagesArr = imagesArr.concat(extraImages).slice(0, MAX_IMAGES);
+  Object.assign(form, { ...product, images: imagesArr });
   showModal.value = true;
 }
 
@@ -184,12 +212,35 @@ function closeModal() {
   showModal.value = false;
 }
 
+function addImageInput() {
+  if (form.images.length < MAX_IMAGES) {
+    form.images.push('');
+  }
+}
+
+function removeImageInput(index) {
+  if (form.images.length > 1) {
+    form.images.splice(index, 1);
+  }
+}
+
 async function createProduct() {
   errorMessage.value = '';
   try {
-    await axios.post(ApiService.getPharmacyApiUrl('/medicines'), { ...form });
+    // Solo la primera imagen se envía al backend
+    const imageString = form.images.find(url => url.trim() !== '') || '';
+    const productData = { ...form, image: imageString };
+    delete productData.images;
+    const response = await axios.post(ApiService.getPharmacyApiUrl('/medicines'), productData);
     showModal.value = false;
     fetchProducts();
+    // Guardar imágenes extra en localStorage
+    if (response.data && response.data.idMedicine) {
+      const extraImages = form.images.filter((url, idx) => idx > 0 && url.trim() !== '');
+      if (extraImages.length > 0) {
+        localStorage.setItem(`product_extra_images_${response.data.idMedicine}`, JSON.stringify(extraImages));
+      }
+    }
   } catch (error) {
     errorMessage.value = 'Error al crear el producto.';
   }
@@ -198,9 +249,19 @@ async function createProduct() {
 async function updateProduct() {
   errorMessage.value = '';
   try {
-    await axios.put(ApiService.getPharmacyApiUrl(`/medicines/${form.idMedicine}`), { ...form });
+    const imageString = form.images.find(url => url.trim() !== '') || '';
+    const productData = { ...form, image: imageString };
+    delete productData.images;
+    await axios.put(ApiService.getPharmacyApiUrl(`/medicines/${form.idMedicine}`), productData);
     showModal.value = false;
     fetchProducts();
+    // Guardar imágenes extra en localStorage
+    const extraImages = form.images.filter((url, idx) => idx > 0 && url.trim() !== '');
+    if (extraImages.length > 0) {
+      localStorage.setItem(`product_extra_images_${form.idMedicine}`, JSON.stringify(extraImages));
+    } else {
+      localStorage.removeItem(`product_extra_images_${form.idMedicine}`);
+    }
   } catch (error) {
     errorMessage.value = 'Error al actualizar el producto.';
   }
@@ -265,6 +326,16 @@ async function deleteCategory(cat) {
     fetchCategories();
   } catch (error) {
     alert('Error al eliminar la categoría.');
+  }
+}
+
+function getProductImage(product) {
+  if (Array.isArray(product.images)) {
+    return product.images[0];
+  } else if (product.image) {
+    return product.image;
+  } else {
+    return null;
   }
 }
 </script>
@@ -473,5 +544,10 @@ async function deleteCategory(cat) {
 }
 .categories-list button {
   margin: 0;
+}
+.image-input {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 </style> 

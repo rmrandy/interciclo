@@ -113,22 +113,15 @@
                       class="dropdown-menu"
                     >
                       <button 
-                        @click="updateOrderStatus(order.idOrder, 'recibido')"
-                        :disabled="order.status === 'recibido'"
-                        class="dropdown-item"
-                      >
-                        Recibido
-                      </button>
-                      <button 
                         @click="updateOrderStatus(order.idOrder, 'enviado')"
-                        :disabled="order.status === 'enviado'"
+                        :disabled="order.status !== 'recibido'"
                         class="dropdown-item"
                       >
                         Enviado
                       </button>
                       <button 
                         @click="updateOrderStatus(order.idOrder, 'entregado')"
-                        :disabled="order.status === 'entregado'"
+                        :disabled="order.status !== 'enviado'"
                         class="dropdown-item"
                       >
                         Entregado

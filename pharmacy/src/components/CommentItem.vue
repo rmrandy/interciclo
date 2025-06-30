@@ -12,7 +12,7 @@
           <button @click="$emit('reply', comment)" class="reply-btn">
             <i class="fas fa-reply"></i>
             Responder
-          </button>
+          </button> 
         </div>
       </div>
       <div v-if="comment.rating" class="comment-rating">

@@ -31,8 +31,12 @@
 
       <!-- Imagen -->
       <div class="mb-4">
-        <label class="block text-gray-700">Imagen</label>
-        <input v-model="image" type="text" class="input-field" required />
+        <label class="block text-gray-700">Imágenes (URLs separadas por comas)</label>
+        <div v-for="(img, idx) in images" :key="idx" class="image-input">
+          <input v-model="images[idx]" type="text" class="input-field" placeholder="URL de la imagen" />
+          <button type="button" class="btn btn-secondary btn-sm" @click="removeImageInput(idx)">Eliminar</button>
+        </div>
+        <button type="button" class="btn btn-secondary" @click="addImageInput">+ Agregar Imagen</button>
       </div>
 
       <!-- Concentración -->
@@ -99,7 +103,8 @@ import ApiService from '../services/ApiService';
 const name = ref('');
 const activeMedicament = ref('');
 const description = ref('');
-const image = ref('');
+const MAX_IMAGES = 5;
+const images = ref(['']);
 const concentration = ref('');
 const presentacion = ref('');
 const stock = ref(0);
@@ -110,18 +115,32 @@ const soldUnits = ref(0);
 const errorMessage = ref('');
 const showModal = ref(false);
 
+function addImageInput() {
+  if (images.value.length < MAX_IMAGES) {
+    images.value.push('');
+  }
+}
+
+function removeImageInput(index) {
+  if (images.value.length > 1) {
+    images.value.splice(index, 1);
+  }
+}
 
 // Función principal de crear producto
 const createProduct = async () => {
   errorMessage.value = '';
 
   try {
+    // Procesar las imágenes: convertir string de URLs separadas por comas en array
+    const imageString = images.value.filter(url => url.trim() !== '').join(',');
+
     // Petición POST al backend (ajusta la URL a la tuya)
     const response = await axios.post(ApiService.getPharmacyApiUrl("/medicines"), {
       name: name.value,
       activeMedicament: activeMedicament.value,
       description: description.value,
-      image: image.value,
+      images: imageString, // Enviar como string de URLs separadas por comas
       concentration: concentration.value,
       presentacion: presentacion.value,
       stock: stock.value,
@@ -138,7 +157,7 @@ const createProduct = async () => {
     name.value = '';
     activeMedicament.value = '';
     description.value = '';
-    image.value = '';
+    images.value = ['', '', '', '', ''];
     concentration.value = '';
     presentacion.value = '';
     stock.value = 0;

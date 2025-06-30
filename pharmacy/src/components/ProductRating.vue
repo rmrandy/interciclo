@@ -46,12 +46,18 @@
 
     <!-- Botón para mostrar formulario de calificación -->
     <button 
-      v-if="!showRatingForm && isUserLoggedIn" 
+      v-if="!showRatingForm && isUserLoggedIn && !userHasRated" 
       @click="showRatingForm = true"
       class="rate-product-btn"
     >
       Calificar Producto
     </button>
+
+    <!-- Mensaje si el usuario ya calificó -->
+    <div v-if="isUserLoggedIn && userHasRated" class="already-rated">
+      <i class="fas fa-check-circle"></i>
+      Ya calificaste este producto
+    </div>
   </div>
 </template>
 
@@ -73,6 +79,10 @@ const props = defineProps({
   ratingCount: {
     type: Number,
     default: 0
+  },
+  readOnly: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -84,6 +94,7 @@ const userRating = ref(0);
 const hoverRating = ref(0);
 const userComment = ref('');
 const submitting = ref(false);
+const userHasRated = ref(false);
 
 const isUserLoggedIn = computed(() => {
   const user = userStore.getUser();
@@ -103,39 +114,65 @@ const submitRating = async () => {
   submitting.value = true;
   try {
     const user = userStore.getUser();
-    const ratingData = {
-      productId: props.productId,
-      userId: user.idUser,
+    
+    // Crear el payload para el endpoint de comentarios
+    const commentData = {
+      user: user,
+      commentText: userComment.value || `Calificación: ${userRating.value} estrellas`,
       rating: userRating.value,
-      comment: userComment.value,
-      date: new Date().toISOString()
+      medicine: { idMedicine: Number(props.productId) }
     };
 
-    // Aquí harías la llamada a la API para guardar la calificación
-    await axios.post(ApiService.getPharmacyApiUrl(`/products/${props.productId}/ratings`), ratingData);
+    // Usar el endpoint correcto de comentarios
+    const response = await axios.post(ApiService.getPharmacyApiUrl("/comments"), commentData);
     
-    // Por ahora, simulamos el éxito
-    console.log('Rating submitted:', ratingData);
-    
-    // Limpiar formulario
-    userRating.value = 0;
-    userComment.value = '';
-    showRatingForm.value = false;
-    
-    // Emitir evento para actualizar el rating
-    emit('rating-updated');
-    
-    alert('¡Gracias por tu calificación!');
+    if (response.status === 201) {
+      console.log('Rating submitted successfully:', response.data);
+      
+      // Limpiar formulario
+      userRating.value = 0;
+      userComment.value = '';
+      showRatingForm.value = false;
+      userHasRated.value = true;
+      
+      // Emitir evento para actualizar el rating
+      emit('rating-updated');
+      
+      alert('¡Gracias por tu calificación!');
+    } else {
+      throw new Error('Error en la respuesta del servidor');
+    }
   } catch (error) {
     console.error('Error submitting rating:', error);
-    alert('Error al enviar la calificación.');
+    alert('Error al enviar la calificación. Por favor intenta de nuevo.');
   } finally {
     submitting.value = false;
   }
 };
 
+const checkUserRating = async () => {
+  if (!isUserLoggedIn.value) return;
+  
+  try {
+    const user = userStore.getUser();
+    const response = await axios.get(ApiService.getPharmacyApiUrl("/comments"));
+    const comments = response.data;
+    
+    // Verificar si el usuario ya calificó este producto
+    const userRating = comments.find(comment => 
+      comment.user && comment.user.idUser === user.idUser &&
+      comment.medicine && Number(comment.medicine.idMedicine) === Number(props.productId) &&
+      comment.rating !== null
+    );
+    
+    userHasRated.value = !!userRating;
+  } catch (error) {
+    console.error('Error checking user rating:', error);
+  }
+};
+
 onMounted(() => {
-  // Aquí podrías cargar la calificación del usuario si ya calificó este producto
+  checkUserRating();
 });
 </script>
 
@@ -246,5 +283,21 @@ onMounted(() => {
 
 .rate-product-btn:hover {
   background: #f59e0b;
+}
+
+.already-rated {
+  color: #64748b;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background-color: #f1f5f9;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.already-rated i {
+  color: #10b981;
 }
 </style> 

@@ -5,7 +5,10 @@
   "scripts": {
     "serve": " python3 getip.py && vue-cli-service serve ",
     "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint"
+    "lint": "vue-cli-service lint",
+    "docs": "jsdoc -c jsdoc.json",
+    "docs:watch": "jsdoc -c jsdoc.json --watch",
+    "docs:serve": "npx http-server docs -p 8081 -o"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^6.7.2",
@@ -26,8 +29,10 @@
     "@vue/cli-plugin-eslint": "~5.0.0",
     "@vue/cli-service": "~5.0.0",
     "autoprefixer": "^10.4.21",
+    "clean-jsdoc-theme": "^4.3.0",
     "eslint": "^7.32.0",
     "eslint-plugin-vue": "^8.0.3",
+    "jsdoc": "^4.0.4",
     "postcss": "^8.5.4",
     "tailwindcss": "^4.1.8"
   },

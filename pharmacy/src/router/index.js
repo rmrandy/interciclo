@@ -19,6 +19,8 @@ import Checkout from '../pages/Checkout.vue';
 import Categoria from '../pages/Categoria.vue'; // Nueva página de categoría
 import Perfil from '../pages/Perfil.vue'; // Nueva página de perfil
 import Gracias from '../pages/Gracias.vue'; // Nueva página de gracias
+import CatalogoAlt from '../pages/CatalogoAlt.vue';
+import CatalogoAlt2 from '../pages/CatalogoAlt2.vue';
 
 // Rutas para usuarios públicos y autenticados
 const userRoutes = [
@@ -51,6 +53,16 @@ const userRoutes = [
     meta: { requiresAuth: true, allowedRoles: ['admin', 'employee'] }
   },
   { path: '/checkout', name: 'Checkout', component: Checkout, meta: { requiresAuth: true } },
+  {
+    path: '/catalogo-alt',
+    name: 'CatalogoAlt',
+    component: CatalogoAlt
+  },
+  {
+    path: '/catalogo-alt-2',
+    name: 'CatalogoAlt2',
+    component: CatalogoAlt2
+  },
 ];
 
 // Rutas exclusivas para administradores
@@ -71,6 +83,12 @@ const adminRoutes = [
     path: '/admin/pedidos',
     name: 'AdminPedidos',
     component: () => import('../pages/admin/Pedidos.vue'),
+    meta: { admin: true }
+  },
+  {
+    path: '/admin/site-content',
+    name: 'SiteContent',
+    component: () => import('../pages/admin/site-content.vue'),
     meta: { admin: true }
   }
 ];

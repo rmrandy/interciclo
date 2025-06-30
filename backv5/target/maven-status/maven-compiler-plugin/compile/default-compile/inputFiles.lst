@@ -1,9 +1,12 @@
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/entities/MedicineCatSubcat.java
+/Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/entities/SiteContent.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/entities/PrescriptionMedicine.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/handlers/PolicyHandler.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/dao/ExternalMedicineDAO.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/entities/Prescription.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/entities/SystemConfig.java
+/Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/dao/SiteContentDAO.java
+/Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/controllers/SiteContentController.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/dao/CommentsDAO.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/dao/HospitalDAO.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/handlers/InsuranceIntegrationHandler.java
@@ -46,6 +49,7 @@
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/App.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/util/HospitalClient.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/handlers/StaticXMLMedicineHandler.java
+/Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/handlers/SiteContentHandler.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/handlers/PrescriptionMedicineHandler.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/handlers/SearchMedicineHandler.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/entities/Subcategory.java

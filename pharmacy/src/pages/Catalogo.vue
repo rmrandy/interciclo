@@ -71,7 +71,7 @@
         <div class="product-content">
           <!-- Quitar badge de receta -->
           <div class="product-image-box">
-            <img v-if="product.image" :src="product.image" :alt="product.name" class="product-img" />
+            <img v-if="getProductImage(product)" :src="getProductImage(product)" :alt="product.name" class="product-img" />
             <div v-else class="product-img-placeholder">🛍️</div>
           </div>
           <h3 class="product-name">{{ product.name }}</h3>
@@ -121,49 +121,37 @@
     <div class="modal-content">
       <button class="close-modal" @click="closeModal">✖</button>
       <div class="modal-body">
-        <div class="modal-header">
-          <h2 class="modal-title">{{ selectedProduct.name }}</h2>
-          <div class="modal-price">Q{{ selectedProduct.price ? selectedProduct.price.toFixed(2) : '0.00' }}</div>
-        </div>
+        <h3>{{ selectedProduct.name }}</h3>
         
-        <!-- Rating en modal -->
-        <div class="modal-rating">
-          <div class="stars">
-            <span v-for="star in 5" :key="star" class="star" :class="{ filled: star <= (selectedProduct.averageRating || 0) }">
-              {{ star <= (selectedProduct.averageRating || 0) ? '★' : '☆' }}
-            </span>
+        <!-- Galería de imágenes en el modal -->
+        <div v-if="selectedProduct.images && selectedProduct.images.length > 0" class="modal-image-gallery">
+          <div class="modal-main-image">
+            <img 
+              :src="selectedProduct.images[0]" 
+              :alt="selectedProduct.name" 
+              class="modal-product-img"
+            />
           </div>
-          <span class="rating-text">{{ (selectedProduct.averageRating || 0).toFixed(1) }} ({{ selectedProduct.ratingCount || 0 }} calificaciones)</span>
+          <div v-if="selectedProduct.images.length > 1" class="modal-thumbnails">
+            <img 
+              v-for="(image, index) in selectedProduct.images" 
+              :key="index"
+              :src="image" 
+              :alt="`${selectedProduct.name} - Imagen ${index + 1}`" 
+              class="modal-thumbnail"
+              @click="selectedProduct.images[0] = image"
+            />
         </div>
+          </div>
+        <div v-else-if="selectedProduct.image" class="modal-image">
+          <img :src="selectedProduct.image" :alt="selectedProduct.name" class="modal-product-img" />
+          </div>
         
-        <div class="info-grid">
-          <div class="info-item">
-            <h4>Categoría</h4>
-            <p>{{ selectedProduct.activeMedicament || 'No disponible' }}</p>
-          </div>
-          <div class="info-item">
-            <h4>Marca</h4>
-            <p>{{ selectedProduct.brand || 'No disponible' }}</p>
-          </div>
-          <div class="info-item">
-            <h4>Concentración</h4>
-            <p>{{ selectedProduct.concentration || 'No disponible' }}</p>
-          </div>
-          <div class="info-item">
-            <h4>Presentación</h4>
-            <p>{{ selectedProduct.presentacion || 'No disponible' }}</p>
-          </div>
-          <div class="info-item">
-            <h4>Stock Disponible</h4>
-            <p class="stock-indicator" :class="{'low-stock': selectedProduct.stock < 10}">
-              {{ selectedProduct.stock }} unidades
-            </p>
-          </div>
-          <div class="info-item full-width">
-            <h4>Descripción</h4>
-            <p class="description-text">{{ selectedProduct.description || 'No hay descripción disponible para este producto.' }}</p>
-          </div>
-        </div>
+        <p><strong>Descripción:</strong> {{ selectedProduct.description }}</p>
+        <p><strong>Ingrediente Activo:</strong> {{ selectedProduct.activeMedicament }}</p>
+        <p><strong>Marca:</strong> {{ selectedProduct.brand }}</p>
+        <p><strong>Precio:</strong> Q{{ selectedProduct.price.toFixed(2) }}</p>
+        <p><strong>Stock:</strong> {{ selectedProduct.stock }} unidades</p>
         <div class="modal-actions">
           <div class="modal-cart-actions">
             <button class="modal-qty-btn" @click="decrementModalQuantity" :disabled="modalQuantity <= 1">-</button>
@@ -370,6 +358,16 @@ const addToCart = async (product) => {
     alert('Error al agregar al carrito.');
     console.error(error);
   }
+};
+
+// Función helper para obtener la imagen principal de un producto
+const getProductImage = (product) => {
+  if (Array.isArray(product.images) && product.images.length > 0) {
+    return product.images[0];
+  } else if (product.image) {
+    return product.image;
+  }
+  return null;
 };
 </script>
 
@@ -886,5 +884,62 @@ const addToCart = async (product) => {
   font-size: 1rem;
   font-weight: 600;
   color: #1e293b;
+}
+/* Estilos para la galería de imágenes en el modal */
+.modal-image-gallery {
+  margin-bottom: 1.5rem;
+}
+
+.modal-main-image {
+  width: 100%;
+  height: 200px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.modal-product-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.modal-thumbnails {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.modal-thumbnail {
+  flex-shrink: 0;
+  width: 60px;
+  height: 60px;
+  border-radius: 6px;
+  object-fit: cover;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.modal-thumbnail:hover {
+  border-color: #3b82f6;
+  transform: scale(1.05);
+}
+
+.modal-image {
+  width: 100%;
+  height: 200px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
 }
 </style>
