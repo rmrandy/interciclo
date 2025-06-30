@@ -20,6 +20,17 @@
         <span class="edit-icon" v-if="isAdmin && !isEditingTitle" @click="editHeaderTitle">✏️</span>
       </div>
 
+      <!-- Dropdown de sucursales/puertos -->
+      <div class="sucursal-dropdown" style="margin-left: 24px;">
+        <label for="sucursal-select" style="font-weight: 500; margin-right: 8px;">Sucursal:</label>
+        <select id="sucursal-select" v-model="selectedSucursal" @change="onSucursalChange" class="sucursal-select">
+          <option v-for="sucursal in sucursales" :key="sucursal.puerto" :value="sucursal.puerto">
+            {{ sucursal.nombre }} ({{ sucursal.puerto }})
+          </option>
+        </select>
+        <button @click="openPortSelector" class="btn btn-secondary btn-sm" style="margin-left: 8px;">⚙️</button>
+      </div>
+
       <!-- Menú de Navegación (versión desktop) -->
       <nav class="nav-links hidden md:flex">
         <router-link to="/" class="nav-item">
@@ -41,6 +52,10 @@
         <router-link to="/contact" class="nav-item">
           <span class="nav-icon">📞</span>
           Contacto
+        </router-link>
+        <router-link to="/admin/puertos" class="nav-item">
+          <span class="nav-icon">🛠️</span>
+          Puertos
         </router-link>
         <router-link to="/cart" class="nav-item cart-link">
           <span class="nav-icon">🛒</span>
@@ -265,11 +280,13 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import { useUserStore } from "@/stores/userStore";
 import SiteContentService from "@/services/SiteContentService";
 import { getPharmacyApiUrl } from '@/services/ApiService';
+import ApiService from '@/services/ApiService';
+import eventBus from '@/eventBus';
 
 export default {
   name: 'AppHeader',
@@ -371,6 +388,38 @@ export default {
       }
     });
     
+    // Nuevo código para sucursales
+    const sucursales = ref([]);
+    const selectedSucursal = ref('');
+    
+    const loadSucursales = () => {
+      // Cargar sucursales desde localStorage o usar valores por defecto
+      const defaultSucursales = [
+        { nombre: 'Sucursal 1', puerto: '8080' },
+        { nombre: 'Sucursal 2', puerto: '8081' },
+      ];
+      const saved = localStorage.getItem('sucursalesPharmacy');
+      sucursales.value = saved ? JSON.parse(saved) : defaultSucursales;
+      // Selección previa o la primera
+      const last = localStorage.getItem('selectedSucursalPharmacy');
+      selectedSucursal.value = last || sucursales.value[0].puerto;
+      // Aplicar el puerto seleccionado
+      ApiService.configureApiPorts({ pharmacy: selectedSucursal.value });
+    };
+    
+    const onSucursalChange = () => {
+      ApiService.configureApiPorts({ pharmacy: selectedSucursal.value });
+      localStorage.setItem('selectedSucursalPharmacy', selectedSucursal.value);
+    };
+    
+    onMounted(() => {
+      eventBus.on('sucursales-actualizadas', loadSucursales);
+    });
+    
+    onBeforeUnmount(() => {
+      eventBus.off('sucursales-actualizadas', loadSucursales);
+    });
+    
     return {
       mobileMenuOpen,
       toggleMenu,
@@ -386,7 +435,11 @@ export default {
       titleInput,
       editHeaderTitle,
       saveHeaderTitle,
-      cancelEditTitle
+      cancelEditTitle,
+      sucursales,
+      selectedSucursal,
+      loadSucursales,
+      onSucursalChange
     };
   }
 }
@@ -854,5 +907,20 @@ export default {
   .mobile-logout {
     padding: 14px 20px;
   }
+}
+
+.sucursal-dropdown {
+  display: flex;
+  align-items: center;
+}
+.sucursal-select {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 13px;
 }
 </style>

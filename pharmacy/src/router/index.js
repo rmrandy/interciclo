@@ -90,7 +90,13 @@ const adminRoutes = [
     name: 'SiteContent',
     component: () => import('../pages/admin/site-content.vue'),
     meta: { admin: true }
-  }
+  },
+  {
+    path: '/admin/puertos',
+    name: 'AdminPuertos',
+    component: () => import('../pages/admin/puertos.vue'),
+    meta: { admin: true }
+  },
 ];
 
 const routes = [
