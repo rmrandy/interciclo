@@ -41,13 +41,9 @@
           <span class="nav-icon">📋</span>
           Catálogo
         </router-link>
-        <router-link to="/catalogo-alt" class="nav-item">
-          <span class="nav-icon">🗂️</span>
-          Catálogo ALT
-        </router-link>
-        <router-link to="/catalogo-alt-2" class="nav-item">
-          <span class="nav-icon">🗂️</span>
-          Catálogo ALT 2
+        <router-link to="/catalogo-internacional" class="nav-item">
+          <span class="nav-icon">🌎</span>
+          Catálogo Internacional
         </router-link>
         <router-link to="/contact" class="nav-item">
           <span class="nav-icon">📞</span>
@@ -173,14 +169,9 @@
         Catálogo de Productos
       </router-link>
       
-      <router-link to="/catalogo-alt" class="mobile-item" @click="toggleMenu">
-        <span class="mobile-icon">🗂️</span>
-        Catálogo ALT
-      </router-link>
-      
-      <router-link to="/catalogo-alt-2" class="mobile-item" @click="toggleMenu">
-        <span class="mobile-icon">🗂️</span>
-        Catálogo ALT 2
+      <router-link to="/catalogo-internacional" class="mobile-item" @click="toggleMenu">
+        <span class="mobile-icon">🌎</span>
+        Catálogo Internacional
       </router-link>
       
       <router-link to="/contact" class="mobile-item" @click="toggleMenu">

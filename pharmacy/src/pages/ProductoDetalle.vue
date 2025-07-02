@@ -70,7 +70,7 @@
             </div>
             <div class="compra-buttons">
               <button
-                @click="addToCart"
+                @click="addToCartLocal"
                 :disabled="!quantity || quantity < 1 || quantity > product.stock || product.stock === 0"
                 class="add-cart-btn"
               >
@@ -85,6 +85,7 @@
               </button>
             </div>
           </div>
+          <div v-if="mensaje" class="mensaje" style="margin-top:12px; color:#059669; font-weight:600;">{{ mensaje }}</div>
         </div>
       </div>
 
@@ -121,6 +122,7 @@ export default {
     return {
       product: null,
       quantity: 1,
+      mensaje: '',
       productComments: [
         { idComments: 1, user: { name: 'Juan' }, commentText: '¡Muy buen producto!' },
         { idComments: 2, user: { name: 'Maria' }, commentText: 'Me ayudó mucho, gracias!' }
@@ -273,6 +275,19 @@ export default {
         }
       }
       return imagesArr.concat(extraImages).slice(0, 5);
+    },
+    addToCartLocal() {
+      this.mensaje = '';
+      const qty = this.quantity || 1;
+      let cart = JSON.parse(localStorage.getItem('cartLocal') || '[]');
+      const idx = cart.findIndex(p => p.idMedicine === this.product.idMedicine);
+      if (idx >= 0) {
+        cart[idx].quantity += qty;
+      } else {
+        cart.push({ ...this.product, quantity: qty });
+      }
+      localStorage.setItem('cartLocal', JSON.stringify(cart));
+      this.mensaje = 'Producto agregado al carrito local.';
     }
   }
 };
@@ -570,5 +585,11 @@ export default {
   margin-left: 0.5rem;
   font-size: 0.9rem;
   color: #555;
+}
+
+.mensaje {
+  margin: 16px 0;
+  color: #059669;
+  font-weight: 600;
 }
 </style>

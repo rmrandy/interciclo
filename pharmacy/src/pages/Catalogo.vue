@@ -89,14 +89,6 @@
           
           <p class="product-price">Q{{ product.price.toFixed(2) }}</p>
           <!-- Selector de cantidad y botón agregar al carrito -->
-          <div class="product-cart-actions">
-            <button class="qty-btn" @click="decrementQuantity(product)" :disabled="getQuantity(product) <= 1">-</button>
-            <input type="number" class="qty-input" v-model.number="quantities[product.idMedicine]" :min="1" :max="product.stock" />
-            <button class="qty-btn" @click="incrementQuantity(product)" :disabled="getQuantity(product) >= product.stock">+</button>
-            <button class="add-cart-btn" @click="addToCart(product)">
-              <span class="icon">🛒</span> Agregar al carrito
-            </button>
-          </div>
           <div class="product-actions">
             <button class="details-button" @click="openModal(product)">
               <span class="icon">ⓘ</span> Detalles
@@ -104,6 +96,12 @@
             <router-link :to="`/producto/${product.idMedicine}`" class="buy-button">
               <span class="icon">🛒</span> Comprar
             </router-link>
+          </div>
+          <div class="cart-int-actions">
+            <input type="number" min="1" v-model.number="addQty[product.idMedicine]" class="qty-input" style="width:60px; margin-right:8px;" />
+            <button class="add-cart-btn" @click="addToCartLocal(product)">
+              <span class="icon">🛒</span> Agregar al carrito
+            </button>
           </div>
         </div>
       </div>
@@ -113,6 +111,13 @@
     <div v-if="products.length === 0" class="loading-container">
       <div class="loading-spinner"></div>
       <p>Cargando productos...</p>
+    </div>
+
+    <div v-if="mensaje" class="mensaje" style="text-align:center; margin:16px 0; color:#059669; font-weight:600;">{{ mensaje }}</div>
+
+    <!-- Mostrar clave y puerto activo en la UI para depuración -->
+    <div style="text-align:center; color:#64748b; font-size:0.95rem; margin-bottom:8px;">
+      Carrito local clave: <b>{{ `cartLocal_${getActiveLocalPort()}` }}</b> | Puerto activo: <b>{{ getActiveLocalPort() }}</b>
     </div>
   </div>
 
@@ -152,19 +157,18 @@
         <p><strong>Marca:</strong> {{ selectedProduct.brand }}</p>
         <p><strong>Precio:</strong> Q{{ selectedProduct.price.toFixed(2) }}</p>
         <p><strong>Stock:</strong> {{ selectedProduct.stock }} unidades</p>
-        <div class="modal-actions">
-          <div class="modal-cart-actions">
-            <button class="modal-qty-btn" @click="decrementModalQuantity" :disabled="modalQuantity <= 1">-</button>
-            <input type="number" class="modal-qty-input" v-model.number="modalQuantity" :min="1" :max="selectedProduct.stock" />
-            <button class="modal-qty-btn" @click="incrementModalQuantity" :disabled="modalQuantity >= selectedProduct.stock">+</button>
-            <button class="modal-add-cart-btn" @click="addToCartFromModal">
-              <span class="icon">🛒</span> Agregar al carrito
-            </button>
-          </div>
-          <router-link :to="`/producto/${selectedProduct.idMedicine}`" class="modal-buy-button">
-            Comprar Ahora
-          </router-link>
+        <div class="modal-cart-actions">
+          <button class="modal-qty-btn" @click="decrementModalQuantity" :disabled="modalQuantity <= 1">-</button>
+          <input type="number" class="modal-qty-input" v-model.number="modalQuantity" :min="1" :max="selectedProduct.stock" />
+          <button class="modal-qty-btn" @click="incrementModalQuantity" :disabled="modalQuantity >= selectedProduct.stock">+</button>
+          <button class="modal-add-cart-btn" @click="addToCartLocalFromModal">
+            <span class="icon">🛒</span> Agregar al carrito
+          </button>
         </div>
+        <div v-if="mensajeModal" class="mensaje" style="margin-top:12px; color:#059669; font-weight:600;">{{ mensajeModal }}</div>
+        <router-link :to="`/producto/${selectedProduct.idMedicine}`" class="modal-buy-button">
+          Comprar Ahora
+        </router-link>
       </div>
     </div>
   </div>
@@ -174,17 +178,22 @@
 import { ref, computed, onMounted } from 'vue';
 import axios from "axios";
 import ApiService from '../services/ApiService';
+import eventBus from '@/eventBus';
 import { useUserStore } from '@/stores/userStore';
 
 const products = ref([]);
 const categories = ref([]);
+const addQty = ref({});
+const mensaje = ref('');
+const mensajeModal = ref('');
 const userStore = useUserStore();
-const quantities = ref({});
 
 const fetchProduct = async () => {
   try {
     const response = await axios.get(ApiService.getPharmacyApiUrl("/medicines"));
     products.value = response.data;
+    // Inicializar cantidades
+    response.data.forEach(p => { if (!(p.idMedicine in addQty.value)) addQty.value[p.idMedicine] = 1; });
   } catch (error) {
     console.error('Error fetching products:', error);
   }
@@ -233,52 +242,6 @@ const decrementModalQuantity = () => {
   }
 };
 
-const addToCartFromModal = async () => {
-  const product = selectedProduct.value;
-  const quantity = modalQuantity.value;
-  if (!userStore.getUser() || !userStore.getUser().idUser) {
-    alert('Debes iniciar sesión para agregar productos al carrito.');
-    return;
-  }
-  const userId = userStore.getUser().idUser;
-  try {
-    // Buscar o crear orden en progreso
-    const ordersResponse = await axios.get(ApiService.getPharmacyApiUrl("/orders"));
-    const orders = ordersResponse.data;
-    let order = orders.find(o => o.user.idUser === userId && o.status === 'recibido');
-    if (!order) {
-      const newOrderResp = await axios.post(ApiService.getPharmacyApiUrl("/orders"), {
-        user: { idUser: userId },
-        status: 'recibido'
-      });
-      order = newOrderResp.data;
-    }
-    // Buscar si ya existe el producto en la orden
-    const orderMedResp = await axios.get(ApiService.getPharmacyApiUrl(`/order_medicines?id=${order.idOrder}%2C${product.idMedicine}`));
-    let items = orderMedResp.data;
-    if (!Array.isArray(items)) items = items ? [items] : [];
-    const existing = items.find(om => om.medicine.idMedicine === product.idMedicine);
-    const payload = {
-      orders: order,
-      medicine: { idMedicine: product.idMedicine },
-      quantity: quantity,
-      cost: product.price,
-      total: product.price * quantity
-    };
-    if (existing) {
-      payload.quantity += existing.quantity;
-      await axios.put(ApiService.getPharmacyApiUrl("/order_medicines"), { ...payload, id: existing.id });
-    } else {
-      await axios.post(ApiService.getPharmacyApiUrl("/order_medicines"), payload);
-    }
-    alert('Producto agregado al carrito.');
-    closeModal();
-  } catch (error) {
-    alert('Error al agregar al carrito.');
-    console.error(error);
-  }
-};
-
 // Filtros
 const searchQuery = ref('');
 const activeIngredientFilter = ref('');
@@ -304,62 +267,6 @@ const filteredProducts = computed(() => {
   });
 });
 
-const getQuantity = (product) => {
-  return quantities.value[product.idMedicine] || 1;
-};
-const incrementQuantity = (product) => {
-  if (!quantities.value[product.idMedicine]) quantities.value[product.idMedicine] = 1;
-  if (quantities.value[product.idMedicine] < product.stock) quantities.value[product.idMedicine]++;
-};
-const decrementQuantity = (product) => {
-  if (!quantities.value[product.idMedicine]) quantities.value[product.idMedicine] = 1;
-  if (quantities.value[product.idMedicine] > 1) quantities.value[product.idMedicine]--;
-};
-
-const addToCart = async (product) => {
-  const quantity = getQuantity(product);
-  if (!userStore.getUser() || !userStore.getUser().idUser) {
-    alert('Debes iniciar sesión para agregar productos al carrito.');
-    return;
-  }
-  const userId = userStore.getUser().idUser;
-  try {
-    // Buscar o crear orden en progreso
-    const ordersResponse = await axios.get(ApiService.getPharmacyApiUrl("/orders"));
-    const orders = ordersResponse.data;
-    let order = orders.find(o => o.user.idUser === userId && o.status === 'recibido');
-    if (!order) {
-      const newOrderResp = await axios.post(ApiService.getPharmacyApiUrl("/orders"), {
-        user: { idUser: userId },
-        status: 'recibido'
-      });
-      order = newOrderResp.data;
-    }
-    // Buscar si ya existe el producto en la orden
-    const orderMedResp = await axios.get(ApiService.getPharmacyApiUrl(`/order_medicines?id=${order.idOrder}%2C${product.idMedicine}`));
-    let items = orderMedResp.data;
-    if (!Array.isArray(items)) items = items ? [items] : [];
-    const existing = items.find(om => om.medicine.idMedicine === product.idMedicine);
-    const payload = {
-      orders: order,
-      medicine: { idMedicine: product.idMedicine },
-      quantity: quantity,
-      cost: product.price,
-      total: product.price * quantity
-    };
-    if (existing) {
-      payload.quantity += existing.quantity;
-      await axios.put(ApiService.getPharmacyApiUrl("/order_medicines"), { ...payload, id: existing.id });
-    } else {
-      await axios.post(ApiService.getPharmacyApiUrl("/order_medicines"), payload);
-    }
-    alert('Producto agregado al carrito.');
-  } catch (error) {
-    alert('Error al agregar al carrito.');
-    console.error(error);
-  }
-};
-
 // Función helper para obtener la imagen principal de un producto
 const getProductImage = (product) => {
   if (Array.isArray(product.images) && product.images.length > 0) {
@@ -369,6 +276,97 @@ const getProductImage = (product) => {
   }
   return null;
 };
+
+function getActiveLocalPort() {
+  // Siempre usa el puerto real de la URL del frontend
+  return window.location.port || '8081';
+}
+
+function addToCartLocal(product) {
+  mensaje.value = '';
+  const qty = addQty.value[product.idMedicine] || 1;
+  const user = userStore.getUser ? userStore.getUser() : userStore.user;
+  console.log('DEBUG usuario actual:', user);
+  if (user && user.idUser) {
+    axios.get(ApiService.getPharmacyApiUrl('/orders'))
+      .then(response => {
+        const orders = response.data;
+        let order = orders.find(o => o.user.idUser === user.idUser && o.status === 'En progreso');
+        if (!order) {
+          return axios.post(ApiService.getPharmacyApiUrl('/orders'), {
+            user: { idUser: user.idUser },
+            status: 'En progreso'
+          }).then(resp => resp.data);
+        }
+        return order;
+      })
+      .then(order => {
+        // Buscar si ya existe el producto en la orden
+        return axios.get(ApiService.getPharmacyApiUrl(`/order_medicines?orderId=${order.idOrder}`))
+          .then(resp => {
+            const items = Array.isArray(resp.data) ? resp.data : (resp.data ? [resp.data] : []);
+            const existing = items.find(om => om.medicine.idMedicine === product.idMedicine);
+            const payload = {
+              orders: order,
+              medicine: { idMedicine: product.idMedicine },
+              quantity: qty,
+              cost: product.price,
+              total: product.price * qty
+            };
+            if (existing) {
+              payload.quantity += existing.quantity;
+              return axios.put(ApiService.getPharmacyApiUrl('/order_medicines'), { ...payload, id: existing.id });
+            } else {
+              return axios.post(ApiService.getPharmacyApiUrl('/order_medicines'), payload);
+            }
+          });
+      })
+      .then(() => {
+        mensaje.value = 'Producto agregado al carrito.';
+        eventBus.emit('carrito-actualizado');
+      })
+      .catch(error => {
+        mensaje.value = 'Error al agregar al carrito. Consulta la consola para más detalles.';
+        console.error('Error al agregar producto al carrito:', error);
+      });
+    return;
+  }
+  mensaje.value = 'Debes iniciar sesión para agregar productos al carrito real.';
+  // Si no está autenticado, usa localStorage
+  const port = getActiveLocalPort();
+  const key = `cartLocal_${port}`;
+  let cart = JSON.parse(localStorage.getItem(key) || '[]');
+  const idx = cart.findIndex(p => p.idMedicine === product.idMedicine);
+  if (idx >= 0) {
+    cart[idx].quantity += qty;
+  } else {
+    cart.push({ ...product, quantity: qty });
+  }
+  localStorage.setItem(key, JSON.stringify(cart));
+  mensaje.value += ` Producto agregado al carrito local. [${key}]`;
+  eventBus.emit('carrito-actualizado');
+  // Log de depuración
+  console.log('Agregado al carrito:', { key, port, cart });
+}
+
+function addToCartLocalFromModal() {
+  mensajeModal.value = '';
+  const qty = modalQuantity.value || 1;
+  const port = getActiveLocalPort();
+  const key = `cartLocal_${port}`;
+  let cart = JSON.parse(localStorage.getItem(key) || '[]');
+  const idx = cart.findIndex(p => p.idMedicine === selectedProduct.value.idMedicine);
+  if (idx >= 0) {
+    cart[idx].quantity += qty;
+  } else {
+    cart.push({ ...selectedProduct.value, quantity: qty });
+  }
+  localStorage.setItem(key, JSON.stringify(cart));
+  mensajeModal.value = `Producto agregado al carrito local. [${key}]`;
+  eventBus.emit('carrito-actualizado');
+  // Log de depuración
+  console.log('Agregado al carrito (modal):', { key, port, cart });
+}
 </script>
 
 <style scoped>
@@ -524,55 +522,6 @@ const getProductImage = (product) => {
   color: #16a34a;
   margin-bottom: 1rem;
   text-align: center;
-}
-.product-cart-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-.qty-btn {
-  width: 32px;
-  height: 32px;
-  background-color: #f1f1f1;
-  border: none;
-  border-radius: 50%;
-  font-size: 1.1rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color 0.2s;
-}
-.qty-btn:disabled {
-  color: #aaa;
-  cursor: not-allowed;
-}
-.qty-input {
-  width: 48px;
-  text-align: center;
-  font-size: 1rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 0.3rem;
-}
-.add-cart-btn {
-  background: linear-gradient(135deg, #16a34a 0%, #22d3ee 100%);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 0.6rem 1.1rem;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.2s, transform 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-.add-cart-btn:hover {
-  background: linear-gradient(135deg, #22d3ee 0%, #16a34a 100%);
-  transform: scale(1.05);
 }
 .product-actions {
   display: flex;
@@ -941,5 +890,38 @@ const getProductImage = (product) => {
   align-items: center;
   justify-content: center;
   margin-bottom: 1.5rem;
+}
+
+.cart-int-actions {
+  display: flex;
+  align-items: center;
+  margin-top: 0.5rem;
+  gap: 0.5rem;
+}
+.add-cart-btn {
+  background: linear-gradient(135deg, #16a34a 0%, #22d3ee 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.add-cart-btn:hover {
+  background: linear-gradient(135deg, #22d3ee 0%, #16a34a 100%);
+}
+.qty-input {
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 1rem;
+  width: 60px;
+}
+.mensaje {
+  margin: 16px 0;
+  color: #059669;
+  font-weight: 600;
 }
 </style>

@@ -471,7 +471,7 @@ onMounted(async () => {
 
   try {
     // Obtener la orden activa del usuario
-    const ordersResponse = await axios.get(ApiService.getPharmacyApiUrl(`/orders?userId=${userStore.user.idUser}&status=En progreso`));
+    const ordersResponse = await axios.get(ApiService.getPharmacyApiUrl(`/orders?userId=${userStore.user.idUser}&status=recibido`));
     activeOrder.value = ordersResponse.data.length > 0 ? ordersResponse.data[0] : null;
 
     const medicineResponse = await axios.get(ApiService.getPharmacyApiUrl(`/medicines/${medicineId}`));

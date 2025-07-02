@@ -19,8 +19,6 @@ import Checkout from '../pages/Checkout.vue';
 import Categoria from '../pages/Categoria.vue'; // Nueva página de categoría
 import Perfil from '../pages/Perfil.vue'; // Nueva página de perfil
 import Gracias from '../pages/Gracias.vue'; // Nueva página de gracias
-import CatalogoAlt from '../pages/CatalogoAlt.vue';
-import CatalogoAlt2 from '../pages/CatalogoAlt2.vue';
 
 // Rutas para usuarios públicos y autenticados
 const userRoutes = [
@@ -54,14 +52,14 @@ const userRoutes = [
   },
   { path: '/checkout', name: 'Checkout', component: Checkout, meta: { requiresAuth: true } },
   {
-    path: '/catalogo-alt',
-    name: 'CatalogoAlt',
-    component: CatalogoAlt
+    path: '/catalogo-internacional',
+    name: 'CatalogoInternacional',
+    component: () => import('../pages/CatalogoInternacional.vue')
   },
   {
-    path: '/catalogo-alt-2',
-    name: 'CatalogoAlt2',
-    component: CatalogoAlt2
+    path: '/producto-internacional/:id',
+    name: 'ProductoInternacional',
+    component: () => import('../pages/ProductoInternacional.vue')
   },
 ];
 
