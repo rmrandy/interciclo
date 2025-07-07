@@ -10,3 +10,5 @@
 /pharmacy/.env
 front/.nuxt/
 .env
+node_modules
+node_modules

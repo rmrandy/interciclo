@@ -1,0 +1,50 @@
+{
+  "tags": {
+    "allowUnknownTags": true,
+    "dictionaries": ["jsdoc", "closure"]
+  },
+  "source": {
+    "include": ["src"],
+    "includePattern": "\\.js$",
+    "excludePattern": "(node_modules/|docs)"
+  },
+  "plugins": [
+    "plugins/markdown"
+  ],
+  "templates": {
+    "cleverLinks": false,
+    "monospaceLinks": false,
+    "default": {
+      "outputSourceFiles": true,
+      "includeDate": false
+    },
+    "path": "node_modules/clean-jsdoc-theme",
+    "theme_opts": {
+      "title": "Documentación de Pharmacy API",
+      "menu": [
+        {
+          "title": "Inicio",
+          "link": "/"
+        },
+        {
+          "title": "Servicios",
+          "link": "/services"
+        },
+        {
+          "title": "Componentes",
+          "link": "/components"
+        }
+      ],
+      "search": true,
+      "navbar": true,
+      "sidebar": true,
+      "footer": "Documentación generada automáticamente con JSDoc"
+    }
+  },
+  "opts": {
+    "destination": "./docs",
+    "recurse": true,
+    "readme": "./README.md",
+    "template": "node_modules/clean-jsdoc-theme"
+  }
+} 
