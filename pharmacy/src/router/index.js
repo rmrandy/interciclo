@@ -73,6 +73,7 @@ const userRoutes = [
     component: () => import('@/pages/CheckoutInternacional.vue'),
     meta: { requiresAuth: false }
   },
+  { path: '/reporteria', name: 'Reporteria', component: () => import('../pages/ReporteriaPage.vue') },
 ];
 
 // Rutas exclusivas para administradores

@@ -1,6 +1,6 @@
 <template>
   <div class="checkout-int-container">
-    <h1 class="checkout-title">Finalizar Compra Internacional</h1>
+    <h1 class="checkout-title">reportería</h1>
     <div v-if="cartInt.length === 0" class="empty-cart">
       <p>Tu carrito internacional está vacío.</p>
       <router-link to="/catalogo-internacional" class="btn btn-primary">Ir al catálogo internacional</router-link>

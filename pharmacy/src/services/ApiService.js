@@ -293,6 +293,11 @@ export const getApiUrlWithPort = (endpoint, port) => {
   return `http://${ip}:${port}/api2/${cleanEndpoint}`;
 };
 
+// Crear categoría
+export const crearCategoria = async (nombre) => {
+  return await post(getPharmacyApiUrl('categories'), { name: nombre });
+};
+
 // Exportar funciones y configuración por defecto
 export default {
   configureApiPorts,

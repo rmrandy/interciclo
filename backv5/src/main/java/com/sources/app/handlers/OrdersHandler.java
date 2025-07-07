@@ -243,7 +243,30 @@ public class OrdersHandler implements HttpHandler {
      */
     private void handleGetAll(HttpExchange exchange) throws IOException {
         List<Orders> list = ordersDAO.getAll();
-        sendResponse(exchange, 200, objectMapper.writeValueAsString(list));
+        // Crear una lista de mapas para incluir el total calculado
+        List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
+        for (Orders order : list) {
+            java.util.Map<String, Object> map = objectMapper.convertValue(order, java.util.Map.class);
+            // Calcular el total sumando los OrderMedicine
+            double total = 0.0;
+            try {
+                List<com.sources.app.entities.OrderMedicine> items = orderMedicineDAO.getByOrderId(order.getIdOrder());
+                if (items != null) {
+                    for (com.sources.app.entities.OrderMedicine om : items) {
+                        try {
+                            total += Double.parseDouble(om.getTotal());
+                        } catch (Exception e) {
+                            // Si hay error en el parseo, ignorar ese item
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // Si hay error, dejar total en 0
+            }
+            map.put("total", total);
+            result.add(map);
+        }
+        sendResponse(exchange, 200, objectMapper.writeValueAsString(result));
     }
 
     /**

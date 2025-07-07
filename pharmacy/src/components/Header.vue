@@ -31,270 +31,97 @@
         <button @click="openPortSelector" class="btn btn-secondary btn-sm" style="margin-left: 8px;">⚙️</button>
       </div>
 
-      <!-- Menú de Navegación (versión desktop) -->
-      <nav class="nav-links hidden md:flex">
-        <router-link to="/" class="nav-item">
-          <span class="nav-icon">🏠</span>
+      <!-- Botón para abrir menú lateral derecho -->
+      <button @click="toggleMenu" class="side-menu-button">
+        <span class="side-menu-icon">☰</span>
+      </button>
+    </div>
+
+    <!-- Menú lateral derecho -->
+    <transition name="slide-right">
+      <div v-if="mobileMenuOpen" class="side-menu">
+        <div class="side-menu-header">
+          <span class="side-menu-title">Menú</span>
+          <button @click="toggleMenu" class="close-side-menu-btn">✕</button>
+        </div>
+        <router-link to="/" class="side-menu-item" @click="toggleMenu">
+          <span class="side-menu-icon">🏠</span>
           Inicio
         </router-link>
-        <router-link to="/catalogo" class="nav-item">
-          <span class="nav-icon">📋</span>
+        <router-link to="/catalogo" class="side-menu-item" @click="toggleMenu">
+          <span class="side-menu-icon">📋</span>
           Catálogo
         </router-link>
-        <router-link to="/catalogo-internacional" class="nav-item">
-          <span class="nav-icon">🌎</span>
+        <router-link to="/catalogo-internacional" class="side-menu-item" @click="toggleMenu">
+          <span class="side-menu-icon">🌎</span>
           Catálogo Internacional
         </router-link>
-        <router-link to="/contact" class="nav-item">
-          <span class="nav-icon">📞</span>
+        <router-link to="/contact" class="side-menu-item" @click="toggleMenu">
+          <span class="side-menu-icon">📞</span>
           Contacto
         </router-link>
-        <router-link to="/admin/puertos" class="nav-item">
-          <span class="nav-icon">🛠️</span>
+        <router-link to="/admin/puertos" class="side-menu-item" @click="toggleMenu">
+          <span class="side-menu-icon">🛠️</span>
           Puertos
         </router-link>
-        <router-link to="/cart" class="nav-item cart-link">
-          <span class="nav-icon">🛒</span>
+        <router-link to="/cart" class="side-menu-item" @click="toggleMenu">
+          <span class="side-menu-icon">🛒</span>
           Carrito
         </router-link>
-        <!-- Enlace a Carrito Internacional -->
-        <router-link to="/cart#internacional" class="nav-item">
-          <span class="nav-icon">🌎🛒</span>
+        <router-link to="/cart#internacional" class="side-menu-item" @click="toggleMenu">
+          <span class="side-menu-icon">🌎🛒</span>
           Carrito Internacional
         </router-link>
-
-        <!-- Enlace SOLO para administradores -->
-        <router-link
-          v-if="isLoggedIn && userStore.getUser().role === 'admin'"
-          to="/admindash"
-          class="nav-item admin-link"
-        >
-          <span class="nav-icon">📊</span>
+        <router-link v-if="isLoggedIn && userStore.getUser().role === 'admin'" to="/admindash" class="side-menu-item" @click="toggleMenu">
+          <span class="side-menu-icon">📊</span>
           Dashboard
         </router-link>
-
-        <router-link
-          v-if="isLoggedIn && userStore.getUser().role === 'admin'"
-          to="/create-product"
-          class="nav-item"
-        >
-          <span class="nav-icon">➕</span>
+        <router-link v-if="isLoggedIn && userStore.getUser().role === 'admin'" to="/create-product" class="side-menu-item" @click="toggleMenu">
+          <span class="side-menu-icon">➕</span>
           Crear Producto
         </router-link>
-
-        <!-- Configuración de puertos (solo para admin y empleados) -->
-        <button
-          v-if="isLoggedIn && (userStore.getUser().role === 'admin' || userStore.getUser().role === 'employee')"
-          @click="openPortSelector"
-          class="nav-item admin-config-button"
-        >
-          <span class="nav-icon">⚙️</span>
+        <button v-if="isLoggedIn && (userStore.getUser().role === 'admin' || userStore.getUser().role === 'employee')" @click="openPortSelector(); toggleMenu();" class="side-menu-item">
+          <span class="side-menu-icon">⚙️</span>
           Puertos
         </button>
-
-        <!-- Enlace para administración de contenido del sitio -->
-        <router-link
-          v-if="isLoggedIn && (['admin','administrador'].includes(userStore.getUser().role))"
-          to="/admin/site-content"
-          class="nav-item"
-        >
-          <span class="nav-icon">📝</span>
+        <router-link v-if="isLoggedIn && (['admin','administrador'].includes(userStore.getUser().role))" to="/admin/site-content" class="side-menu-item" @click="toggleMenu">
+          <span class="side-menu-icon">📝</span>
           Contenido del Sitio
         </router-link>
-
-        <!-- Si el usuario está loggeado -->
-        <template v-if="isLoggedIn">
-          <!-- Enlace a Mis pedidos -->
-          <router-link to="/mis-pedidos" class="nav-item">
-            <span class="nav-icon">📦</span>
-            Mis pedidos
-          </router-link>
-          <!-- Enlace al perfil -->
-          <router-link to="/perfil" class="nav-item">
-            <span class="nav-icon">👤</span>
-            Mi Perfil
-          </router-link>
-          
-          <!-- Muestra el rol -->
-          <div class="user-info">
-            <span class="user-role">{{ userStore.getUser().role }}</span>
-            <span class="user-avatar">👤</span>
-          </div>
-          <!-- Botón para cerrar sesión -->
-          <button @click="logout" class="logout-button">
-            <span class="logout-icon">🚪</span>
-            Salir
-          </button>
-        </template>
-
-        <!-- Si NO está loggeado, muestra el botón de Iniciar Sesión -->
-        <template v-else>
-          <router-link to="/login" class="login-button">
-            <span class="login-icon">🔑</span>
-            Iniciar Sesión
-          </router-link>
-        </template>
-
-        <!-- Enlace para gestión de productos -->
-        <router-link
-          v-if="isLoggedIn && (['admin','administrador','employee','empleado'].includes(userStore.getUser().role))"
-          to="/gestion-productos"
-          class="nav-item"
-        >
-          <span class="nav-icon">✏️</span>
-          Gestión de Productos
+        <router-link v-if="isLoggedIn" to="/mis-pedidos" class="side-menu-item" @click="toggleMenu">
+          <span class="side-menu-icon">📦</span>
+          Mis pedidos
         </router-link>
-
-        <!-- Enlace para gestión de pedidos -->
-        <router-link
-          v-if="isLoggedIn && (['admin','administrador','employee','empleado'].includes(userStore.getUser().role))"
-          to="/admin/pedidos"
-          class="nav-item"
-        >
-          <span class="nav-icon">📦</span>
-          Gestión de Pedidos
-        </router-link>
-
-        <!-- Enlace para finalizar compra internacional -->
-        <router-link to="/checkout-internacional" class="nav-item">
-          <span class="nav-icon">🌎✅</span>
-          Finalizar compra internacional
-        </router-link>
-      </nav>
-
-      <!-- Botón de menú hamburguesa (versión móvil) -->
-      <button @click="toggleMenu" class="menu-button md:hidden">
-        <span class="menu-icon">☰</span>
-      </button>
-    </div>
-
-    <!-- Menú desplegable en móviles -->
-    <div v-if="mobileMenuOpen" class="mobile-menu">
-      <div class="mobile-menu-header">
-        <span class="mobile-menu-title">Menú</span>
-        <button @click="toggleMenu" class="close-menu-btn">✕</button>
-      </div>
-      
-      <router-link to="/" class="mobile-item" @click="toggleMenu">
-        <span class="mobile-icon">🏠</span>
-        Inicio
-      </router-link>
-      
-      <router-link to="/catalogo" class="mobile-item" @click="toggleMenu">
-        <span class="mobile-icon">📋</span>
-        Catálogo de Productos
-      </router-link>
-      
-      <router-link to="/catalogo-internacional" class="mobile-item" @click="toggleMenu">
-        <span class="mobile-icon">🌎</span>
-        Catálogo Internacional
-      </router-link>
-      
-      <router-link to="/contact" class="mobile-item" @click="toggleMenu">
-        <span class="mobile-icon">📞</span>
-        Contacto
-      </router-link>
-      
-      <router-link to="/cart" class="mobile-item" @click="toggleMenu">
-        <span class="mobile-icon">🛒</span>
-        Carrito
-      </router-link>
-     
-      <!-- Enlace a Carrito Internacional móvil -->
-      <router-link to="/cart#internacional" class="mobile-item" @click="toggleMenu">
-        <span class="mobile-icon">🌎🛒</span>
-        Carrito Internacional
-      </router-link>
-     
-      <!-- Configuración de puertos (móvil - solo para admin y empleados) -->
-      <button
-        v-if="isLoggedIn && (userStore.getUser().role === 'admin' || userStore.getUser().role === 'employee')"
-        @click="openPortSelector(); toggleMenu();"
-        class="mobile-item admin-config-button"
-      >
-        <span class="mobile-icon">⚙️</span>
-        Configurar Puertos
-      </button>
-
-      <!-- Enlace SOLO para administradores (móvil) -->
-      <router-link
-        v-if="isLoggedIn && userStore.getUser().role === 'admin'"
-        to="/admindash"
-        class="mobile-item admin-link"
-        @click="toggleMenu"
-      >
-        <span class="mobile-icon">📊</span>
-        Dashboard Admin
-      </router-link>
-
-      <!-- Enlace para gestión de productos -->
-      <router-link
-        v-if="isLoggedIn && (['admin','administrador','employee','empleado'].includes(userStore.getUser().role))"
-        to="/gestion-productos"
-        class="mobile-item"
-        @click="toggleMenu"
-      >
-        <span class="mobile-icon">✏️</span>
-        Gestión de Productos
-      </router-link>
-
-      <!-- Enlace para gestión de pedidos -->
-      <router-link
-        v-if="isLoggedIn && (['admin','administrador','employee','empleado'].includes(userStore.getUser().role))"
-        to="/admin/pedidos"
-        class="mobile-item"
-        @click="toggleMenu"
-      >
-        <span class="mobile-icon">📦</span>
-        Gestión de Pedidos
-      </router-link>
-
-      <!-- Enlace para administración de contenido del sitio -->
-      <router-link
-        v-if="isLoggedIn && (['admin','administrador'].includes(userStore.getUser().role))"
-        to="/admin/site-content"
-        class="mobile-item"
-        @click="toggleMenu"
-      >
-        <span class="mobile-icon">📝</span>
-        Contenido del Sitio
-      </router-link>
-
-      <!-- Enlace para finalizar compra internacional -->
-      <router-link to="/checkout-internacional" class="mobile-item" @click="toggleMenu">
-        <span class="mobile-icon">🌎✅</span>
-        Finalizar compra internacional
-      </router-link>
-
-      <!-- Si está loggeado, muestra rol y logout (móvil) -->
-      <template v-if="isLoggedIn">
-        <router-link to="/perfil" class="mobile-item" @click="toggleMenu">
-          <span class="mobile-icon">👤</span>
+        <router-link v-if="isLoggedIn" to="/perfil" class="side-menu-item" @click="toggleMenu">
+          <span class="side-menu-icon">👤</span>
           Mi Perfil
         </router-link>
-        
-        <div class="mobile-user-info">
-          <span class="mobile-user-role">Rol: {{ userStore.user.role }}</span>
+        <div v-if="isLoggedIn" class="side-user-info">
+          <span class="side-user-role">{{ userStore.getUser().role }}</span>
+          <span class="side-user-avatar">👤</span>
         </div>
-        <button
-          @click="
-            logout();
-            toggleMenu();
-          "
-          class="mobile-logout"
-        >
-          <span class="mobile-icon">🚪</span>
-          Cerrar Sesión
+        <button v-if="isLoggedIn" @click="logout; toggleMenu();" class="side-logout">
+          <span class="side-menu-icon">🚪</span>
+          Salir
         </button>
-      </template>
-      <!-- Si NO está loggeado, login (móvil) -->
-      <template v-else>
-        <router-link to="/login" class="mobile-login" @click="toggleMenu">
-          <span class="mobile-icon">🔑</span>
+        <router-link v-else to="/login" class="side-login" @click="toggleMenu">
+          <span class="side-menu-icon">🔑</span>
           Iniciar Sesión
         </router-link>
-      </template>
-    </div>
+        <router-link v-if="isLoggedIn && (['admin','administrador','employee','empleado'].includes(userStore.getUser().role))" to="/gestion-productos" class="side-menu-item" @click="toggleMenu">
+          <span class="side-menu-icon">✏️</span>
+          Gestión de Productos
+        </router-link>
+        <router-link v-if="isLoggedIn && (['admin','administrador','employee','empleado'].includes(userStore.getUser().role))" to="/admin/pedidos" class="side-menu-item" @click="toggleMenu">
+          <span class="side-menu-icon">📦</span>
+          Gestión de Pedidos
+        </router-link>
+        <router-link to="/reporteria" class="side-menu-item" @click="toggleMenu">
+          <span class="side-menu-icon">📊</span>
+          reportería
+        </router-link>
+      </div>
+    </transition>
   </header>
 </template>
 
@@ -483,6 +310,7 @@ export default {
   max-width: 1400px;
   margin: 0 auto;
   display: flex;
+  flex-direction: row;
   justify-content: space-between;
   align-items: center;
   padding: 0 30px;
@@ -941,5 +769,149 @@ export default {
 .btn-sm {
   padding: 4px 10px;
   font-size: 13px;
+}
+
+.side-menu-button {
+  font-size: 24px;
+  color: white;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.side-menu-icon {
+  font-size: 20px;
+}
+.slide-right-enter-active, .slide-right-leave-active {
+  transition: transform 0.3s, opacity 0.3s;
+}
+.slide-right-enter-from, .slide-right-leave-to {
+  transform: translateX(100%);
+  opacity: 0;
+}
+.slide-right-enter-to, .slide-right-leave-from {
+  transform: translateX(0);
+  opacity: 1;
+}
+.side-menu {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 320px;
+  height: 100vh;
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+  box-shadow: -4px 0 24px rgba(30, 58, 138, 0.2);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  padding-top: 0;
+  animation: slideInRight 0.3s;
+  overflow-y: auto;
+}
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.side-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 28px 16px 28px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.side-menu-title {
+  color: white;
+  font-size: 20px;
+  font-weight: 700;
+}
+.close-side-menu-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background 0.3s ease;
+}
+.close-side-menu-btn:hover {
+  background: rgba(255,255,255,0.1);
+}
+.side-menu-item {
+  color: white;
+  font-size: 16px;
+  padding: 18px 32px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: all 0.2s;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.side-menu-item:hover {
+  background: rgba(255,255,255,0.08);
+  padding-right: 40px;
+}
+.side-user-info {
+  padding: 18px 32px;
+  background: rgba(255,255,255,0.08);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.side-user-role {
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.side-user-avatar {
+  font-size: 18px;
+}
+.side-login {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  padding: 18px 32px;
+  text-decoration: none;
+  font-weight: 600;
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: all 0.2s;
+}
+.side-login:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+.side-logout {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  padding: 18px 32px;
+  text-decoration: none;
+  font-weight: 600;
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s;
+}
+.side-logout:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+}
+@media (max-width: 480px) {
+  .side-menu {
+    width: 100vw;
+    min-width: 0;
+  }
 }
 </style>
