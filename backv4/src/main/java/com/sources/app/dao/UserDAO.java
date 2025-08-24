@@ -1,7 +1,7 @@
 package com.sources.app.dao;
 
 import com.sources.app.entities.User;
-import com.sources.app.entities.Policy;
+
 import com.sources.app.util.HibernateUtil;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
@@ -71,6 +71,134 @@ public class UserDAO {
     }
 
     /**
+     * Verifica si ya existe un usuario con el número de pasaporte proporcionado.
+     *
+     * @param passportNumber El número de pasaporte a verificar.
+     * @return true si existe un usuario con ese número de pasaporte, false en caso contrario.
+     */
+    public boolean existsUserWithPassport(String passportNumber) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Query<Long> query = session.createQuery("SELECT COUNT(u) FROM User u WHERE u.passportNumber = :passportNumber", Long.class);
+            query.setParameter("passportNumber", passportNumber);
+            return query.uniqueResult() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Crea un nuevo usuario con todos los campos requeridos para el sistema de aerolíneas.
+     *
+     * @param name Nombre completo del usuario.
+     * @param cui CUI del usuario.
+     * @param firstName Nombres del usuario.
+     * @param lastName Apellidos del usuario.
+     * @param age Edad del usuario.
+     * @param country País de origen del usuario.
+     * @param passportNumber Número de pasaporte del usuario.
+     * @param phone Teléfono del usuario.
+     * @param email Correo electrónico del usuario.
+     * @param address Dirección del usuario.
+     * @param birthDate Fecha de nacimiento del usuario.
+     * @param password Contraseña del usuario.
+     * @param role Rol del usuario (por defecto REGISTERED_VISITOR).
+     * @return El objeto User creado, o null si ya existe un usuario con el mismo email/CUI/pasaporte o si ocurre un error.
+     */
+    /**
+     * Verifica si es el primer usuario en el sistema
+     * @return true si es el primer usuario, false en caso contrario
+     */
+    public boolean isFirstUser() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Query<Long> query = session.createQuery("SELECT COUNT(*) FROM User", Long.class);
+            Long count = query.getSingleResult();
+            return count == 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public User createAirlineUser(String name, Long cui, String firstName, String lastName, Integer age, 
+                                 String country, String passportNumber, String phone, String email, 
+                                 String address, Date birthDate, String password, String role) {
+        
+        if (existsUserWithEmail(email)) {
+            System.out.println("ERROR: Ya existe un usuario con el email: " + email);
+            return null;
+        }
+        
+        if (existsUserWithCUI(cui)) {
+            System.out.println("ERROR: Ya existe un usuario con el CUI: " + cui);
+            return null;
+        }
+
+        if (existsUserWithPassport(passportNumber)) {
+            System.out.println("ERROR: Ya existe un usuario con el número de pasaporte: " + passportNumber);
+            return null;
+        }
+        
+        Transaction tx = null;
+        Session session = null;
+        User user = null;
+        
+        try {
+            session = HibernateUtil.getSessionFactory().openSession();
+            tx = session.beginTransaction();
+            
+            // Verificar si es el primer usuario
+            boolean isFirstUser = isFirstUser();
+            String finalRole = role;
+            
+            if (isFirstUser) {
+                finalRole = "ADMIN";
+                System.out.println("🎉 ¡PRIMER USUARIO REGISTRADO! Se le asigna rol de ADMIN");
+            } else if (role == null || role.isEmpty()) {
+                finalRole = "REGISTERED_VISITOR";
+            }
+            
+            user = new User();
+            user.setName(name);
+            user.setCui(cui);
+            user.setFirstName(firstName);
+            user.setLastName(lastName);
+            user.setAge(age);
+            user.setCountry(country);
+            user.setPassportNumber(passportNumber);
+            user.setPhone(phone);
+            user.setEmail(email);
+            user.setAddress(address);
+            user.setBirthDate(birthDate);
+            user.setPassword(password);
+            user.setRole(finalRole);
+            user.setEnabled(1); // Usuario siempre activo por defecto
+            user.setPaidService(0); // No ha pagado servicio por defecto
+            
+            session.save(user);
+            tx.commit();
+            
+            if (isFirstUser) {
+                System.out.println("👑 ADMIN creado exitosamente: " + user.getEmail() + " (Primer usuario del sistema)");
+            } else {
+                System.out.println("Usuario creado exitosamente: " + user.getEmail() + " (Rol: " + finalRole + ")");
+            }
+            return user;
+            
+        } catch (Exception e) {
+            if (tx != null) {
+                tx.rollback();
+            }
+            e.printStackTrace();
+            return null;
+        } finally {
+            if (session != null) {
+                session.close();
+            }
+        }
+    }
+
+    /**
      * Crea un nuevo usuario en la base de datos.
      * Verifica previamente si ya existe un usuario con el mismo email o CUI.
      *
@@ -81,10 +209,10 @@ public class UserDAO {
      * @param birthdate Fecha de nacimiento del usuario.
      * @param address Dirección del usuario.
      * @param password Contraseña del usuario.
-     * @param policy Póliza asociada al usuario.
+
      * @return El objeto User creado, o null si ya existe un usuario con el mismo email/CUI o si ocurre un error.
      */
-    public User create(String name, Long cui, String phone, String email, Date birthdate, String address, String password, Policy policy) {
+    public User create(String name, Long cui, String phone, String email, Date birthdate, String address, String password) {
         if (existsUserWithEmail(email)) {
             System.out.println("ERROR: Ya existe un usuario con el email: " + email);
             return null;
@@ -112,7 +240,7 @@ public class UserDAO {
             user.setPassword(password);
             user.setRole(" ");
             user.setEnabled(0);
-            user.setPolicy(policy);
+            // Ya no usamos Policy
             
             // Valores por defecto para los nuevos campos
             user.setPaidService(null); // Inicialmente nulo, sin valor definido
@@ -202,23 +330,14 @@ public class UserDAO {
             existingUser.setExpirationDate(user.getExpirationDate());
 
             // Verificar si hay que limpiar la fecha de expiración
-            if (user.getPaidService() != null && !user.getPaidService()) {
+            if (user.getPaidService() != null && user.getPaidService().equals(0)) {
                 existingUser.setExpirationDate(null); // Si no tiene servicio pagado, no tiene fecha de expiración
             }
 
             // Verificar expiración del servicio
             checkServiceExpiration(existingUser);
 
-            // Actualizar política según el servicio
-            if (user.getPolicy() != null && 
-                (existingUser.getPolicy() == null || 
-                 !existingUser.getPolicy().getIdPolicy().equals(user.getPolicy().getIdPolicy()))) {
-                existingUser.setPolicy(user.getPolicy());
-            } else if (user.getPolicy() == null || 
-                      (user.getPaidService() != null && !user.getPaidService())) {
-                // Si el usuario ya no tiene póliza asignada o el servicio no está pagado
-                existingUser.setPolicy(null);
-            }
+            // Ya no usamos Policy en el sistema de aerolínea
 
             session.update(existingUser);
             tx.commit();
@@ -255,12 +374,12 @@ public class UserDAO {
         }
         
         // Solo verificar expiración si el servicio está pagado
-        if (user.getPaidService()) {
+        if (user.getPaidService() != null && user.getPaidService().equals(1)) {
             Date today = new Date();
             if (user.getExpirationDate().before(today)) {
                 // El servicio ha expirado
-                user.setPaidService(false);
-                user.setPolicy(null); // Quitar la póliza asignada
+                user.setPaidService(0);
+                // Ya no usamos Policy
                 System.out.println("Servicio expirado para el usuario: " + user.getEmail());
             }
         }
@@ -285,15 +404,15 @@ public class UserDAO {
             // Buscar usuarios con servicio pagado y fecha de expiración anterior a hoy
             Date today = new Date();
             Query<User> query = session.createQuery(
-                "FROM User WHERE paidService = true AND expirationDate < :today", 
+                "FROM User WHERE paidService = 1 AND expirationDate < :today", 
                 User.class
             );
             query.setParameter("today", today);
             List<User> expiredUsers = query.getResultList();
             
             for (User user : expiredUsers) {
-                user.setPaidService(false);
-                user.setPolicy(null);
+                user.setPaidService(0);
+                // Ya no usamos Policy
                 session.update(user);
                 updatedCount++;
             }

@@ -92,20 +92,9 @@ public class App {
         }
 
         String ip = getLocalExternalIp();
-
-        // Solicitar puerto por consola
-        System.out.println("Ingrese el puerto para iniciar el servidor (predeterminado: 8080): ");
-        java.util.Scanner scanner = new java.util.Scanner(System.in);
-        String portInput = scanner.nextLine().trim();
+        int port = 8080; // Puerto fijo
         
-        int port = 8080; // Puerto predeterminado
-        if (!portInput.isEmpty()) {
-            try {
-                port = Integer.parseInt(portInput);
-            } catch (NumberFormatException e) {
-                System.out.println("Formato de puerto inválido. Se usará el puerto predeterminado 8080.");
-            }
-        }
+        System.out.println("Iniciando servidor en puerto: " + port);
 
         // Verificar servicios expirados al iniciar
         System.out.println("Verificando servicios expirados...");
@@ -129,6 +118,13 @@ public class App {
         HttpServer server = HttpServer.create(new InetSocketAddress(ip, port), 0);
         server.createContext("/api/login", new LoginHandler(userDAO));
         server.createContext("/api/users", new UserHandler(userDAO));
+        // Exponer endpoints de aerolínea bajo el mismo servidor
+        server.createContext("/api/airline", new AirlineHttpHandler(userDAO));
+        server.createContext("/api/airline/flights", new FlightHandler());
+        server.createContext("/api/airline/cities", new AirlineHttpHandler(userDAO));
+        server.createContext("/api/airline/seats", new SeatsHandler());
+        server.createContext("/api/airline/inventory", new InventoryHandler());
+        server.createContext("/api/airline/tickets", new TicketHandler());
         server.createContext("/api/policy", new PolicyHandler(policyDAO));
         server.createContext("/api/appointment", new AppointmentHandler(appointmentDAO));
         server.createContext("/api/appointmentmade", new AppointmentMadeHandler(appointmentMadeDAO));
@@ -161,6 +157,10 @@ public class App {
         server.createContext("/api/configurable-amount/", new ConfigurableAmountHandler(configurableAmountDAO));
         // Registrar el nuevo handler para proxy de servicios de hospital
         server.createContext("/api/hospital-proxy", new HospitalServiceProxyHandler(hospitalDAO));
+        
+        // Endpoints para perfil de usuario
+        server.createContext("/api/airline/user/profile", new UserProfileHandler(userDAO));
+        server.createContext("/api/health", new HealthHandler());
         
         server.setExecutor(null); // Usa el executor por defecto
         server.start();

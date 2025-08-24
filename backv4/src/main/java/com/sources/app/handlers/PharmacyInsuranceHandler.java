@@ -61,8 +61,8 @@ public class PharmacyInsuranceHandler implements HttpHandler {
      */
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        // Set CORS headers for all requests
-        HibernateUtil.setCorsHeaders(exchange);
+        // Set CORS headers for all requests (comentado)
+        // HibernateUtil.setCorsHeaders(exchange);
         
         // Handle OPTIONS requests (CORS preflight)
         if (exchange.getRequestMethod().equals("OPTIONS")) {

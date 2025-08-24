@@ -222,7 +222,14 @@ onMounted(async () => {
 
 <template>
   <div class="p-6">
-    <h1 class="text-2xl font-bold mb-6">Catálogo de Servicios del Seguro</h1>
+    <div class="flex items-center gap-4 mb-6">
+      <div class="w-12 h-12 airline-gradient-primary rounded-full flex items-center justify-center">
+        <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+        </svg>
+      </div>
+      <h1 class="airline-title">Servicios Aeronáuticos AeroLinea</h1>
+    </div>
     
     <div v-if="success" class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4" role="alert">
       <p>{{ success }}</p>

@@ -39,7 +39,7 @@ const birthDate: Ref<string> = ref<string>("");
 const password: Ref<string> = ref<string>("");
 const confirmPassword: Ref<string> = ref<string>("");
 const selectedPolicyId: Ref<number | null> = ref<number | null>(null);
-const directActivation: Ref<boolean> = ref<boolean>(true); // Activar directamente
+const selectedPolicyName: Ref<string> = ref<string>("");
 const loading: Ref<boolean> = ref<boolean>(false);
 const error: Ref<string> = ref<string>("");
 const success: Ref<boolean> = ref<boolean>(false);
@@ -243,7 +243,7 @@ const registerClient = async () => {
       policy: {
         idPolicy: selectedPolicyId.value
       },
-      enabled: directActivation.value ? 1 : 0, // Activar según configuración
+      enabled: 1, // Siempre activar por defecto
       password: password.value
     };
 
@@ -259,9 +259,7 @@ const registerClient = async () => {
       await sendWelcomeEmail(email.value, name.value, password.value);
       
       success.value = true;
-      successMessage.value = directActivation.value
-        ? "Cliente registrado y activado exitosamente. Se han enviado las credenciales de acceso por correo electrónico."
-        : "Cliente registrado exitosamente. Será activado por un administrador.";
+      successMessage.value = "Cliente registrado exitosamente. Se han enviado las credenciales de acceso por correo electrónico.";
       
       // Limpiar formulario
       resetForm();
@@ -311,7 +309,14 @@ onMounted(() => {
 
 <template>
   <div class="container mx-auto px-4 py-8">
-    <h1 class="text-2xl font-bold mb-6">Registrar Nuevo Cliente</h1>
+    <div class="flex items-center gap-4 mb-6">
+      <div class="w-12 h-12 airline-gradient-primary rounded-full flex items-center justify-center">
+        <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6z"/>
+        </svg>
+      </div>
+      <h1 class="airline-title">Registrar Nuevo Asegurado AeroLinea</h1>
+    </div>
     
     <!-- Mensaje de éxito -->
     <div v-if="success" class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6">
@@ -494,21 +499,6 @@ onMounted(() => {
             </div>
             
             <div class="pt-4">
-              <div class="flex items-center mb-4">
-                <input
-                  id="directActivation"
-                  v-model="directActivation"
-                  type="checkbox"
-                  class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                />
-                <label for="directActivation" class="ml-2 block text-sm text-gray-700">
-                  Activar cuenta inmediatamente
-                </label>
-              </div>
-              <p class="text-sm text-gray-600">Si esta opción está marcada, el cliente podrá acceder al sistema inmediatamente.</p>
-            </div>
-            
-            <div class="pt-4">
               <label class="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>
               <div class="space-y-3">
                 <div>
@@ -569,7 +559,7 @@ onMounted(() => {
             :disabled="loading || availablePolicies.length === 0"
           >
             <span v-if="loading">Registrando...</span>
-            <span v-else>Registrar Cliente</span>
+            <span v-else>Registrar Asegurado</span>
           </button>
         </div>
       </form>

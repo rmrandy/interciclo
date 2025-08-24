@@ -9,16 +9,12 @@ import HospitalServices from "./pages/admin/hospital-services.vue";
 import HospitalServicesImport from "./pages/admin/hospital-services-import.vue";
 import HospitalConfiguration from "./pages/admin/hospital-configuration.vue";
 import ProfileCompletion from "./pages/profile-completion.vue";
-import InactiveAccount from "./pages/inactive-account.vue";
 import CatalogInsuranceServices from "./pages/catalog/insurance-services.vue";
 import CatalogHospitals from "./pages/catalog/hospitals.vue";
 import CatalogHospitalServices from "./pages/catalog/hospital-services.vue";
 import Policies from "./pages/admin/policies.vue";
 import RegisterClient from "./pages/employee/register-client.vue";
-import Appointments from "./pages/appointments.vue";
 import ClientManagement from "./pages/admin/client-management.vue";
-import DailyAppointments from "./pages/admin/daily-appointments.vue";
-import PrescriptionApprovals from "./pages/admin/prescription-approvals.vue";
 import SystemConfiguration from "./pages/admin/system-configuration.vue";
 import UserServices from "./pages/user-services.vue";
 import { checkMissingRequiredFields } from "./utils/profile-utils";
@@ -32,22 +28,11 @@ const requireAuth = (
   const profile = JSON.parse(localStorage.getItem("user") || "null");
   
   if (!profile || profile === "null") {
-    // No autenticado, redirigir a login
-    next('/login');
-  } else if (profile.enabled !== 1) {
-    // Usuario no activado
-    next('/inactive-account');
+    // No autenticado, redirigir a login con parámetro de retorno
+    next(`/login?redirect=${encodeURIComponent(to.fullPath)}`);
   } else {
-    // COMENTADO: Verificar si el usuario necesita completar su perfil
-    // Ya no verificamos si faltan campos de perfil para evitar redirecciones indeseadas
-    /*
-    const missingFields = checkMissingRequiredFields(profile);
-    if (missingFields && to.path !== '/profile-completion') {
-      next('/profile-completion');
-    } else {
-    */
-      next(); // Usuario autenticado, continuar sin verificar perfil
-    //}
+    // Usuario autenticado, continuar (sin verificar activación)
+    next();
   }
 };
 
@@ -68,8 +53,9 @@ const requireAdmin = (
   
   console.log("Role:", profile.role);
   
-  // Verificar si es admin (en minúsculas, como lo envía el backend)
-  if (profile.role !== "admin") {
+  // Verificar si es admin (aceptar mayúsculas/minúsculas)
+  const role = String(profile.role || '').toUpperCase();
+  if (role !== "ADMIN") {
     // No es administrador, redirigir a home
     console.log("No es admin, redirigiendo a home");
     next('/home');
@@ -140,21 +126,24 @@ const requireEmployeeOrAdmin = (
   const user = JSON.parse(localStorage.getItem("user") || "null");
   if (!user) {
     next('/login');
-  } else if (user.role === 'employee' || user.role === 'admin') {
-    next();
   } else {
-    next('/home');
+    const role = String(user.role || '').toUpperCase();
+    if (role === 'EMPLOYEE' || role === 'ADMIN') {
+    next();
+    } else {
+      next('/home');
+    }
   }
 };
 
 const routes = [
-  { path: "/", redirect: "/login" },
+  { path: "/", redirect: "/home" },
   { path: "/login", component: Login },
   { path: "/register", component: Register },
   { 
     path: "/home", 
-    component: Home, 
-    beforeEnter: requireAuth 
+    component: Home 
+    // Sin requireAuth - página pública
   },
   {
     path: "/admin/users",
@@ -186,21 +175,24 @@ const routes = [
     component: Policies,
     beforeEnter: requireAdmin
   },
+  // Gestión de ciudades (admin)
+  {
+    path: "/admin/flight-operations",
+    component: () => import('./pages/admin/flight-operations/cities.vue'),
+    beforeEnter: requireAdmin
+  },
+  // Gestión de vuelos (admin)
+  {
+    path: "/admin/flight-schedule",
+    component: () => import('./pages/admin/flight-operations/flight-schedule.vue'),
+    beforeEnter: requireAdmin
+  },
   {
     path: '/admin/client-management',
     component: ClientManagement,
     beforeEnter: requireAdmin
   },
-  {
-    path: '/admin/daily-appointments',
-    component: DailyAppointments,
-    beforeEnter: requireAdmin
-  },
-  {
-    path: '/admin/prescription-approvals',
-    component: PrescriptionApprovals,
-    beforeEnter: requireEmployeeOrAdmin // Permitir a empleados y admins
-  },
+
   {
     path: '/admin/configuration',
     component: SystemConfiguration,
@@ -213,7 +205,7 @@ const routes = [
   },
   {
     path: "/inactive-account",
-    component: InactiveAccount,
+    component: () => import('./pages/inactive-account.vue'),
     beforeEnter: inactiveUserOnly
   },
   // Nuevas rutas de catálogo
@@ -237,15 +229,47 @@ const routes = [
     component: RegisterClient,
     beforeEnter: requireEmployeeOrAdmin
   },
-  // Nueva ruta para citas
-  {
-    path: '/appointments',
-    component: Appointments,
-    beforeEnter: requireAuth
-  },
+
   {
     path: '/user-services',
     component: UserServices,
+    beforeEnter: requireAuth
+  },
+  // Rutas públicas para consulta de vuelos
+  {
+    path: '/flights',
+    component: () => import('./pages/flights.vue')
+    // Pública - no requiere autenticación
+  },
+  {
+    path: '/flight-details/:id',
+    component: () => import('./pages/flight-details.vue')
+    // Pública - no requiere autenticación
+  },
+  // Rutas protegidas para compra
+  {
+    path: '/flight/:id/book',
+    component: () => import('./pages/book-flight.vue'),
+    beforeEnter: requireAuth
+  },
+  {
+    path: '/cart',
+    component: () => import('./pages/cart.vue'),
+    beforeEnter: requireAuth
+  },
+  {
+    path: '/checkout',
+    component: () => import('./pages/checkout.vue'),
+    beforeEnter: requireAuth
+  },
+  {
+    path: '/booking/confirmation/:bookingId',
+    component: () => import('./pages/booking-confirmation.vue'),
+    beforeEnter: requireAuth
+  },
+  {
+    path: '/my-bookings',
+    component: import('./pages/my-bookings.vue'),
     beforeEnter: requireAuth
   }
 ];

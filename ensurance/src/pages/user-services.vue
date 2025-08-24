@@ -1,197 +1,183 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
-import axios from "axios";
-import { getInsuranceApiUrl } from "../utils/api";
-// Función para obtener el hospital predeterminado
-const getDefaultHospital = () => {
-  try {
-    const storedHospital = localStorage.getItem('defaultHospital');
-    if (storedHospital) {
-      return JSON.parse(storedHospital);
-    }
-    return null;
-  } catch (error) {
-    console.error('Error al obtener el hospital predeterminado:', error);
-    return null;
-  }
-};
-
-// Interfaces
-interface Transaction {
-  idTransaction: number;
-  transDate: string;
-  total: number;
-  copay: number;
-  transactionComment: string;
-  result: string;
-  covered: number;
-  auth: string;
-  hospital: {
-    idHospital: number;
-    name: string;
-  };
-}
-
-interface HospitalService {
-  _id: string;
-  name: string;
-  total: number;
-  description?: string;
-  date: string;
-}
+import { ref, onMounted } from "vue";
+import { userProfileUpdateApi, isProfileUpdateServerAvailable, type UserProfileUpdateRequest } from "../utils/userProfileUpdateApi";
 
 // Estado
 const user = JSON.parse(localStorage.getItem('user') || 'null');
-const userTransactions = ref<Transaction[]>([]);
-const hospitalServices = ref<HospitalService[]>([]);
-const hospitalUserDetails = ref<any>(null);
-const loading = ref(false);
 const error = ref("");
-const activeTab = ref("insurance");
+const activeTab = ref("profile");
 
-// Obtener información del hospital predeterminado
-const defaultHospital = getDefaultHospital();
-const ip = import.meta.env.VITE_IP || "localhost";
-// Usar el puerto del hospital predeterminado o 5050 como fallback
-const DEFAULT_PORT = defaultHospital?.port || '5050';
-// Configuración de IPs
-const possibleIPs = [ip];
-const HOSPITAL_API_URL = `http://${ip}:${DEFAULT_PORT}`;
 
-// Información sobre el hospital predeterminado para mostrar
-const usingDefaultHospital = computed(() => {
-  return defaultHospital 
-    ? `Hospital seleccionado: ${defaultHospital.name} (Puerto: ${defaultHospital.port || '5050'})` 
-    : 'No hay hospital predeterminado seleccionado';
+
+// Métodos para el Panel de Usuario
+const handleProfileUpdate = (updatedUser: any) => {
+  console.log('Perfil actualizado:', updatedUser);
+  // Actualizar el usuario en localStorage
+  localStorage.setItem('user', JSON.stringify(updatedUser));
+  // Aquí podrías hacer una llamada a la API para actualizar en el backend
+};
+
+const handleSettingsUpdate = (updatedSettings: any) => {
+  console.log('Configuraciones actualizadas:', updatedSettings);
+  // Guardar configuraciones en localStorage
+  localStorage.setItem('user_settings', JSON.stringify(updatedSettings));
+};
+
+const handlePasswordChange = () => {
+  console.log('Contraseña cambiada');
+  // Aquí podrías mostrar un mensaje de confirmación o redirigir
+};
+
+// Estado para el panel de usuario
+const userPanelTab = ref('profile');
+const serverStatus = ref<'checking' | 'available' | 'unavailable'>('checking');
+
+// Métodos para el panel de usuario
+const showUserProfile = () => {
+  userPanelTab.value = 'profile';
+};
+
+const showUserSettings = () => {
+  userPanelTab.value = 'settings';
+};
+
+const showUserSecurity = () => {
+  userPanelTab.value = 'security';
+};
+
+const showUserHistory = () => {
+  userPanelTab.value = 'history';
+};
+
+// Estado para el formulario de perfil
+const profileForm = ref({
+  firstName: user?.firstName || '',
+  lastName: user?.lastName || '',
+  email: user?.email || '',
+  phone: user?.phone || ''
 });
 
-// Función para probar múltiples IPs
-async function tryMultipleIPs(endpoint: string, method: string = 'GET', data: any = null) {
-  const serverIP = import.meta.env.VITE_IP || "localhost";
+// Método para guardar cambios del perfil
+const saveProfileChanges = async () => {
   try {
-    const url = getInsuranceApiUrl(endpoint);
-    console.log(`Intentando ${method} a ${url}`);
-    const response = await axios({ method, url, data, timeout: 3000 });
-    return response;
-  } catch (error: any) {
-    console.error(`Error con IP ${serverIP}:`, error.message);
-    throw new Error("No se pudo conectar con el servidor");
-  }
-}
-
-// Cargar transacciones del usuario
-const fetchUserTransactions = async () => {
-  if (!user || !user.idUser) {
-    error.value = "No se encontró información del usuario, por favor inicie sesión nuevamente";
-    return;
-  }
-  
-  try {
-    loading.value = true;
-    const response = await tryMultipleIPs(`/transactions?userId=${user.idUser}`, 'GET');
-    userTransactions.value = response.data || [];
-  } catch (err: any) {
-    console.error("Error al cargar transacciones del usuario:", err);
-    error.value = "Error al cargar los servicios. Por favor, intente de nuevo más tarde.";
-    userTransactions.value = [];
-  } finally {
-    loading.value = false;
-  }
-};
-
-// Obtener información del usuario en el sistema del hospital
-const fetchHospitalUserInfo = async () => {
-  if (!user || !user.email) return;
-  
-  try {
-    // Intentar obtener usuario por email desde el hospital
-    const response = await axios.get(`${HOSPITAL_API_URL}/users?email=${user.email}`);
+    // Verificar si el servidor está disponible
+    const serverAvailable = await isProfileUpdateServerAvailable();
     
-    // Verificar si hay datos y encontrar el usuario por email
-    if (response.data) {
-      let foundUser = null;
+    if (serverAvailable) {
+      // Usar la API del backend
+      const updateRequest: UserProfileUpdateRequest = {
+        userId: user.idUser,
+        firstName: profileForm.value.firstName,
+        lastName: profileForm.value.lastName,
+        email: profileForm.value.email,
+        phone: profileForm.value.phone
+      };
       
-      // La API puede retornar datos en diferentes formatos, intentar ambos
-      if (Array.isArray(response.data)) {
-        foundUser = response.data.find((u: any) => u.email === user.email);
-      } else if (response.data.appointments && Array.isArray(response.data.appointments)) {
-        foundUser = response.data.appointments.find((u: any) => u.email === user.email);
-      }
+      const response = await userProfileUpdateApi.updateUserProfile(updateRequest);
       
-      if (foundUser) {
-        hospitalUserDetails.value = foundUser;
+      if (response.success && response.user) {
+        // Actualizar el usuario en localStorage con los datos del backend
+        const updatedUser = { ...user, ...response.user };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
         
-        // Si encontramos el usuario, obtener sus servicios del hospital
-        fetchHospitalUserServices(foundUser._id);
+        // Mostrar mensaje de éxito
+        alert('✅ Perfil actualizado correctamente en el servidor');
+        
+        // Recargar la página para reflejar los cambios
+        window.location.reload();
       } else {
-        hospitalUserDetails.value = null;
-        hospitalServices.value = [];
+        throw new Error(response.error || 'Error desconocido del servidor');
       }
+    } else {
+      // Fallback a localStorage si el servidor no está disponible
+      const updatedUser = { ...user, ...profileForm.value };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      
+      alert('⚠️ Servidor no disponible. Cambios guardados localmente.');
+      window.location.reload();
     }
-  } catch (err) {
-    console.error("Error al buscar usuario en el hospital:", err);
-    hospitalUserDetails.value = null;
-    hospitalServices.value = [];
+  } catch (error) {
+    console.error('Error al guardar perfil:', error);
+    alert(`❌ Error al guardar el perfil: ${error instanceof Error ? error.message : 'Error desconocido'}`);
   }
 };
 
-// Obtener servicios del usuario en el hospital
-const fetchHospitalUserServices = async (hospitalUserId: string) => {
+// Función para verificar el estado del servidor
+const checkServerStatus = async () => {
   try {
-    // Obtener las citas/servicios del usuario en el hospital
-    const servicesResponse = await axios.get(`${HOSPITAL_API_URL}/api/appointments/patient/${hospitalUserId}`);
-    
-    if (servicesResponse.data && Array.isArray(servicesResponse.data)) {
-      hospitalServices.value = servicesResponse.data.map((appointment: any) => ({
-        _id: appointment._id,
-        name: `Cita con ${appointment.doctor?.name || 'Doctor'}`,
-        date: new Date(appointment.start).toLocaleDateString(),
-        total: appointment.cost || 0,
-        description: appointment.reason || 'Sin descripción'
-      }));
-    }
-  } catch (err) {
-    console.error("Error al cargar servicios del hospital:", err);
-    hospitalServices.value = [];
+    serverStatus.value = 'checking';
+    const available = await isProfileUpdateServerAvailable();
+    serverStatus.value = available ? 'available' : 'unavailable';
+  } catch (error) {
+    console.error('Error verificando estado del servidor:', error);
+    serverStatus.value = 'unavailable';
   }
 };
 
-// Formatear fecha
-const formatDate = (dateString: string) => {
-  if (!dateString) return "N/A";
-  return new Date(dateString).toLocaleDateString();
-};
-
-// Obtener color para estatus de cobertura
-const getCoveredStatusColor = (covered: number) => {
-  return covered === 1 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
-};
-
-// Obtener texto para estatus de cobertura
-const getCoveredStatusText = (covered: number) => {
-  return covered === 1 ? 'Cubierto' : 'No cubierto';
-};
-
-// Cargar datos iniciales
-onMounted(() => {
-  if (!user) {
-    error.value = "Debe iniciar sesión para ver sus servicios";
-    return;
+// Inicializar el formulario con los datos del usuario
+onMounted(async () => {
+  if (user) {
+    profileForm.value = {
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      email: user.email || '',
+      phone: user.phone || ''
+    };
   }
   
-  fetchUserTransactions();
-  fetchHospitalUserInfo();
+  // Verificar estado del servidor
+  await checkServerStatus();
 });
 </script>
 
 <template>
   <div class="container mx-auto p-6">
-    <h1 class="text-2xl font-bold mb-6">Mis Servicios Médicos</h1>
+    <h1 class="text-2xl font-bold mb-6">👤 Panel de Usuario</h1>
     
-    <!-- Información del hospital por defecto -->
-    <div v-if="defaultHospital" class="bg-blue-50 p-3 rounded mb-4 border border-blue-200">
-      <div class="flex items-center">
-        <span class="text-blue-700">{{ usingDefaultHospital }}</span>
+    <!-- Banner del Panel de Usuario -->
+    <div class="bg-gradient-to-r from-green-500 to-blue-500 rounded-lg p-4 mb-6 text-white shadow-lg">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-semibold mb-1">🌟 Panel de Usuario Completo</h3>
+          <p class="text-green-100 text-sm">Gestiona tu perfil, configuraciones, seguridad y actividad en el sistema</p>
+        </div>
+        <div class="text-right">
+          <div class="text-2xl">👤</div>
+          <div class="text-xs text-green-100">Disponible</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Indicador de Estado del Servidor -->
+    <div class="mb-6">
+      <div class="flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-md p-4 border-l-4" 
+             :class="{
+               'border-yellow-500': serverStatus === 'checking',
+               'border-green-500': serverStatus === 'available',
+               'border-red-500': serverStatus === 'unavailable'
+             }">
+          <div class="flex items-center space-x-3">
+            <div class="w-3 h-3 rounded-full animate-pulse"
+                 :class="{
+                   'bg-yellow-500': serverStatus === 'checking',
+                   'bg-green-500': serverStatus === 'available',
+                   'bg-red-500': serverStatus === 'unavailable'
+                 }">
+            </div>
+            <span class="text-sm font-medium text-gray-700">
+              <span v-if="serverStatus === 'checking'">🔄 Verificando conexión con el servidor...</span>
+              <span v-else-if="serverStatus === 'available'">✅ Servidor conectado - Cambios se guardan en la base de datos</span>
+              <span v-else-if="serverStatus === 'unavailable'">❌ Servidor no disponible - Cambios se guardan localmente</span>
+            </span>
+            <button 
+              @click="checkServerStatus"
+              class="ml-2 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded text-gray-600"
+            >
+              🔄
+            </button>
+          </div>
+        </div>
       </div>
     </div>
     
@@ -200,113 +186,207 @@ onMounted(() => {
     
     <!-- Mensaje de no autenticado -->
     <div v-if="!user" class="bg-yellow-100 text-yellow-700 p-4 rounded">
-      <p>Debe iniciar sesión para ver sus servicios médicos.</p>
+      <p>Debe iniciar sesión para acceder al Panel de Usuario.</p>
     </div>
     
     <div v-else>
-      <!-- Tabs -->
-      <div class="border-b mb-6">
-        <nav class="flex space-x-8">
-          <button
-            @click="activeTab = 'insurance'"
-            :class="[
-              'py-2 px-1 border-b-2 font-medium text-sm',
-              activeTab === 'insurance'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            ]"
-          >
-            Servicios cubiertos por el seguro
-          </button>
-          <button
-            @click="activeTab = 'hospital'"
-            :class="[
-              'py-2 px-1 border-b-2 font-medium text-sm',
-              activeTab === 'hospital'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            ]"
-          >
-            Mis servicios en hospitales
-          </button>
-        </nav>
-      </div>
-      
-      <!-- Contenido de los tabs -->
-      <div v-if="activeTab === 'insurance'">
-        <h2 class="text-xl font-semibold mb-4">Servicios cubiertos por mi seguro</h2>
-        
-        <div v-if="loading" class="text-center py-6">
-          <div class="spinner"></div>
-          <p class="mt-4 text-gray-600">Cargando sus servicios...</p>
-        </div>
-        
-        <div v-else-if="userTransactions.length === 0" class="bg-gray-100 p-6 text-center rounded-md">
-          <p>No se encontraron servicios cubiertos por el seguro.</p>
-        </div>
-        
-        <div v-else class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hospital</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Copago</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Comentario</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Resultado</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              <tr v-for="transaction in userTransactions" :key="transaction.idTransaction" class="hover:bg-gray-50">
-                <td class="px-4 py-3 whitespace-nowrap">{{ formatDate(transaction.transDate) }}</td>
-                <td class="px-4 py-3 whitespace-nowrap">{{ transaction.hospital?.name || 'N/A' }}</td>
-                <td class="px-4 py-3 whitespace-nowrap">Q{{ transaction.total.toFixed(2) }}</td>
-                <td class="px-4 py-3 whitespace-nowrap">Q{{ transaction.copay.toFixed(2) }}</td>
-                <td class="px-4 py-3 whitespace-nowrap">
-                  <span :class="['px-2 py-1 rounded-full text-xs font-medium', getCoveredStatusColor(transaction.covered)]">
-                    {{ getCoveredStatusText(transaction.covered) }}
-                  </span>
-                </td>
-                <td class="px-4 py-3">{{ transaction.transactionComment }}</td>
-                <td class="px-4 py-3">{{ transaction.result }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-      
-      <div v-if="activeTab === 'hospital'">
-        <h2 class="text-xl font-semibold mb-4">Mis servicios en hospitales</h2>
-        
-        <div v-if="!hospitalUserDetails" class="bg-yellow-100 p-4 rounded-md mb-4">
-          <p>No se encontró su información en el sistema del hospital. Es posible que no haya utilizado servicios del hospital hasta el momento o que esté registrado con una dirección de correo diferente.</p>
-        </div>
-        
-        <div v-else-if="hospitalServices.length === 0" class="bg-gray-100 p-6 text-center rounded-md">
-          <p>No se encontraron servicios del hospital para su cuenta.</p>
-        </div>
-        
-        <div v-else class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Servicio</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detalles</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              <tr v-for="service in hospitalServices" :key="service._id" class="hover:bg-gray-50">
-                <td class="px-4 py-3">{{ service.name }}</td>
-                <td class="px-4 py-3 whitespace-nowrap">{{ service.date }}</td>
-                <td class="px-4 py-3 whitespace-nowrap">Q{{ service.total.toFixed(2) }}</td>
-                <td class="px-4 py-3">{{ service.description }}</td>
-              </tr>
-            </tbody>
-          </table>
+      <!-- Panel de Usuario - Contenido Principal -->
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <!-- Información básica del usuario -->
+        <div class="text-center py-8">
+          <div class="text-6xl mb-4">👤</div>
+          <h3 class="text-xl font-semibold text-gray-700 mb-2">Panel de Usuario</h3>
+          <p class="text-gray-500 mb-4">Usuario: {{ user.firstName }} {{ user.lastName }}</p>
+          
+          <!-- Información básica del usuario -->
+          <div class="bg-gray-50 rounded-lg p-4 mb-4 text-left">
+            <h4 class="font-semibold mb-2">📋 Información Personal:</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p><strong>Email:</strong> {{ user.email || 'No especificado' }}</p>
+                <p><strong>Teléfono:</strong> {{ user.phone || 'No especificado' }}</p>
+              </div>
+              <div>
+                <p><strong>CUI:</strong> {{ user.cui || 'No especificado' }}</p>
+                <p><strong>Fecha de Nacimiento:</strong> {{ user.birthDate ? new Date(user.birthDate).toLocaleDateString() : 'No especificado' }}</p>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Botones de acción -->
+          <div class="flex gap-3 justify-center flex-wrap mb-6">
+            <button 
+              @click="showUserProfile"
+              :class="[
+                'px-4 py-2 rounded-lg transition-colors',
+                userPanelTab === 'profile' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-blue-500 text-white hover:bg-blue-600'
+              ]"
+            >
+              ✏️ Editar Perfil
+            </button>
+            <button 
+              @click="showUserSettings"
+              :class="[
+                'px-4 py-2 rounded-lg transition-colors',
+                userPanelTab === 'settings' 
+                  ? 'bg-green-600 text-white' 
+                  : 'bg-green-500 text-white hover:bg-green-600'
+              ]"
+            >
+              ⚙️ Configuraciones
+            </button>
+            <button 
+              @click="showUserSecurity"
+              :class="[
+                'px-4 py-2 rounded-lg transition-colors',
+                userPanelTab === 'security' 
+                  ? 'bg-purple-600 text-white' 
+                  : 'bg-purple-500 text-white hover:bg-purple-600'
+              ]"
+            >
+              🔐 Seguridad
+            </button>
+            <button 
+              @click="showUserHistory"
+              :class="[
+                'px-4 py-2 rounded-lg transition-colors',
+                userPanelTab === 'history' 
+                  ? 'bg-orange-600 text-white' 
+                  : 'bg-orange-500 text-white hover:bg-orange-600'
+              ]"
+            >
+              📊 Historial
+            </button>
+          </div>
+          
+          <!-- Contenido del panel según la pestaña seleccionada -->
+          <div v-if="userPanelTab === 'profile'" class="bg-white border rounded-lg p-6">
+            <h4 class="text-lg font-semibold mb-4">📝 Editar Perfil</h4>
+            <form @submit.prevent="saveProfileChanges" class="space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                  <input 
+                    type="text" 
+                    v-model="profileForm.firstName"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Tu nombre"
+                  >
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Apellido</label>
+                  <input 
+                    type="text" 
+                    v-model="profileForm.lastName"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Tu apellido"
+                  >
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input 
+                  type="email" 
+                  v-model="profileForm.email"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="tu@email.com"
+                >
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                <input 
+                  type="tel" 
+                  v-model="profileForm.phone"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Tu teléfono"
+                >
+              </div>
+              <button type="submit" class="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600">
+                💾 Guardar Cambios
+              </button>
+            </form>
+          </div>
+          
+          <div v-if="userPanelTab === 'settings'" class="bg-white border rounded-lg p-6">
+            <h4 class="text-lg font-semibold mb-4">⚙️ Configuraciones</h4>
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <span class="text-gray-700">Notificaciones por email</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" class="sr-only peer" checked>
+                  <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-gray-700">Tema oscuro</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" class="sr-only peer">
+                  <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+            </div>
+          </div>
+          
+          <div v-if="userPanelTab === 'security'" class="bg-white border rounded-lg p-6">
+            <h4 class="text-lg font-semibold mb-4">🔐 Seguridad</h4>
+            <form class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña actual</label>
+                <input 
+                  type="password" 
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Tu contraseña actual"
+                >
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nueva contraseña</label>
+                <input 
+                  type="password" 
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Nueva contraseña"
+                >
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Confirmar nueva contraseña</label>
+                <input 
+                  type="password" 
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Confirma la nueva contraseña"
+                >
+              </div>
+              <button type="submit" class="w-full bg-purple-500 text-white py-2 px-4 rounded-lg hover:bg-purple-600">
+                🔒 Cambiar Contraseña
+              </button>
+            </form>
+          </div>
+          
+          <div v-if="userPanelTab === 'history'" class="bg-white border rounded-lg p-6">
+            <h4 class="text-lg font-semibold mb-4">📊 Historial de Actividad</h4>
+            <div class="space-y-3">
+              <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                  <span class="text-blue-600 text-sm">✈️</span>
+                </div>
+                <div class="flex-1">
+                  <p class="font-medium text-gray-800">Búsqueda de vuelo</p>
+                  <p class="text-sm text-gray-600">Ciudad Guatemala → Nueva York</p>
+                </div>
+                <span class="text-xs text-gray-500">Hace 2 horas</span>
+              </div>
+              <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                  <span class="text-green-600 text-sm">🏥</span>
+                </div>
+                <div class="flex-1">
+                  <p class="font-medium text-gray-800">Consulta médica</p>
+                  <p class="text-sm text-gray-600">Hospital General</p>
+                </div>
+                <span class="text-xs text-gray-500">Ayer</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

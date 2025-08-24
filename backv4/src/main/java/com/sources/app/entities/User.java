@@ -34,24 +34,59 @@ public class User {
     private Long cui;  // CUI (identificación única)
 
     /**
-     * Número de teléfono del usuario.
-     * Puede ser nulo.
+     * Nombres del usuario.
+     * No puede ser nulo.
      */
-    @Column(name = "PHONE")
+    @Column(name = "FIRST_NAME", nullable = false, length = 100)
+    private String firstName;  // Nombres
+
+    /**
+     * Apellidos del usuario.
+     * No puede ser nulo.
+     */
+    @Column(name = "LAST_NAME", nullable = false, length = 100)
+    private String lastName;  // Apellidos
+
+    /**
+     * Edad del usuario.
+     * No puede ser nulo.
+     */
+    @Column(name = "AGE", nullable = false)
+    private Integer age;  // Edad
+
+    /**
+     * País de origen del usuario.
+     * No puede ser nulo.
+     */
+    @Column(name = "COUNTRY", nullable = false, length = 100)
+    private String country;  // País de origen
+
+    /**
+     * Número de pasaporte del usuario.
+     * Debe ser único y no puede ser nulo.
+     */
+    @Column(name = "PASSPORT_NUMBER", nullable = false, unique = true, length = 50)
+    private String passportNumber;  // Número de pasaporte
+
+    /**
+     * Número de teléfono del usuario.
+     * Puede ser nulo. Almacenado como VARCHAR2(255).
+     */
+    @Column(name = "PHONE", length = 255)
     private String phone;  // Teléfono
 
     /**
      * Dirección de correo electrónico del usuario.
-     * Debe ser único y no puede ser nulo.
+     * Debe ser único y no puede ser nulo. Longitud máxima de 255 caracteres.
      */
-    @Column(name = "EMAIL", nullable = false, unique = true)
+    @Column(name = "EMAIL", nullable = false, unique = true, length = 255)
     private String email;  // Correo electrónico
 
     /**
      * Dirección física del usuario.
-     * Puede ser nulo.
+     * Puede ser nulo. Longitud máxima de 255 caracteres.
      */
-    @Column(name = "ADDRESS")
+    @Column(name = "ADDRESS", length = 255)
     private String address;  // Dirección
 
     /**
@@ -64,20 +99,12 @@ public class User {
 
     /**
      * Rol del usuario dentro del sistema (ej. ADMIN, USER).
-     * No puede ser nulo.
+     * No puede ser nulo. Longitud máxima de 255 caracteres.
      */
-    @Column(name = "ROL", nullable = false)
+    @Column(name = "ROL", nullable = false, length = 255)
     private String role;  // Rol del usuario
 
-    /**
-     * Póliza asociada al usuario.
-     * Relación Many-to-One opcional con la entidad Policy.
-     * Puede ser nulo.
-     */
-    // Relación ManyToOne opcional con Policy (ya no es obligatoria)
-    @ManyToOne(optional = true)
-    @JoinColumn(name = "ID_POLICY", nullable = true)
-    private Policy policy;
+    // Ya no usamos Policy en el sistema de aerolínea
 
     /**
      * Estado del usuario (habilitado/deshabilitado).
@@ -88,17 +115,18 @@ public class User {
 
     /**
      * Contraseña del usuario (generalmente almacenada hasheada).
-     * No puede ser nulo.
+     * No puede ser nulo. Longitud máxima de 255 caracteres.
      */
-    @Column(name = "PASSWORD", nullable = false)
+    @Column(name = "PASSWORD", nullable = false, length = 255)
     private String password;
 
     /**
      * Indica si el usuario ha pagado por el servicio.
      * Puede ser nulo si el estado de pago no está definido.
+     * NUMBER(1,0) con CHECK (PAID_SERVICE in (0,1)).
      */
-    @Column(name = "PAID_SERVICE")
-    private Boolean paidService;  // Ahora puede ser nulo
+    @Column(name = "PAID_SERVICE", precision = 1, scale = 0)
+    private Integer paidService;  // Cambiado a Integer para coincidir con la BD
 
     /**
      * Fecha de expiración del servicio pagado.
@@ -110,7 +138,7 @@ public class User {
 
     /**
      * Fecha y hora de creación del registro del usuario.
-     * Se almacena con precisión de timestamp.
+     * Se almacena con precisión de timestamp (TIMESTAMP(6)).
      */
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "CREATED_AT")
@@ -130,6 +158,11 @@ public class User {
      * Constructor completo para crear una instancia de User con todos los detalles.
      * @param name Nombre del usuario.
      * @param cui CUI del usuario.
+     * @param firstName Nombres del usuario.
+     * @param lastName Apellidos del usuario.
+     * @param age Edad del usuario.
+     * @param country País de origen del usuario.
+     * @param passportNumber Número de pasaporte del usuario.
      * @param phone Teléfono del usuario.
      * @param email Correo electrónico del usuario.
      * @param address Dirección del usuario.
@@ -142,18 +175,23 @@ public class User {
      * @param expirationDate Fecha de expiración del servicio.
      */
     // Constructor completo
-    public User(String name, Long cui, String phone, String email, String address, Date birthDate, String role, Policy policy, Integer enabled, String password, Boolean paidService, Date expirationDate) {
+    public User(String name, Long cui, String firstName, String lastName, Integer age, String country, String passportNumber, String phone, String email, String address, Date birthDate, String role, Integer enabled, String password, Integer paidService, Date expirationDate) {
         this.name = name;
         this.cui = cui;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.age = age;
+        this.country = country;
+        this.passportNumber = passportNumber;
         this.phone = phone;
         this.email = email;
         this.address = address;
         this.birthDate = birthDate;
         this.role = role;
-        this.policy = policy;
+
         this.enabled = enabled;
         this.password = password;
-        this.paidService = paidService; // Puede ser null
+        this.paidService = paidService; // 0, 1, o null
         this.expirationDate = expirationDate;
         this.createdAt = new Date();
     }
@@ -247,16 +285,7 @@ public class User {
      */
     public void setRole(String role) { this.role = role; }
 
-    /**
-     * Obtiene la póliza asociada al usuario.
-     * @return la póliza asociada.
-     */
-    public Policy getPolicy() { return policy; }
-    /**
-     * Establece la póliza asociada al usuario.
-     * @param policy la póliza a establecer.
-     */
-    public void setPolicy(Policy policy) { this.policy = policy; }
+
 
     /**
      * Obtiene el estado de habilitación del usuario.
@@ -293,14 +322,14 @@ public class User {
 
     /**
      * Obtiene el estado de pago del servicio.
-     * @return true si el servicio está pagado, false si no, null si no definido.
+     * @return 1 si el servicio está pagado, 0 si no, null si no definido.
      */
-    public Boolean getPaidService() { return paidService; }
+    public Integer getPaidService() { return paidService; }
     /**
      * Establece el estado de pago del servicio.
-     * @param paidService el estado de pago a establecer.
+     * @param paidService el estado de pago a establecer (0, 1, o null).
      */
-    public void setPaidService(Boolean paidService) { this.paidService = paidService; }
+    public void setPaidService(Integer paidService) { this.paidService = paidService; }
 
     /**
      * Obtiene la fecha de expiración del servicio.
@@ -312,4 +341,60 @@ public class User {
      * @param expirationDate la fecha de expiración a establecer.
      */
     public void setExpirationDate(Date expirationDate) { this.expirationDate = expirationDate; }
+
+    // Getters y Setters para nuevos campos
+    /**
+     * Obtiene los nombres del usuario.
+     * @return los nombres del usuario.
+     */
+    public String getFirstName() { return firstName; }
+    /**
+     * Establece los nombres del usuario.
+     * @param firstName los nombres del usuario a establecer.
+     */
+    public void setFirstName(String firstName) { this.firstName = firstName; }
+
+    /**
+     * Obtiene los apellidos del usuario.
+     * @return los apellidos del usuario.
+     */
+    public String getLastName() { return lastName; }
+    /**
+     * Establece los apellidos del usuario.
+     * @param lastName los apellidos del usuario a establecer.
+     */
+    public void setLastName(String lastName) { this.lastName = lastName; }
+
+    /**
+     * Obtiene la edad del usuario.
+     * @return la edad del usuario.
+     */
+    public Integer getAge() { return age; }
+    /**
+     * Establece la edad del usuario.
+     * @param age la edad del usuario a establecer.
+     */
+    public void setAge(Integer age) { this.age = age; }
+
+    /**
+     * Obtiene el país de origen del usuario.
+     * @return el país de origen del usuario.
+     */
+    public String getCountry() { return country; }
+    /**
+     * Establece el país de origen del usuario.
+     * @param country el país de origen del usuario a establecer.
+     */
+    public void setCountry(String country) { this.country = country; }
+
+    /**
+     * Obtiene el número de pasaporte del usuario.
+     * @return el número de pasaporte del usuario.
+     */
+    public String getPassportNumber() { return passportNumber; }
+    /**
+     * Establece el número de pasaporte del usuario.
+     * @param passportNumber el número de pasaporte del usuario a establecer.
+     */
+    public void setPassportNumber(String passportNumber) { this.passportNumber = passportNumber; }
 }

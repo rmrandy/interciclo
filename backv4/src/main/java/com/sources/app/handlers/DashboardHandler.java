@@ -88,8 +88,8 @@ public class DashboardHandler implements HttpHandler {
      */
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        // Configura los encabezados CORS para todas las respuestas
-        HibernateUtil.setCorsHeaders(exchange);
+        // Configura los encabezados CORS para todas las respuestas (comentado)
+        // HibernateUtil.setCorsHeaders(exchange);
         
         // Maneja las solicitudes OPTIONS (preflight de CORS)
         if (exchange.getRequestMethod().equals("OPTIONS")) {

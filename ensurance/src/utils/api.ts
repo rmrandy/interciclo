@@ -9,12 +9,14 @@ const ip = import.meta.env.VITE_IP || "localhost";
 interface PortConfig {
   ensurance: string;  // Puerto para el backend de seguros
   pharmacy: string;   // Puerto para el backend de farmacia
+  airline: string;    // Puerto para el backend de aerolínea
 }
 
 // Almacenar la configuración de puertos
 let portConfig: PortConfig = {
   ensurance: "8080",  // Puerto por defecto para ensurance
-  pharmacy: "8081"    // Puerto por defecto para pharmacy
+  pharmacy: "8089",   // Puerto por defecto para pharmacy
+  airline: "8080"     // Puerto por defecto para aerolínea (mismo servidor)
 };
 
 /**
@@ -24,11 +26,12 @@ let portConfig: PortConfig = {
 export const configureApiPorts = (ports: Partial<PortConfig>): void => {
   if (ports.ensurance) portConfig.ensurance = ports.ensurance;
   if (ports.pharmacy) portConfig.pharmacy = ports.pharmacy;
+  if (ports.airline) portConfig.airline = ports.airline;
   
   // Guardar la configuración en localStorage para persistencia
   localStorage.setItem("apiPortConfig", JSON.stringify(portConfig));
   
-  console.log(`Puertos configurados: Ensurance=${portConfig.ensurance}, Pharmacy=${portConfig.pharmacy}`);
+  console.log(`Puertos configurados: Ensurance=${portConfig.ensurance}, Pharmacy=${portConfig.pharmacy}, Airline=${portConfig.airline}`);
 };
 
 /**
@@ -40,7 +43,7 @@ export const loadPortConfiguration = (): void => {
     try {
       const config = JSON.parse(savedConfig);
       portConfig = { ...portConfig, ...config };
-      console.log(`Configuración de puertos cargada: Ensurance=${portConfig.ensurance}, Pharmacy=${portConfig.pharmacy}`);
+      console.log(`Configuración de puertos cargada: Ensurance=${portConfig.ensurance}, Pharmacy=${portConfig.pharmacy}, Airline=${portConfig.airline}`);
     } catch (error) {
       console.warn("Error al cargar configuración de puertos:", error);
     }
@@ -73,4 +76,18 @@ export const getPharmacyApiUrl = (endpoint: string): string => {
   
   // Construir la URL completa
   return `http://${ip}:${portConfig.pharmacy}/api/${cleanEndpoint}`;
+};
+
+/**
+ * Obtiene la URL de la API de aerolínea con el puerto configurado
+ * 
+ * @param endpoint - El endpoint de la API sin la barra inicial
+ * @returns URL completa de la API de aerolínea
+ */
+export const getAirlineApiUrl = (endpoint: string): string => {
+  // Eliminar la barra inicial del endpoint si existe
+  const cleanEndpoint = endpoint.startsWith("/") ? endpoint.substring(1) : endpoint;
+  
+  // Construir la URL completa
+  return `http://${ip}:${portConfig.airline}/api/airline/${cleanEndpoint}`;
 }; 

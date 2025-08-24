@@ -3,10 +3,10 @@
     <session-factory>
         <!-- JDBC Database connection settings -->
         <property name="hibernate.connection.driver_class">oracle.jdbc.driver.OracleDriver</property>
-        <!-- Example URL for Oracle XE; update host, port, and SID/service name as needed -->
+        <!-- Conexión al esquema AEROLINEA existente -->
         <property name="hibernate.connection.url">jdbc:oracle:thin:@//64.225.58.196:1521/XEPDB1</property>
-        <property name="hibernate.connection.username">USUARIO</property>
-        <property name="hibernate.connection.password">user123</property>
+        <property name="hibernate.connection.username">AEROLINEA</property>
+        <property name="hibernate.connection.password">123</property>
         
         <!-- Connection pool settings (optional) -->
         <property name="hibernate.connection.pool_size">10</property>
@@ -17,8 +17,18 @@
         <!-- Show SQL statements in the console -->
         <property name="show_sql">true</property>
         
-        <!-- Automatically update the schema (use with caution in production) -->
-        <property name="hibernate.hbm2ddl.auto">update</property>
+        <!-- Usar esquema existente sin modificar las tablas -->
+        <property name="hibernate.hbm2ddl.auto">none</property>
+        
+        <!-- Configuraciones para manejar conexiones cerradas -->
+        <property name="hibernate.connection.autoCommit">false</property>
+        <property name="hibernate.connection.isolation">2</property>
+        <property name="hibernate.connection.release_mode">after_transaction</property>
+        
+        <!-- Configuraciones de timeout -->
+        <property name="hibernate.jdbc.batch_size">20</property>
+        <property name="hibernate.jdbc.fetch_size">20</property>
+        <property name="hibernate.jdbc.batch_versioned_data">true</property>
 
         <!-- Optionally, configure a c3p0 connection pool -->
         <property name="hibernate.c3p0.min_size">5</property>
@@ -28,24 +38,21 @@
         <property name="hibernate.c3p0.idle_test_period">3000</property>
 
         <!-- Mapping your entity classes -->
+        <!-- Solo mapeos necesarios para Aerolínea y Usuarios -->
+        <mapping class="com.sources.app.entities.Aeropuerto"/>
+        <mapping class="com.sources.app.entities.City"/>
+        <mapping class="com.sources.app.entities.Aircraft"/>
+        <mapping class="com.sources.app.entities.Route"/>
+        <mapping class="com.sources.app.entities.Flight"/>
+        <mapping class="com.sources.app.entities.Ticket"/>
+        <mapping class="com.sources.app.entities.Booking"/>
         <mapping class="com.sources.app.entities.User"/>
-        <mapping class="com.sources.app.entities.Policy"/>
-        <mapping class="com.sources.app.entities.Appointment"/>
-        <mapping class="com.sources.app.entities.AppointmentMade"/>
-        <mapping class="com.sources.app.entities.Category"/>
-        <mapping class="com.sources.app.entities.ConfigurableAmount"/>
-        <mapping class="com.sources.app.entities.Hospital"/>
-        <mapping class="com.sources.app.entities.Medicine"/>
-        <mapping class="com.sources.app.entities.MedicinePres"/>
-        <mapping class="com.sources.app.entities.Pharmacy"/>
-        <mapping class="com.sources.app.entities.Prescription"/>
-        <mapping class="com.sources.app.entities.Service"/>
-        <mapping class="com.sources.app.entities.TotalHospital"/>
-        <mapping class="com.sources.app.entities.TotalPharmacy"/>
-        <mapping class="com.sources.app.entities.Transactions"/>
-        <mapping class="com.sources.app.entities.TransactionPolicy"/>
-        <mapping class="com.sources.app.entities.InsuranceService"/>
-        <mapping class="com.sources.app.entities.HospitalInsuranceService"/>
-        <mapping class="com.sources.app.entities.EnsuranceAppointment"/>
+        <mapping class="com.sources.app.entities.UserRole"/>
+        
+        <!-- Nuevas entidades para gestión completa de vuelos -->
+        <mapping class="com.sources.app.entities.FlightLeg"/>
+        <mapping class="com.sources.app.entities.FlightInventory"/>
+        <mapping class="com.sources.app.entities.FlightFare"/>
+
     </session-factory>
 </hibernate-configuration>

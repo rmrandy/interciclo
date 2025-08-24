@@ -617,7 +617,7 @@ class UserDAOTest {
 
         // Assert
         assertEquals(2, updatedCount);
-        verify(mockSession).createQuery("FROM User WHERE paidService = true AND expirationDate < :today", User.class);
+        verify(mockSession).createQuery("FROM User WHERE paidService = 1 AND expirationDate < :today", User.class);
         verify(mockUserQuery).setParameter(eq("today"), any(Date.class));
         verify(mockSession, times(2)).update(any(User.class));
         verify(mockSession).update(expiredUser1);
@@ -643,7 +643,7 @@ class UserDAOTest {
 
         // Assert
         assertEquals(0, updatedCount);
-        verify(mockSession).createQuery("FROM User WHERE paidService = true AND expirationDate < :today", User.class);
+        verify(mockSession).createQuery("FROM User WHERE paidService = 1 AND expirationDate < :today", User.class);
         verify(mockUserQuery).setParameter(eq("today"), any(Date.class));
         verify(mockSession, never()).update(any(User.class));
         verify(mockTransaction).commit();

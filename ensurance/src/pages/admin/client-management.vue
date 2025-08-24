@@ -2,16 +2,16 @@
 import { ref, onMounted, computed } from "vue";
 import axios from "axios";
 
-// Función para obtener el hospital predeterminado
-const getDefaultHospital = () => {
+// Función para obtener el centro de operaciones predeterminado
+const getDefaultOperationsCenter = () => {
   try {
-    const storedHospital = localStorage.getItem('defaultHospital');
-    if (storedHospital) {
-      return JSON.parse(storedHospital);
+    const storedCenter = localStorage.getItem('defaultOperationsCenter');
+    if (storedCenter) {
+      return JSON.parse(storedCenter);
     }
     return null;
   } catch (error) {
-    console.error('Error al obtener el hospital predeterminado:', error);
+    console.error('Error al obtener el centro de operaciones predeterminado:', error);
     return null;
   }
 };

@@ -40,9 +40,9 @@ public class HibernateUtil {
      * Configura los headers CORS para una petición
      * @param exchange el intercambio HTTP donde agregar los headers
      */
-    public static void setCorsHeaders(com.sun.net.httpserver.HttpExchange exchange) {
-        exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
-        exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    }
+    // public static void setCorsHeaders(com.sun.net.httpserver.HttpExchange exchange) {
+    //     exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+    //     exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    //     exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    // }
 }

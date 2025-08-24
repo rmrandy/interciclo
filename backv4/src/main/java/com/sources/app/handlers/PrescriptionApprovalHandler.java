@@ -176,7 +176,7 @@ public class PrescriptionApprovalHandler implements HttpHandler {
         }
 
         // 2. Verificar si el usuario tiene servicio pagado
-        if (user.getPaidService() == null || !user.getPaidService()) {
+        if (user.getPaidService() == null || !user.getPaidService().equals(1)) {
             rejectApproval(approval, "Client coverage inactive");
             sendJsonResponse(exchange, 400, "{\"error\": \"Client coverage inactive\", \"status\": \"Rejected\"}");
             return;

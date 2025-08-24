@@ -85,10 +85,9 @@ public class Medicine {
 
     /**
      * Indica el nivel de cobertura del medicamento (ej. 0 o 1).
-     * No puede ser nulo. Precisión de 1 dígito.
+     * No puede ser nulo.
      */
-    // Nuevo atributo coverage (NUMBER(1,0))
-    @Column(name = "COVERAGE", nullable = false, precision = 1, scale = 0)
+    @Column(name = "COVERAGE", nullable = false)
     private Integer coverage;
 
     /**

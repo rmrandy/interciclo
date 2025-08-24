@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prueba API de Inventario - AeroLinea</title>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin: 0;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ffffff, #f7fafc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .test-section {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .test-section h3 {
+            margin: 0 0 1rem 0;
+            color: #68d391;
+            font-size: 1.25rem;
+        }
+        
+        .input-group {
+            margin-bottom: 1rem;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        
+        input, button {
+            padding: 0.75rem 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 0.75rem;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1rem;
+            backdrop-filter: blur(10px);
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #48bb78;
+            box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.1);
+        }
+        
+        button {
+            background: linear-gradient(135deg, #48bb78, #38a169);
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-left: 0.5rem;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(72, 187, 120, 0.3);
+        }
+        
+        .result {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 0.75rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.875rem;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .success { border-color: #48bb78; }
+        .error { border-color: #e53e3e; }
+        
+        .status {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+        
+        .status.success { background: #48bb78; }
+        .status.error { background: #e53e3e; }
+        .status.loading { background: #ed8936; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Prueba API de Inventario</h1>
+        
+        <div class="test-section">
+            <h3>📊 Obtener Inventario Completo</h3>
+            <div class="input-group">
+                <label for="flightId">ID del Vuelo:</label>
+                <input type="number" id="flightId" value="1" placeholder="Ingresa el ID del vuelo">
+                <button onclick="getInventory()">🔍 Obtener Inventario</button>
+            </div>
+            <div id="inventoryResult" class="result" style="display: none;"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>📈 Obtener Resumen de Inventario</h3>
+            <div class="input-group">
+                <label for="flightIdSummary">ID del Vuelo:</label>
+                <input type="number" id="flightIdSummary" value="1" placeholder="Ingresa el ID del vuelo">
+                <button onclick="getInventorySummary()">📊 Obtener Resumen</button>
+            </div>
+            <div id="summaryResult" class="result" style="display: none;"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🌐 Configuración de API</h3>
+            <div class="input-group">
+                <label for="apiUrl">URL Base de la API:</label>
+                <input type="text" id="apiUrl" value="http://localhost:8080" placeholder="http://localhost:8080">
+                <button onclick="updateApiUrl()">🔄 Actualizar</button>
+            </div>
+            <p><strong>URL actual:</strong> <span id="currentUrl">http://localhost:8080</span></p>
+        </div>
+    </div>
+
+    <script>
+        let currentApiUrl = 'http://localhost:8080';
+        
+        function updateApiUrl() {
+            const newUrl = document.getElementById('apiUrl').value.trim();
+            if (newUrl) {
+                currentApiUrl = newUrl;
+                document.getElementById('currentUrl').textContent = newUrl;
+                console.log('API URL actualizada:', newUrl);
+            }
+        }
+        
+        async function getInventory() {
+            const flightId = document.getElementById('flightId').value;
+            const resultDiv = document.getElementById('inventoryResult');
+            
+            if (!flightId) {
+                showResult(resultDiv, '❌ Error: Ingresa un ID de vuelo válido', 'error');
+                return;
+            }
+            
+            showResult(resultDiv, '🔄 Cargando inventario...', 'loading');
+            
+            try {
+                const response = await fetch(`${currentApiUrl}/api/airline/inventory/${flightId}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult(resultDiv, formatInventoryData(data), 'success');
+                } else {
+                    showResult(resultDiv, `❌ Error ${response.status}: ${data.error || 'Error desconocido'}`, 'error');
+                }
+            } catch (error) {
+                showResult(resultDiv, `❌ Error de conexión: ${error.message}`, 'error');
+            }
+        }
+        
+        async function getInventorySummary() {
+            const flightId = document.getElementById('flightIdSummary').value;
+            const resultDiv = document.getElementById('summaryResult');
+            
+            if (!flightId) {
+                showResult(resultDiv, '❌ Error: Ingresa un ID de vuelo válido', 'error');
+                return;
+            }
+            
+            showResult(resultDiv, '🔄 Cargando resumen...', 'loading');
+            
+            try {
+                const response = await fetch(`${currentApiUrl}/api/airline/inventory/${flightId}/summary`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult(resultDiv, formatSummaryData(data), 'success');
+                } else {
+                    showResult(resultDiv, `❌ Error ${response.status}: ${data.error || 'Error desconocido'}`, 'error');
+                }
+            } catch (error) {
+                showResult(resultDiv, `❌ Error de conexión: ${error.message}`, 'error');
+            }
+        }
+        
+        function showResult(element, content, type) {
+            element.style.display = 'block';
+            element.textContent = content;
+            element.className = `result ${type}`;
+            
+            // Agregar indicador de estado
+            const statusDiv = element.previousElementSibling;
+            if (statusDiv && statusDiv.classList.contains('status')) {
+                statusDiv.remove();
+            }
+            
+            const status = document.createElement('div');
+            status.className = `status ${type}`;
+            status.textContent = type === 'success' ? '✅ Éxito' : 
+                               type === 'error' ? '❌ Error' : '🔄 Cargando';
+            
+            element.parentNode.insertBefore(status, element);
+        }
+        
+        function formatInventoryData(data) {
+            if (!data.success) {
+                return `❌ Error: ${data.error}`;
+            }
+            
+            let result = `✅ Inventario obtenido exitosamente\n`;
+            result += `🛩️ Vuelo ID: ${data.flightId}\n\n`;
+            
+            if (data.inventory && Object.keys(data.inventory).length > 0) {
+                result += `📊 INVENTARIO POR CATEGORÍA:\n`;
+                result += `─`.repeat(40) + `\n`;
+                
+                Object.entries(data.inventory).forEach(([category, info]) => {
+                    result += `\n🎯 ${category}:\n`;
+                    result += `   • Total: ${info.totalSeats} asientos\n`;
+                    result += `   • Disponibles: ${info.availableSeats} asientos\n`;
+                    result += `   • Reservados: ${info.reservedSeats} asientos\n`;
+                    result += `   • Vendidos: ${info.soldSeats} asientos\n`;
+                    result += `   • Estado: ${info.status}\n`;
+                });
+                
+                if (data.summary) {
+                    result += `\n📈 RESUMEN GENERAL:\n`;
+                    result += `─`.repeat(40) + `\n`;
+                    result += `• Total asientos: ${data.summary.totalSeats}\n`;
+                    result += `• Asientos disponibles: ${data.summary.availableSeats}\n`;
+                    result += `• Asientos reservados: ${data.summary.reservedSeats}\n`;
+                    result += `• Asientos vendidos: ${data.summary.soldSeats}\n`;
+                    result += `• Categorías: ${data.summary.categories.join(', ')}\n`;
+                    result += `• Tasa de ocupación: ${(data.summary.occupancyRate * 100).toFixed(1)}%\n`;
+                }
+            } else {
+                result += `⚠️ No se encontró inventario para este vuelo`;
+            }
+            
+            return result;
+        }
+        
+        function formatSummaryData(data) {
+            if (!data.success) {
+                return `❌ Error: ${data.error}`;
+            }
+            
+            let result = `✅ Resumen obtenido exitosamente\n`;
+            result += `🛩️ Vuelo ID: ${data.flightId}\n\n`;
+            
+            if (data.summary) {
+                result += `📊 RESUMEN DEL INVENTARIO:\n`;
+                result += `─`.repeat(40) + `\n`;
+                result += `• Total asientos: ${data.summary.totalSeats}\n`;
+                result += `• Asientos disponibles: ${data.summary.availableSeats}\n`;
+                result += `• Asientos reservados: ${data.summary.reservedSeats}\n`;
+                result += `• Asientos vendidos: ${data.summary.soldSeats}\n`;
+                result += `• Tasa de ocupación: ${(data.summary.occupancyRate * 100).toFixed(1)}%\n`;
+            } else {
+                result += `⚠️ No se encontró resumen para este vuelo`;
+            }
+            
+            return result;
+        }
+        
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🧪 Prueba API de Inventario iniciada');
+            console.log('📍 URL base:', currentApiUrl);
+        });
+    </script>
+</body>
+</html>
+

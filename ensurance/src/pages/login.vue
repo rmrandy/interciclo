@@ -48,6 +48,10 @@ const login: () => Promise<void> = async (): Promise<void> => {
     if (response.status === 200 && response.data) {
       // Verificar si ya existe información de perfil completado para este usuario
       const previousUserData = localStorage.getItem("user");
+      
+      // Obtener parámetro de redirección
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectTo = urlParams.get('redirect') || '/home';
       let profileCompletedFlag = false;
       let profileData = null;
       
@@ -80,14 +84,16 @@ const login: () => Promise<void> = async (): Promise<void> => {
       eventBus.emit('login');
       
       if (userData.enabled !== 1) {
-        console.log("Redirigiendo a cuenta inactiva");
-        router.push("/inactive-account");
-      } else if (!profileCompletedFlag && checkMissingRequiredFields(userData)) {
+        console.log("Usuario no activado, pero permitiendo acceso");
+        // No redirigir a cuenta inactiva, continuar normalmente
+      }
+      
+      if (!profileCompletedFlag && checkMissingRequiredFields(userData)) {
         console.log("Redirigiendo a completar perfil");
         router.push("/profile-completion");
       } else {
         console.log("Redirigiendo a home");
-        router.push("/home");
+        router.push(redirectTo);
       }
     } else {
       error.value = "Error en el inicio de sesión. Por favor intente de nuevo.";

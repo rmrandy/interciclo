@@ -213,7 +213,7 @@ public class UserHandler implements HttpHandler {
                 return;
             }
 
-            // Llamamos al método create del DAO, ahora incluyendo el objeto Policy
+            // Llamamos al método create del DAO
             User user = userDAO.create(
                     createUser.getName(),
                     createUser.getCui(),
@@ -221,8 +221,7 @@ public class UserHandler implements HttpHandler {
                     createUser.getEmail(),
                     createUser.getBirthDate(),
                     createUser.getAddress(),
-                    createUser.getPassword(),
-                    createUser.getPolicy() // Se espera que en el JSON se incluya la información de la Policy
+                    createUser.getPassword()
             );
 
             if (user != null) {
@@ -306,9 +305,8 @@ public class UserHandler implements HttpHandler {
             updatedUser.setIdUser(userId);
             
             // Reglas de negocio para la actualización
-            // 1. Si paidService es false, policy debe ser null
-            if (updatedUser.getPaidService() != null && !updatedUser.getPaidService()) {
-                updatedUser.setPolicy(null);
+            // 1. Si paidService es 0, se establece la fecha de expiración como null
+            if (updatedUser.getPaidService() != null && updatedUser.getPaidService().equals(0)) {
                 updatedUser.setExpirationDate(null);
             }
             

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estado del Backend</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        pre { background: #f8f9fa; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Verificación del Estado del Backend</h1>
+    
+    <div class="info">
+        <h3>📡 Información del Servidor</h3>
+        <p><strong>URL:</strong> http://192.168.0.10:8080</p>
+        <p><strong>Fecha:</strong> <span id="currentTime"></span></p>
+    </div>
+
+    <div>
+        <h3>🧪 Pruebas de Conexión</h3>
+        <button onclick="testHealth()">1. Health Check</button>
+        <button onclick="testCities()">2. API Ciudades</button>
+        <button onclick="testFlights()">3. API Vuelos</button>
+        <button onclick="testDebugCities()">4. Debug Ciudades</button>
+        <button onclick="testAll()">5. Probar Todo</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        const API_BASE = 'http://192.168.0.10:8080';
+        
+        // Mostrar hora actual
+        document.getElementById('currentTime').textContent = new Date().toLocaleString();
+
+        function showResult(title, content, isSuccess = true) {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `status ${isSuccess ? 'success' : 'error'}`;
+            div.innerHTML = `<h4>${title}</h4><pre>${content}</pre>`;
+            results.appendChild(div);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function testHealth() {
+            clearResults();
+            try {
+                const response = await fetch(`${API_BASE}/api/health`);
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult('✅ Health Check Exitoso', JSON.stringify(data, null, 2));
+                } else {
+                    showResult('❌ Health Check Falló', `HTTP ${response.status}: ${response.statusText}`, false);
+                }
+            } catch (error) {
+                showResult('❌ Error de Conexión', error.message, false);
+            }
+        }
+
+        async function testCities() {
+            try {
+                const response = await fetch(`${API_BASE}/api/airline/cities`);
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult('✅ API Ciudades Exitoso', JSON.stringify(data, null, 2));
+                } else {
+                    showResult('❌ API Ciudades Falló', `HTTP ${response.status}: ${response.statusText}`, false);
+                }
+            } catch (error) {
+                showResult('❌ Error en API Ciudades', error.message, false);
+            }
+        }
+
+        async function testFlights() {
+            try {
+                const response = await fetch(`${API_BASE}/api/airline/flights`);
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult('✅ API Vuelos Exitoso', JSON.stringify(data, null, 2));
+                } else {
+                    showResult('❌ API Vuelos Falló', `HTTP ${response.status}: ${response.statusText}`, false);
+                }
+            } catch (error) {
+                showResult('❌ Error en API Vuelos', error.message, false);
+            }
+        }
+
+        async function testDebugCities() {
+            try {
+                const response = await fetch(`${API_BASE}/api/debug/cities`);
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult('✅ Debug Ciudades Exitoso', JSON.stringify(data, null, 2));
+                } else {
+                    showResult('❌ Debug Ciudades Falló', `HTTP ${response.status}: ${response.statusText}`, false);
+                }
+            } catch (error) {
+                showResult('❌ Error en Debug Ciudades', error.message, false);
+            }
+        }
+
+        async function testAll() {
+            clearResults();
+            await testHealth();
+            await testCities();
+            await testFlights();
+            await testDebugCities();
+        }
+    </script>
+</body>
+</html>
