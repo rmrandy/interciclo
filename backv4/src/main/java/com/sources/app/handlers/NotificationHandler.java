@@ -126,13 +126,26 @@ public class NotificationHandler implements HttpHandler {
             try {
                 // Leer el cuerpo de la petición (JSON)
                 String requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-                @SuppressWarnings("unchecked") // Usamos Map por simplicidad, DTO sería más robusto
-                Map<String, String> emailRequest = objectMapper.readValue(requestBody, Map.class);
+                @SuppressWarnings("unchecked")
+                Map<String, Object> emailRequest = objectMapper.readValue(requestBody, Map.class);
 
                 // Extraer datos del email
-                String to = emailRequest.get("to");
-                String subject = emailRequest.get("subject");
-                String body = emailRequest.get("body");
+                String to = (String) emailRequest.get("to");
+                String subject = (String) emailRequest.get("subject");
+                String body = (String) emailRequest.get("body");
+                boolean isHtml = false;
+                try {
+                    Object isHtmlVal = emailRequest.get("isHtml");
+                    Object contentTypeVal = emailRequest.get("contentType");
+                    if (isHtmlVal instanceof Boolean && (Boolean) isHtmlVal) {
+                        isHtml = true;
+                    } else if (isHtmlVal instanceof String && ((String) isHtmlVal).equalsIgnoreCase("true")) {
+                        isHtml = true;
+                    }
+                    if (contentTypeVal instanceof String && ((String) contentTypeVal).equalsIgnoreCase("text/html")) {
+                        isHtml = true;
+                    }
+                } catch (Exception ignored) {}
 
                 // Validar datos mínimos requeridos
                 if (to == null || to.trim().isEmpty() || 
@@ -144,7 +157,7 @@ public class NotificationHandler implements HttpHandler {
                 }
 
                 // Enviar el email usando el método auxiliar
-                boolean emailSent = sendEmail(to, subject, body);
+                boolean emailSent = sendEmail(to, subject, body, isHtml);
 
                 if (emailSent) {
                     // Email enviado con éxito
@@ -185,7 +198,7 @@ public class NotificationHandler implements HttpHandler {
      * @return {@code true} si {@link Transport#send(Message)} se completa sin lanzar excepciones, {@code false} si
      *         faltan credenciales en la configuración o si ocurre cualquier excepción durante la preparación o envío del correo.
      */
-    private boolean sendEmail(String to, String subject, String body) {
+    private boolean sendEmail(String to, String subject, String body, boolean isHtml) {
         // Validar que las propiedades esenciales estén cargadas
         if (senderEmail == null || senderPassword == null) {
             LOGGER.severe("Intento de enviar email sin credenciales configuradas.");
@@ -225,10 +238,13 @@ public class NotificationHandler implements HttpHandler {
             message.setFrom(new InternetAddress(senderEmail));
             // Manejar múltiples destinatarios si están separados por coma
             message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(to, false)); 
-            message.setSubject(subject, "UTF-8"); // Especificar UTF-8 para el asunto
-            // Considerar usar MimeMultipart para contenido HTML o mixto
-            message.setText(body, "UTF-8"); // Especificar UTF-8 para el cuerpo
-            message.setHeader("Content-Type", "text/plain; charset=UTF-8"); // Asegurar Content-Type
+            message.setSubject(subject, "UTF-8");
+            if (isHtml) {
+                message.setContent(body, "text/html; charset=UTF-8");
+            } else {
+                message.setText(body, "UTF-8");
+                message.setHeader("Content-Type", "text/plain; charset=UTF-8");
+            }
             
             // Enviar el mensaje
             Transport.send(message);

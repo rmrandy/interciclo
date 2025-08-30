@@ -15,7 +15,7 @@ interface PortConfig {
 // Almacenar la configuración de puertos
 let portConfig: PortConfig = {
   ensurance: "8080",  // Puerto por defecto para ensurance
-  pharmacy: "8089",   // Puerto por defecto para pharmacy
+  pharmacy: "8080",   // Puerto por defecto para pharmacy
   airline: "8080"     // Puerto por defecto para aerolínea (mismo servidor)
 };
 

@@ -4,6 +4,7 @@ import com.sources.app.entities.Flight;
 import com.sources.app.entities.FlightLeg;
 import com.sources.app.entities.City;
 import com.sources.app.entities.User;
+import com.sources.app.entities.Aircraft;
 import com.sources.app.util.HibernateUtil;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
@@ -12,7 +13,6 @@ import org.hibernate.query.Query;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import com.sources.app.entities.FlightFare;
@@ -20,10 +20,11 @@ import java.util.HashMap;
 
 public class FlightDAO {
 
-    // Crear vuelo simple (sin inventario ni tarifas)
+    // Crear vuelo simple y opcionalmente asignar aeronave con autogeneración de inventario/tarifas
     public Flight createSimpleFlight(String flightNumber, int originCityId, int destinationCityId,
                                    String departureDate, String departureTime, String arrivalDate, String arrivalTime,
-                                   BigDecimal basePrice, int availableSeats, int createdBy) {
+                                   BigDecimal basePrice, int availableSeats, int createdBy,
+                                   Integer aircraftId) {
         Transaction tx = null;
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
             tx = session.beginTransaction();
@@ -51,15 +52,97 @@ public class FlightDAO {
             flight.setCreatedBy(createdBy);
             
             session.persist(flight);
+            session.flush();
+
+            // Asignar aeronave y generar inventario/tarifas si se envió aircraftId
+            if (aircraftId != null && aircraftId > 0) {
+                Aircraft aircraft = session.get(Aircraft.class, aircraftId.longValue());
+                if (aircraft == null) {
+                    throw new RuntimeException("Aeronave no encontrada: " + aircraftId);
+                }
+                flight.setAircraft(aircraft);
+                session.merge(flight);
+                try {
+                    generateInventoryAndFares(session, flight.getIdFlight(), aircraftId);
+                } catch (Exception ex) {
+                    if (isOracleTriggerInvalid(ex)) {
+                        System.err.println("WARN: Inventario/tarifas no generados por trigger inválido. Continuando sin actualizar FLIGHTS. Detalle: " + ex.getMessage());
+                    } else {
+                        throw ex;
+                    }
+                }
+            }
             tx.commit();
             
             return flight;
         } catch (Exception e) {
-            if (tx != null && tx.getStatus().canRollback()) {
-                tx.rollback();
+            try {
+                if (tx != null && tx.getStatus() != null && tx.getStatus().canRollback()) {
+                    tx.rollback();
+                }
+            } catch (Exception rollbackEx) {
+                System.err.println("WARN: Rollback falló (posible conexión cerrada): " + rollbackEx.getMessage());
             }
             throw e;
         }
+    }
+
+    private void generateInventoryAndFares(Session session, Integer flightId, Integer aircraftId) {
+        // Limpiar inventario previo
+        session.createNativeQuery(
+            "DELETE FROM FLIGHT_INVENTORY WHERE FLIGHT_ID = :fid"
+        ).setParameter("fid", flightId).executeUpdate();
+
+        // Insertar inventario desde configuración del avión
+        session.createNativeQuery(
+            "INSERT INTO FLIGHT_INVENTORY (FLIGHT_ID, SEAT_CATEGORY, TOTAL_SEATS, AVAILABLE_SEATS, RESERVED_SEATS, SOLD_SEATS, STATUS) " +
+            "SELECT :fid, c.SEAT_CATEGORY, c.SEATS, c.SEATS, 0, 0, 'ACTIVE' " +
+            "FROM AIRCRAFT_SEAT_CONFIG c WHERE c.AIRCRAFT_ID = :aid AND c.SEATS > 0"
+        ).setParameter("fid", flightId).setParameter("aid", aircraftId).executeUpdate();
+
+        // Actualizar asientos disponibles globales del vuelo
+        try {
+            session.createNativeQuery(
+                "UPDATE FLIGHTS f SET f.AVAILABLE_SEATS = (SELECT NVL(SUM(TOTAL_SEATS),0) FROM FLIGHT_INVENTORY WHERE FLIGHT_ID = :fid), " +
+                "f.UPDATED_AT = TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS') WHERE f.ID_FLIGHT = :fid"
+            ).setParameter("fid", flightId).executeUpdate();
+        } catch (Exception ex) {
+            if (isOracleTriggerInvalid(ex)) {
+                // Si existe un trigger inválido en FLIGHTS (ej. ORA-04098), continuar sin bloquear la transacción
+                System.err.println("WARN: UPDATE de FLIGHTS omitido por trigger inválido. Detalle: " + ex.getMessage());
+            } else {
+                throw ex;
+            }
+        }
+
+        // MERGE de tarifas por categoría usando multiplicadores
+        session.createNativeQuery(
+            "MERGE INTO FLIGHT_FARES ff " +
+            "USING ( " +
+            "  SELECT :fid AS FLIGHT_ID, c.SEAT_CATEGORY AS SEAT_CATEGORY, " +
+            "         ROUND(f.BASE_PRICE * c.PRICE_MULTIPLIER, 2) AS BASE_PRICE " +
+            "  FROM FLIGHTS f, AIRCRAFT_SEAT_CONFIG c " +
+            "  WHERE f.ID_FLIGHT = :fid AND c.AIRCRAFT_ID = :aid AND c.SEATS > 0 " +
+            ") s ON (ff.FLIGHT_ID = s.FLIGHT_ID AND ff.SEAT_CATEGORY = s.SEAT_CATEGORY) " +
+            "WHEN MATCHED THEN UPDATE SET ff.BASE_PRICE = s.BASE_PRICE, ff.TOTAL_PRICE = s.BASE_PRICE, ff.UPDATED_AT = SYSTIMESTAMP, ff.STATUS = 'ACTIVE' " +
+            "WHEN NOT MATCHED THEN INSERT (FLIGHT_ID, SEAT_CATEGORY, BASE_PRICE, CURRENCY, TAXES, FEES, TOTAL_PRICE, STATUS, CREATED_AT, UPDATED_AT) " +
+            "VALUES (s.FLIGHT_ID, s.SEAT_CATEGORY, s.BASE_PRICE, 'GTQ', 0, 0, s.BASE_PRICE, 'ACTIVE', SYSTIMESTAMP, SYSTIMESTAMP)"
+        ).setParameter("fid", flightId).setParameter("aid", aircraftId).executeUpdate();
+    }
+
+    /**
+     * Detecta si el error proviene de un trigger inválido de Oracle (ORA-04098)
+     */
+    private boolean isOracleTriggerInvalid(Exception ex) {
+        Throwable t = ex;
+        while (t != null) {
+            String msg = t.getMessage();
+            if (msg != null && (msg.contains("ORA-04098") || msg.toUpperCase().contains("TRIGGER") && msg.toUpperCase().contains("INVALID"))) {
+                return true;
+            }
+            t = t.getCause();
+        }
+        return false;
     }
     
     public void createFlightFares(Flight flight, Map<String, BigDecimal> fares) {
@@ -231,6 +314,13 @@ public class FlightDAO {
                 return false;
             }
             
+            // Verificar que el nuevo estado sea válido
+            if (!isValidFlightStatus(newStatus)) {
+                return false;
+            }
+            
+            // Actualizar estado
+            String oldStatus = flight.getStatus();
             flight.setStatus(newStatus);
             flight.setUpdatedBy(updatedBy);
             flight.setUpdatedAt(LocalDateTime.now().toString());
@@ -238,6 +328,9 @@ public class FlightDAO {
             if ("CANCELLED".equals(newStatus)) {
                 flight.setCancellationDate(LocalDateTime.now().toString());
             }
+            
+            // Agregar entrada al log de cambios
+            flight.addChangeLogEntry("Estado cambiado de " + oldStatus + " a " + newStatus, updatedBy);
             
             session.update(flight);
             tx.commit();
@@ -346,6 +439,216 @@ public class FlightDAO {
         } finally {
             session.close();
         }
+    }
+    
+    // ===== NUEVOS MÉTODOS PARA GESTIÓN COMPLETA DE VUELOS =====
+    
+    /**
+     * Cancela un vuelo
+     */
+    public boolean cancelFlight(Integer flightId, String cancellationReason, Integer cancelledBy) {
+        Transaction tx = null;
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            tx = session.beginTransaction();
+            
+            Flight flight = session.get(Flight.class, flightId);
+            if (flight == null) {
+                return false;
+            }
+            
+            // Verificar que el vuelo puede ser cancelado
+            if (!flight.canBeCancelled()) {
+                return false;
+            }
+            
+            // Actualizar estado del vuelo
+            flight.setStatus(Flight.STATUS_CANCELLED);
+            flight.setCancellationReason(cancellationReason);
+            flight.setCancelledBy(cancelledBy);
+            flight.setCancellationDate(LocalDateTime.now().toString());
+            
+            // Agregar entrada al log de cambios
+            flight.addChangeLogEntry("Vuelo cancelado: " + cancellationReason, cancelledBy);
+            
+            session.merge(flight);
+            tx.commit();
+            
+            return true;
+            
+        } catch (Exception e) {
+            if (tx != null && tx.getStatus().canRollback()) {
+                tx.rollback();
+            }
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+
+    
+    /**
+     * Actualiza un vuelo completo
+     */
+    public Flight updateFlight(Integer flightId, com.google.gson.JsonObject updateData) {
+        Transaction tx = null;
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            tx = session.beginTransaction();
+            
+            Flight flight = session.get(Flight.class, flightId);
+            if (flight == null) {
+                return null;
+            }
+            
+            // Verificar que el vuelo puede ser modificado
+            if (!flight.canBeModified()) {
+                return null;
+            }
+            
+            // Actualizar campos si están presentes en updateData
+            if (updateData.has("flightNumber")) {
+                flight.setFlightNumber(updateData.get("flightNumber").getAsString());
+            }
+            
+            if (updateData.has("originCityId")) {
+                City originCity = session.get(City.class, updateData.get("originCityId").getAsInt());
+                if (originCity != null) {
+                    flight.setOriginCity(originCity);
+                }
+            }
+            
+            if (updateData.has("destinationCityId")) {
+                City destinationCity = session.get(City.class, updateData.get("destinationCityId").getAsInt());
+                if (destinationCity != null) {
+                    flight.setDestinationCity(destinationCity);
+                }
+            }
+            
+            if (updateData.has("departureDate")) {
+                flight.setDepartureDate(updateData.get("departureDate").getAsString());
+            }
+            
+            if (updateData.has("departureTime")) {
+                flight.setDepartureTime(updateData.get("departureTime").getAsString());
+            }
+            
+            if (updateData.has("arrivalDate")) {
+                flight.setArrivalDate(updateData.get("arrivalDate").getAsString());
+            }
+            
+            if (updateData.has("arrivalTime")) {
+                flight.setArrivalTime(updateData.get("arrivalTime").getAsString());
+            }
+            
+            if (updateData.has("basePrice")) {
+                flight.setBasePrice(BigDecimal.valueOf(updateData.get("basePrice").getAsDouble()));
+            }
+            
+            if (updateData.has("availableSeats")) {
+                flight.setAvailableSeats(updateData.get("availableSeats").getAsInt());
+            }
+            
+            if (updateData.has("gate")) {
+                flight.setGate(updateData.get("gate").getAsString());
+            }
+            
+            if (updateData.has("terminal")) {
+                flight.setTerminal(updateData.get("terminal").getAsString());
+            }
+            
+            if (updateData.has("checkInStart")) {
+                flight.setCheckInStart(updateData.get("checkInStart").getAsString());
+            }
+            
+            if (updateData.has("checkInEnd")) {
+                flight.setCheckInEnd(updateData.get("checkInEnd").getAsString());
+            }
+            
+            if (updateData.has("boardingTime")) {
+                flight.setBoardingTime(updateData.get("boardingTime").getAsString());
+            }
+
+            // Asignación de aeronave (y regeneración de inventario/tarifas)
+            if (updateData.has("aircraftId")) {
+                Integer aircraftId = updateData.get("aircraftId").isJsonNull() ? null : updateData.get("aircraftId").getAsInt();
+                if (aircraftId != null && aircraftId > 0) {
+                    Aircraft aircraft = session.get(Aircraft.class, aircraftId.longValue());
+                    if (aircraft == null) {
+                        throw new RuntimeException("Aeronave no encontrada: " + aircraftId);
+                    }
+                    flight.setAircraft(aircraft);
+                    session.merge(flight);
+                    // Generar inventario y tarifas basadas en la configuración del avión
+                    generateInventoryAndFares(session, flightId, aircraftId);
+                } else {
+                    flight.setAircraft(null);
+                }
+            }
+            
+            // Actualizar campos de auditoría
+            if (updateData.has("updatedBy")) {
+                flight.setUpdatedBy(updateData.get("updatedBy").getAsInt());
+            }
+            
+            // Agregar entrada al log de cambios
+            if (updateData.has("updatedBy")) {
+                flight.addChangeLogEntry("Vuelo actualizado", updateData.get("updatedBy").getAsInt());
+            }
+            
+            session.merge(flight);
+            tx.commit();
+            
+            return flight;
+            
+        } catch (Exception e) {
+            if (tx != null && tx.getStatus().canRollback()) {
+                tx.rollback();
+            }
+            e.printStackTrace();
+            return null;
+        }
+    }
+    
+    /**
+     * Elimina un vuelo
+     */
+    public boolean deleteFlight(Integer flightId) {
+        Transaction tx = null;
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            tx = session.beginTransaction();
+            
+            Flight flight = session.get(Flight.class, flightId);
+            if (flight == null) {
+                return false;
+            }
+            
+            // Verificar que el vuelo puede ser eliminado
+            if (!flight.isDraft()) {
+                return false;
+            }
+            
+            // Eliminar el vuelo
+            session.remove(flight);
+            tx.commit();
+            
+            return true;
+            
+        } catch (Exception e) {
+            if (tx != null && tx.getStatus().canRollback()) {
+                tx.rollback();
+            }
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    /**
+     * Valida que el estado del vuelo sea válido
+     */
+    private boolean isValidFlightStatus(String status) {
+        return Flight.STATUS_DRAFT.equals(status) ||
+               Flight.STATUS_PUBLISHED.equals(status) ||
+               Flight.STATUS_CANCELLED.equals(status) ||
+               Flight.STATUS_COMPLETED.equals(status);
     }
 }
 

@@ -39,7 +39,7 @@ import com.sources.app.handlers.AppointmentHandler;
 import com.sources.app.handlers.AppointmentMadeHandler;
 import com.sources.app.handlers.CategoryHandler;
 import com.sources.app.handlers.ConfigurableAmountHandler;
-import com.sources.app.handlers.HospitalHandler;
+// import com.sources.app.handlers.HospitalHandler;
 import com.sources.app.handlers.MedicineHandler;
 import com.sources.app.handlers.MedicinePresHandler;
 import com.sources.app.handlers.PharmacyHandler;
@@ -132,7 +132,7 @@ public class AirlineServer {
     private AppointmentMadeHandler appointmentMadeHandler;
     private CategoryHandler categoryHandler;
     private ConfigurableAmountHandler configurableAmountHandler;
-    private HospitalHandler hospitalHandler;
+    // private HospitalHandler hospitalHandler;
     private MedicineHandler medicineHandler;
     private MedicinePresHandler medicinePresHandler;
     private PharmacyHandler pharmacyHandler;
@@ -204,7 +204,7 @@ public class AirlineServer {
         this.appointmentMadeHandler = new AppointmentMadeHandler(appointmentMadeDAO);
         this.categoryHandler = new CategoryHandler(categoryDAO);
         this.configurableAmountHandler = new ConfigurableAmountHandler(configurableAmountDAO);
-        this.hospitalHandler = new HospitalHandler(hospitalDAO);
+        // this.hospitalHandler = new HospitalHandler(hospitalDAO);
         this.medicineHandler = new MedicineHandler(medicineDAO);
         this.medicinePresHandler = new MedicinePresHandler(medicinePresDAO);
         this.pharmacyHandler = new PharmacyHandler(pharmacyDAO);
@@ -474,6 +474,29 @@ public class AirlineServer {
             if (path.equals("/api/airline/aircrafts") && method.equals("GET")) {
                 return aircraftHandler.listAircrafts();
             }
+            if (path.equals("/api/airline/aircrafts") && method.equals("POST")) {
+                return aircraftHandler.createAircraft(body);
+            }
+            if (path.startsWith("/api/airline/aircrafts/") && method.equals("PUT")) {
+                String[] parts = path.split("/");
+                String id = parts[parts.length - 1];
+                return aircraftHandler.updateAircraft(id, body);
+            }
+            if (path.startsWith("/api/airline/aircrafts/") && method.equals("DELETE")) {
+                String[] parts = path.split("/");
+                String id = parts[parts.length - 1];
+                return aircraftHandler.deleteAircraft(id);
+            }
+            if (path.startsWith("/api/airline/aircrafts/") && path.endsWith("/seat-config") && method.equals("GET")) {
+                String[] parts = path.split("/");
+                String id = parts[parts.length - 2];
+                return aircraftHandler.getSeatConfig(id);
+            }
+            if (path.startsWith("/api/airline/aircrafts/") && path.endsWith("/seat-config") && method.equals("PUT")) {
+                String[] parts = path.split("/");
+                String id = parts[parts.length - 2];
+                return aircraftHandler.updateSeatConfig(id, body);
+            }
             if (path.equals("/api/airline/routes") && method.equals("GET")) {
                 return routeHandler.listRoutes();
             }
@@ -517,9 +540,8 @@ public class AirlineServer {
 
             // Búsqueda de vuelos con parámetros
             if (path.startsWith("/api/airline/flights/search") && method.equals("GET")) {
-                // Extraer parámetros de query string si existen
-                // Por simplicidad, por ahora devolvemos todos los vuelos
-                return flightHandler.getAllFlightsJson();
+                // Requiere HttpExchange en el otro servidor; aquí no lo tenemos, responder no soportado temporalmente
+                return gson.toJson(Map.of("success", false, "error", "Búsqueda con exchange no soportada en este servidor"));
             }
 
             // Endpoints de reservas

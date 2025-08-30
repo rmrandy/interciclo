@@ -2,7 +2,7 @@ package com.sources.app.entities;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+// Mantener tipos String para compatibilidad con columnas VARCHAR en Oracle
 
 @Entity
 @Table(name = "TICKETS")
@@ -36,10 +36,10 @@ public class Ticket {
     @Column(name = "STATUS", length = 20)
     private String status; // RESERVED, CONFIRMED, CANCELLED, USED
 
-    @Column(name = "BOOKING_DATE")
+    @Column(name = "BOOKING_DATE", insertable = false, updatable = false)
     private String bookingDate; // Fecha de reserva
 
-    @Column(name = "BOOKING_TIME")
+    @Column(name = "BOOKING_TIME", insertable = false, updatable = false)
     private String bookingTime; // Hora de reserva
 
     @Column(name = "PASSENGER_FIRST_NAME", length = 100)
@@ -93,10 +93,10 @@ public class Ticket {
     @Column(name = "REFUND_AMOUNT", precision = 10, scale = 2)
     private BigDecimal refundAmount;
 
-    @Column(name = "CREATED_AT")
+    @Column(name = "CREATED_AT", insertable = false, updatable = false)
     private String createdAt;
 
-    @Column(name = "UPDATED_AT")
+    @Column(name = "UPDATED_AT", insertable = false, updatable = false)
     private String updatedAt;
 
     public Ticket() { }
@@ -191,9 +191,6 @@ public class Ticket {
 
     @PrePersist
     protected void onCreate() {
-        String now = java.time.LocalDateTime.now().toString();
-        this.createdAt = now;
-        this.updatedAt = now;
         if (this.status == null) {
             this.status = "RESERVED";
         }
@@ -204,7 +201,7 @@ public class Ticket {
 
     @PreUpdate
     protected void onUpdate() {
-        this.updatedAt = java.time.LocalDateTime.now().toString();
+        // timestamps manejados por BD
     }
 }
 

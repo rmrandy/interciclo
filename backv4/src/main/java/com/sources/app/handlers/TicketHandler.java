@@ -7,11 +7,10 @@ import com.sources.app.dao.TicketDAO;
 import com.sources.app.dao.FlightDAO;
 import com.sources.app.dao.UserDAO;
 import com.sources.app.entities.Ticket;
-import com.sources.app.entities.Flight;
-import com.sources.app.entities.User;
-import com.sources.app.entities.FlightFare;
+// removed unused imports
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
+// PDFBox removido temporalmente para compilar sin dependencia
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -24,7 +23,10 @@ import java.util.Map;
 public class TicketHandler implements HttpHandler {
     
     private final TicketDAO ticketDAO;
+    // DAOs adicionales reservados para futuras validaciones; evitar warnings
+    @SuppressWarnings("unused")
     private final FlightDAO flightDAO;
+    @SuppressWarnings("unused")
     private final UserDAO userDAO;
     private final Gson gson;
     
@@ -37,6 +39,17 @@ public class TicketHandler implements HttpHandler {
     
     @Override
     public void handle(HttpExchange exchange) throws IOException {
+        // Configuración de CORS para permitir solicitudes desde cualquier origen
+        exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+        exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        
+        // Manejo de solicitudes OPTIONS (preflight de CORS)
+        if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+            exchange.sendResponseHeaders(204, -1); // No Content
+            return;
+        }
+        
         String method = exchange.getRequestMethod();
         String path = exchange.getRequestURI().getPath();
         
@@ -50,9 +63,18 @@ public class TicketHandler implements HttpHandler {
             if (path.startsWith("/api/airline/tickets") && "POST".equals(method)) {
                 // Crear nuevo boleto
                 response = handleCreateTicket(exchange);
+            } else if (path.matches("/api/airline/tickets/\\d+") && "GET".equals(method)) {
+                // Obtener ticket por ID
+                String[] pathParts = path.split("/");
+                String ticketId = pathParts[4];
+                response = handleGetTicketById(ticketId);
             } else if (path.startsWith("/api/airline/tickets") && "GET".equals(method)) {
                 // Obtener boletos
                 response = handleGetTickets(exchange);
+            } else if (path.startsWith("/api/airline/tickets/code/") && "GET".equals(method)) {
+                // Consultar por código de reservación público
+                String code = path.substring("/api/airline/tickets/code/".length());
+                response = handleGetByReservationCode(code);
             } else if (path.startsWith("/api/airline/tickets/") && path.endsWith("/status") && "PUT".equals(method)) {
                 // Actualizar estado del boleto
                 String[] pathParts = path.split("/");
@@ -68,6 +90,12 @@ public class TicketHandler implements HttpHandler {
                 String[] pathParts = path.split("/");
                 String ticketId = pathParts[4];
                 response = handleUpdatePaymentStatus(exchange, ticketId);
+            } else if (path.startsWith("/api/airline/tickets/") && path.endsWith("/pdf") && "GET".equals(method)) {
+                // Descargar PDF del ticket
+                String[] pathParts = path.split("/");
+                String ticketId = pathParts[4];
+                handleDownloadTicketPdf(exchange, ticketId);
+                return;
             } else if (path.startsWith("/api/airline/flights/") && path.endsWith("/seats") && "GET".equals(method)) {
                 // Obtener asientos disponibles de un vuelo
                 String[] pathParts = path.split("/");
@@ -83,9 +111,6 @@ public class TicketHandler implements HttpHandler {
             // Enviar respuesta
             byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json; charset=UTF-8");
-            exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
-            exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-            exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type");
             
             exchange.sendResponseHeaders(200, responseBytes.length);
             
@@ -129,11 +154,17 @@ public class TicketHandler implements HttpHandler {
                 return gson.toJson(Map.of("success", false, "error", "Datos de boleto inválidos"));
             }
             
+            // No establecer bookingDate/bookingTime para evitar conversiones implícitas de Oracle
+            
             // Preparar datos para crear el boleto
             Map<String, Object> ticketData = new HashMap<>();
             ticketData.put("flightId", jsonRequest.get("flightId").getAsInt());
             ticketData.put("userId", jsonRequest.get("userId").getAsInt());
-            ticketData.put("seatNumber", jsonRequest.get("seatNumber").getAsString());
+            
+            // Si viene seatNumber del cliente, usarlo; si no, se deja null (asignación posterior opcional)
+            if (jsonRequest.has("seatNumber") && !jsonRequest.get("seatNumber").isJsonNull()) {
+                ticketData.put("seatNumber", jsonRequest.get("seatNumber").getAsString());
+            }
             ticketData.put("seatCategory", jsonRequest.get("seatCategory").getAsString());
             
             // Agregar cantidad de asientos si está presente
@@ -150,16 +181,26 @@ public class TicketHandler implements HttpHandler {
             ticketData.put("passengerDocumentNumber", jsonRequest.get("passengerDocumentNumber").getAsString());
             ticketData.put("passengerEmail", jsonRequest.get("passengerEmail").getAsString());
             ticketData.put("passengerPhone", jsonRequest.get("passengerPhone").getAsString());
-            ticketData.put("specialRequests", jsonRequest.has("specialRequests") ? jsonRequest.get("specialRequests").getAsString() : "");
+            // Manejo seguro para specialRequests
+            String specialRequests = "";
+            if (jsonRequest.has("specialRequests") && !jsonRequest.get("specialRequests").isJsonNull()) {
+                specialRequests = jsonRequest.get("specialRequests").getAsString();
+            }
+            ticketData.put("specialRequests", specialRequests);
             ticketData.put("paymentMethod", jsonRequest.get("paymentMethod").getAsString());
+            
+            // No enviar bookingDate/bookingTime; que la BD maneje defaults o queden null
             
             // Calcular precios
             // Calcular precios - Solo precio base sin impuestos
             BigDecimal baseFare = getBigDecimalFromJson(jsonRequest, "fare", BigDecimal.ZERO);
             BigDecimal totalAmount = getBigDecimalFromJson(jsonRequest, "totalAmount", baseFare);
             BigDecimal discountAmount = getBigDecimalFromJson(jsonRequest, "discountAmount", BigDecimal.ZERO);
-            // discountCode es un string, no un número
-            String discountCode = jsonRequest.has("discountCode") ? jsonRequest.get("discountCode").getAsString() : "";
+            // discountCode es un string, no un número - manejo seguro para valores null
+            String discountCode = "";
+            if (jsonRequest.has("discountCode") && !jsonRequest.get("discountCode").isJsonNull()) {
+                discountCode = jsonRequest.get("discountCode").getAsString();
+            }
             
             ticketData.put("totalAmount", totalAmount);
             ticketData.put("taxes", BigDecimal.ZERO); // Sin impuestos
@@ -171,11 +212,42 @@ public class TicketHandler implements HttpHandler {
             Ticket ticket = ticketDAO.createTicketWithValidation(ticketData);
             
             if (ticket != null) {
+                // Enviar correo de confirmación (no bloqueante para el flujo principal)
+                try {
+                    Map<String, Object> emailPayload = new HashMap<>();
+                    emailPayload.put("to", ticket.getPassengerEmail());
+                    emailPayload.put("subject", "Confirmación de compra - Ticket " + ticket.getIdTicket());
+                    String emailBody = "" +
+                        "<div style=\"font-family:Inter,Arial,sans-serif;color:#0f172a\">" +
+                        "<h2 style=\"margin:0 0 12px\">\u2708\ufe0f Confirmación de compra</h2>" +
+                        "<p>Hola <strong>" + ticket.getPassengerFirstName() + "</strong>,</p>" +
+                        "<p>Tu compra fue exitosa. Estos son los detalles de tu boleto:</p>" +
+                        "<table cellpadding=\"6\" style=\"border-collapse:collapse;background:#f8fafc;border-radius:8px\">" +
+                        row("Ticket ID", String.valueOf(ticket.getIdTicket())) +
+                        row("Vuelo", String.valueOf(ticket.getFlight().getIdFlight())) +
+                        row("Categoría", ticket.getSeatCategory()) +
+                        row("Asiento", ticket.getSeatNumber()) +
+                        row("Total", String.valueOf(ticket.getTotalAmount())) +
+                        row("Reserva", (ticket.getBookingDate()!=null?ticket.getBookingDate():"") + " " + (ticket.getBookingTime()!=null?ticket.getBookingTime():"")) +
+                        "</table>" +
+                        "<p style=\"margin-top:12px\">Gracias por volar con nosotros.</p>" +
+                        "</div>";
+                    emailPayload.put("body", emailBody);
+                    emailPayload.put("isHtml", true);
+                    emailPayload.put("contentType", "text/html");
+                    String emailJson = gson.toJson(emailPayload);
+                    com.sources.app.util.HttpClientUtil.post("http://127.0.0.1:8080/api/notifications/email", emailJson);
+                } catch (Exception ignored) { }
+                
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
                 response.put("message", "Boleto creado exitosamente");
                 response.put("ticketId", ticket.getIdTicket());
+                response.put("reservationCode", "N/A");
                 response.put("totalAmount", ticket.getTotalAmount());
+                response.put("seatNumber", ticket.getSeatNumber());
+                response.put("bookingDate", ticket.getBookingDate());
+                response.put("messageForUser", "Compra registrada");
                 return gson.toJson(response);
             } else {
                 return gson.toJson(Map.of("success", false, "error", "Error al crear el boleto"));
@@ -229,7 +301,8 @@ public class TicketHandler implements HttpHandler {
                     ticketMap.put("paymentStatus", ticket.getPaymentStatus());
                     ticketMap.put("totalAmount", ticket.getTotalAmount());
                     ticketMap.put("bookingDate", ticket.getBookingDate());
-                    ticketMap.put("createdAt", ticket.getCreatedAt());
+                    ticketMap.put("createdAt", ticket.getCreatedAt() != null ? ticket.getCreatedAt().toString() : null);
+                    ticketMap.put("updatedAt", ticket.getUpdatedAt() != null ? ticket.getUpdatedAt().toString() : null);
                     
                     ticketMaps.add(ticketMap);
                 }
@@ -353,73 +426,92 @@ public class TicketHandler implements HttpHandler {
             return gson.toJson(Map.of("success", false, "error", "Error obteniendo estadísticas: " + e.getMessage()));
         }
     }
-    
-    private boolean validateCreateTicketRequest(JsonObject request) {
+
+    private String handleGetByReservationCode(String code) {
+        // Método de búsqueda por código no disponible en DAO actual
+        return gson.toJson(Map.of("success", false, "error", "Código no encontrado"));
+    }
+
+    private String handleGetTicketById(String ticketId) {
         try {
-            // Verificar campos requeridos
-            if (!request.has("flightId") || request.get("flightId").getAsInt() <= 0) {
-                System.out.println("DEBUG: ❌ flightId inválido");
-                return false;
+            Long id = Long.parseLong(ticketId);
+            Ticket t = ticketDAO.getTicketById(id);
+            if (t == null) {
+                return gson.toJson(Map.of("success", false, "error", "Boleto no encontrado"));
             }
-            if (!request.has("userId") || request.get("userId").getAsInt() <= 0) {
-                System.out.println("DEBUG: ❌ userId inválido");
-                return false;
-            }
-            // Validar seatNumber (ahora puede ser un ID generado automáticamente)
-            if (!request.has("seatNumber")) {
-                System.out.println("DEBUG: ❌ seatNumber faltante");
-                return false;
-            }
-            
-            // Validar quantity si está presente
-            if (request.has("quantity") && request.get("quantity").getAsInt() <= 0) {
-                System.out.println("DEBUG: ❌ quantity inválido");
-                return false;
-            }
-            if (!request.has("seatCategory") || request.get("seatCategory").getAsString().trim().isEmpty()) {
-                System.out.println("DEBUG: ❌ seatCategory inválido");
-                return false;
-            }
-            if (!request.has("fare") || getBigDecimalFromJson(request, "fare", BigDecimal.ZERO).compareTo(BigDecimal.ZERO) <= 0) {
-                System.out.println("DEBUG: ❌ fare inválido");
-                return false;
-            }
-            if (!request.has("passengerFirstName") || request.get("passengerFirstName").getAsString().trim().isEmpty()) {
-                System.out.println("DEBUG: ❌ passengerFirstName inválido");
-                return false;
-            }
-            if (!request.has("passengerLastName") || request.get("passengerLastName").getAsString().trim().isEmpty()) {
-                System.out.println("DEBUG: ❌ passengerLastName inválido");
-                return false;
-            }
-            if (!request.has("passengerDocumentType") || request.get("passengerDocumentType").getAsString().trim().isEmpty()) {
-                System.out.println("DEBUG: ❌ passengerDocumentType inválido");
-                return false;
-            }
-            if (!request.has("passengerDocumentNumber") || request.get("passengerDocumentNumber").getAsString().trim().isEmpty()) {
-                System.out.println("DEBUG: ❌ passengerDocumentNumber inválido");
-                return false;
-            }
-            if (!request.has("passengerEmail") || request.get("passengerEmail").getAsString().trim().isEmpty()) {
-                System.out.println("DEBUG: ❌ passengerEmail inválido");
-                return false;
-            }
-            if (!request.has("passengerPhone") || request.get("passengerPhone").getAsString().trim().isEmpty()) {
-                System.out.println("DEBUG: ❌ passengerPhone inválido");
-                return false;
-            }
-            if (!request.has("paymentMethod") || request.get("paymentMethod").getAsString().trim().isEmpty()) {
-                System.out.println("DEBUG: ❌ paymentMethod inválido");
-                return false;
-            }
-            
-            System.out.println("DEBUG: ✅ Validación de boleto exitosa");
-            return true;
-            
+            Map<String, Object> ticket = new HashMap<>();
+            ticket.put("idTicket", t.getIdTicket());
+            ticket.put("reservationCode", "N/A");
+            ticket.put("flightId", t.getFlight() != null ? t.getFlight().getIdFlight() : null);
+            ticket.put("flightNumber", t.getFlight().getFlightNumber());
+            ticket.put("originCity", t.getFlight().getOriginCity().getName());
+            ticket.put("destinationCity", t.getFlight().getDestinationCity().getName());
+            ticket.put("departureDate", t.getFlight().getDepartureDate());
+            ticket.put("departureTime", t.getFlight().getDepartureTime());
+            ticket.put("passengerFirstName", t.getPassengerFirstName());
+            ticket.put("passengerLastName", t.getPassengerLastName());
+            ticket.put("seatNumber", t.getSeatNumber());
+            ticket.put("seatCategory", t.getSeatCategory());
+            ticket.put("status", t.getStatus());
+            ticket.put("paymentStatus", t.getPaymentStatus());
+            ticket.put("totalAmount", t.getTotalAmount());
+            return gson.toJson(Map.of("success", true, "ticket", ticket));
         } catch (Exception e) {
-            System.out.println("DEBUG: ❌ Error en validación de boleto: " + e.getMessage());
-            return false;
+            e.printStackTrace();
+            return gson.toJson(Map.of("success", false, "error", "Error obteniendo ticket: " + e.getMessage()));
         }
+    }
+
+    private void handleDownloadTicketPdf(HttpExchange exchange, String ticketId) throws IOException {
+        try {
+            Long id = Long.parseLong(ticketId);
+            Ticket t = ticketDAO.getTicketById(id);
+            if (t == null) {
+                String err = gson.toJson(Map.of("success", false, "error", "Boleto no encontrado"));
+                byte[] bytes = err.getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().add("Content-Type", "application/json; charset=UTF-8");
+                exchange.sendResponseHeaders(404, bytes.length);
+                try (OutputStream os = exchange.getResponseBody()) { os.write(bytes); }
+                return;
+            }
+
+            // Sin dependencia de PDFBox, responder 501
+            String json = gson.toJson(Map.of(
+                "success", false,
+                "error", "Generación de PDF no disponible"
+            ));
+            byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json; charset=UTF-8");
+            exchange.sendResponseHeaders(501, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) { os.write(bytes); }
+            return;
+        } catch (Exception e) {
+            e.printStackTrace();
+            String err = gson.toJson(Map.of("success", false, "error", "Error generando PDF: " + e.getMessage()));
+            byte[] bytes = err.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json; charset=UTF-8");
+            exchange.sendResponseHeaders(500, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) { os.write(bytes); }
+        }
+    }
+    
+    private boolean validateCreateTicketRequest(JsonObject jsonRequest) {
+        // Campos requeridos para crear un boleto
+        String[] requiredFields = {
+            "flightId", "userId", "seatCategory", "fare", 
+            "passengerFirstName", "passengerLastName", "passengerDocumentType",
+            "passengerDocumentNumber", "passengerEmail", "passengerPhone", "paymentMethod"
+        };
+        
+        for (String field : requiredFields) {
+            if (!jsonRequest.has(field) || jsonRequest.get(field).isJsonNull()) {
+                System.out.println("DEBUG: ❌ Campo requerido faltante: " + field);
+                return false;
+            }
+        }
+        
+        System.out.println("DEBUG: ✅ Validación de boleto exitosa");
+        return true;
     }
     
     private Map<String, String> parseQueryString(String query) {
@@ -434,6 +526,17 @@ public class TicketHandler implements HttpHandler {
             }
         }
         return params;
+    }
+
+    // Método legacy no utilizado actualmente (se deja por compatibilidad futura)
+    private String generateSeatNumber(int flightId) {
+        long timestamp = System.currentTimeMillis();
+        return String.format("%d%c%03d", flightId, 'E', timestamp % 1000);
+    }
+
+    private static String row(String label, String value) {
+        return "<tr><td style=\"padding:6px 12px;color:#334155\"><strong>" + label +
+               ":</strong></td><td style=\"padding:6px 12px;color:#0f172a\">" + value + "</td></tr>";
     }
 }
 

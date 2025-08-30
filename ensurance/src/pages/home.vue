@@ -2,6 +2,8 @@
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import axios from "axios";
+import { AirlineApiClient } from "../utils/airlineApi";
+import { getAirlineApiUrl, getInsuranceApiUrl } from "../utils/api";
 
 const router = useRouter();
 const user = ref<any>(null);
@@ -9,8 +11,28 @@ const isAdmin = ref(false);
 const isEmployee = ref(false);
 const isLoading = ref(true);
 const policyDetails = ref<any>(null);
+// Estado de vuelos próximos
+const upcomingTickets = ref<any[]>([])
+const loadingUpcoming = ref(false)
+// Reservas del usuario (mis tickets)
+const myTickets = ref<any[]>([])
+const loadingMyTickets = ref(false)
+const reservationSearch = ref('')
+const showTicketModal = ref(false)
+const ticketDetail = ref<any | null>(null)
+// Alertas operativas simuladas (podemos conectarlas a backend luego)
+const operationalAlerts = ref<Array<{id:number; title:string; description:string; severity:'info'|'warning'|'critical'}>>([
+  { id: 1, title: 'Clima', description: 'Posibles demoras por tormenta en MIA', severity: 'warning' },
+  { id: 2, title: 'Seguridad', description: 'Refuerzo de controles en todos los aeropuertos', severity: 'info' }
+])
+// Promos de ejemplo
+const promos = ref([
+  { id: 1, title: '2x1 fin de semana', desc: 'Compra hoy y recibe 2x1 en rutas seleccionadas', color: 'from-pink-500 to-rose-500' },
+  { id: 2, title: 'Tarifa Flash', desc: 'Descuentos hasta 35% por 24 horas', color: 'from-blue-500 to-cyan-500' },
+  { id: 3, title: 'Business Upgrade', desc: 'Upgrade a Business desde Q399', color: 'from-amber-500 to-orange-500' }
+])
 const error = ref<string | null>(null);
-import { getInsuranceApiUrl } from "../utils/api";
+
 const fetchUserPolicyDetails = async () => {
   if (!user.value || !user.value.policy || !user.value.policy.idPolicy) {
     isLoading.value = false;
@@ -50,6 +72,11 @@ onMounted(() => {
     // No hay usuario logueado, página sigue siendo accesible
     isLoading.value = false;
   }
+  // cargar ciudades para caja de compras
+  loadCitiesForBooking()
+  // cargar estado de vuelos si aplica
+  loadUpcomingTickets()
+  loadMyTickets()
 });
 
 // Formatear precio
@@ -80,20 +107,157 @@ const tryBookFlight = () => {
     router.push('/login?redirect=' + encodeURIComponent('/flights'));
   }
 };
+
+// ============ Caja de compras (Aerolíneas) ============
+const booking = ref({
+  flightType: 'roundtrip', // roundtrip | oneway
+  origin: '',
+  destination: '',
+  departureDate: '',
+  returnDate: '',
+  seatCategory: 'ECONOMY', // ECONOMY | BUSINESS
+  passengers: 1
+})
+const cities = ref<{ idCity: number; name: string; country: string }[]>([])
+const loadingCities = ref(false)
+const airlineApi = new AirlineApiClient()
+
+const loadCitiesForBooking = async () => {
+  try {
+    loadingCities.value = true
+    const res = await airlineApi.getCities()
+    if (Array.isArray(res)) {
+      cities.value = res
+    } else if (res && Array.isArray(res.cities)) {
+      cities.value = res.cities
+    }
+  } catch (e) {
+    console.warn('No se pudieron cargar ciudades, usando fallback', e)
+    cities.value = [
+      { idCity: 1, name: 'Ciudad de Guatemala', country: 'Guatemala' },
+      { idCity: 2, name: 'Miami', country: 'USA' },
+      { idCity: 3, name: 'Orlando', country: 'USA' }
+    ]
+  } finally {
+    loadingCities.value = false
+  }
+}
+
+const submitBooking = () => {
+  const payload = { ...booking.value }
+  localStorage.setItem('preSearch', JSON.stringify(payload))
+  router.push('/flights')
+}
+
+// Cargar tickets próximos del usuario
+const loadUpcomingTickets = async () => {
+  if (!user.value || !user.value.idUser) return
+  loadingUpcoming.value = true
+  try {
+    const url = getAirlineApiUrl(`/tickets?userId=${user.value.idUser}`)
+    const res = await fetch(url)
+    const data = await res.json()
+    const list = Array.isArray(data?.tickets) ? data.tickets : (Array.isArray(data) ? data : [])
+    // Tomar próximos por fecha (si está disponible)
+    const now = new Date()
+    const norm = (t: any): { when: Date; t: any } => {
+      const d = t?.flight?.departureDate || t?.departureDate
+      const tm = t?.flight?.departureTime || t?.departureTime
+      const when = d ? new Date(`${d} ${tm || '00:00'}`) : now
+      return { when, t }
+      
+    }
+    upcomingTickets.value = list
+      .map(norm)
+      .filter((x: { when: Date; t: any }) => x.when >= now)
+      .sort((a: { when: Date }, b: { when: Date }) => a.when.getTime() - b.when.getTime())
+      .slice(0,3)
+      .map((x: { when: Date; t: any }) => x.t)
+  } catch (e) {
+    console.warn('No se pudo cargar estado de vuelos del usuario', e)
+    upcomingTickets.value = []
+  } finally {
+    loadingUpcoming.value = false
+  }
+}
+
+// Cargar todas las reservas del usuario
+const loadMyTickets = async () => {
+  if (!user.value || !user.value.idUser) return
+  loadingMyTickets.value = true
+  try {
+    const url = getAirlineApiUrl(`/tickets?userId=${user.value.idUser}`)
+    const res = await fetch(url)
+    const data = await res.json()
+    myTickets.value = Array.isArray(data?.tickets) ? data.tickets : (Array.isArray(data) ? data : [])
+  } catch (e) {
+    console.warn('No se pudo cargar tus reservas', e)
+    myTickets.value = []
+  } finally {
+    loadingMyTickets.value = false
+  }
+}
+
+// Buscar por código de reservación (si está disponible)
+const searchReservation = async () => {
+  const code = reservationSearch.value?.trim()
+  if (!code) return
+  try {
+    const api = new AirlineApiClient()
+    const res = await api.getTicketByCode(code)
+    if (res?.success && res.ticket) {
+      ticketDetail.value = res.ticket
+      showTicketModal.value = true
+    } else {
+      alert(res?.error || 'Código no encontrado')
+    }
+  } catch (e) {
+    alert('No se pudo buscar el código')
+  }
+}
+
+// Detalle se navega a su propia ruta ahora
+
+const closeTicketModal = () => {
+  showTicketModal.value = false
+  ticketDetail.value = null
+}
+
+// Descargar PDF con manejo de error 501
+const downloadTicketPdf = async (id: number) => {
+  try {
+    const api = new AirlineApiClient()
+    const blob = await api.downloadTicketPdf(id)
+    if (!blob || (blob.type && blob.type !== 'application/pdf')) {
+      alert('El PDF no está disponible por el momento')
+      return
+    }
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `ticket-${id}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    alert('El PDF no está disponible por el momento')
+  }
+}
 </script>
 
 <template>
   <div class="container mx-auto px-4 py-8">
     <!-- Hero Section -->
-    <div class="airline-gradient-sky text-white rounded-3xl p-8 mb-8 relative overflow-hidden">
+    <div class="airline-gradient-sky text-white rounded-3xl p-6 mb-8 relative overflow-hidden">
       <div class="absolute top-0 right-0 w-64 h-64 opacity-10">
         <svg fill="currentColor" viewBox="0 0 24 24" class="w-full h-full">
           <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
         </svg>
       </div>
       <div class="relative z-10">
-        <h1 class="text-4xl md:text-5xl font-bold mb-4 animate-fade-in-up">¡Bienvenido a AeroLinea!</h1>
-        <p class="text-xl md:text-2xl mb-6 text-blue-100 animate-fade-in-up" style="animation-delay: 0.2s;">Tu compañía de seguros aeronáuticos de confianza</p>
+        <h1 class="text-3xl md:text-4xl font-bold mb-3 animate-fade-in-up">¡Bienvenido a AeroLinea!</h1>
+        <p class="text-lg md:text-xl mb-5 text-blue-100 animate-fade-in-up" style="animation-delay: 0.2s;">Tu compañía de seguros aeronáuticos de confianza</p>
         <div class="flex flex-wrap gap-3 animate-fade-in-up" style="animation-delay: 0.4s;">
           <div class="bg-white bg-opacity-20 px-4 py-2 rounded-full backdrop-blur-sm">
             <span class="font-semibold">🛡️ Protección Total</span>
@@ -107,10 +271,10 @@ const tryBookFlight = () => {
         </div>
         
         <!-- Botones de acción para usuarios no autenticados -->
-        <div v-if="!user" class="mt-8 flex flex-wrap gap-4 animate-fade-in-up" style="animation-delay: 0.6s;">
+        <div v-if="!user" class="mt-6 flex flex-wrap gap-3 animate-fade-in-up" style="animation-delay: 0.6s;">
           <button 
             @click="navigateToFlights"
-            class="bg-white text-blue-800 px-6 py-3 rounded-full font-semibold hover:bg-blue-50 transition-colors flex items-center gap-2"
+            class="bg-white text-blue-800 px-4 py-2 rounded-full font-semibold hover:bg-blue-50 transition-colors flex items-center gap-2"
           >
             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
               <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
@@ -119,7 +283,7 @@ const tryBookFlight = () => {
           </button>
           <button 
             @click="tryBookFlight"
-            class="bg-blue-900 text-white px-6 py-3 rounded-full font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2"
+            class="bg-blue-900 text-white px-4 py-2 rounded-full font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2"
           >
             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
               <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6z"/>
@@ -135,42 +299,42 @@ const tryBookFlight = () => {
       <!-- Ver Vuelos -->
       <div class="airline-card hover:scale-105 transition-transform cursor-pointer" @click="navigateToFlights">
         <div class="text-center">
-          <div class="w-16 h-16 airline-gradient-primary rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+          <div class="w-12 h-12 airline-gradient-primary rounded-full flex items-center justify-center mx-auto mb-3">
+            <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
               <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
             </svg>
           </div>
-          <h3 class="text-xl font-bold text-gray-800 mb-2">Consultar Vuelos</h3>
-          <p class="text-gray-600 mb-4">Explora nuestra amplia oferta de vuelos nacionales e internacionales.</p>
-          <div class="bg-blue-50 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">Sin registro requerido</div>
+          <h3 class="text-lg font-bold text-gray-800 mb-1">Consultar Vuelos</h3>
+          <p class="text-gray-600 mb-3 text-sm">Explora nuestra amplia oferta de vuelos nacionales e internacionales.</p>
+          <div class="bg-blue-50 text-blue-800 px-2.5 py-0.5 rounded-full text-xs font-medium">Sin registro requerido</div>
         </div>
       </div>
 
       <!-- Reservar -->
       <div class="airline-card hover:scale-105 transition-transform cursor-pointer" @click="tryBookFlight">
         <div class="text-center">
-          <div class="w-16 h-16 airline-gradient-secondary rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+          <div class="w-12 h-12 airline-gradient-secondary rounded-full flex items-center justify-center mx-auto mb-3">
+            <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
               <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
           </div>
-          <h3 class="text-xl font-bold text-gray-800 mb-2">Reservar Vuelo</h3>
-          <p class="text-gray-600 mb-4">Asegura tu lugar en el vuelo de tu elección con unos pocos clics.</p>
-          <div class="bg-orange-50 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">Requiere registro</div>
+          <h3 class="text-lg font-bold text-gray-800 mb-1">Reservar Vuelo</h3>
+          <p class="text-gray-600 mb-3 text-sm">Asegura tu lugar en el vuelo de tu elección con unos pocos clics.</p>
+          <div class="bg-orange-50 text-orange-800 px-2.5 py-0.5 rounded-full text-xs font-medium">Requiere registro</div>
         </div>
       </div>
 
       <!-- Registrarse -->
       <div class="airline-card hover:scale-105 transition-transform cursor-pointer" @click="router.push('/register')">
         <div class="text-center">
-          <div class="w-16 h-16 airline-gradient-accent rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+          <div class="w-12 h-12 airline-gradient-accent rounded-full flex items-center justify-center mx-auto mb-3">
+            <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
               <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6z"/>
             </svg>
           </div>
-          <h3 class="text-xl font-bold text-gray-800 mb-2">Crear Cuenta</h3>
-          <p class="text-gray-600 mb-4">Regístrate para acceder a reservas, historial y beneficios exclusivos.</p>
-          <div class="bg-green-50 text-green-800 px-3 py-1 rounded-full text-sm font-medium">¡Gratis!</div>
+          <h3 class="text-lg font-bold text-gray-800 mb-1">Crear Cuenta</h3>
+          <p class="text-gray-600 mb-3 text-sm">Regístrate para acceder a reservas, historial y beneficios exclusivos.</p>
+          <div class="bg-green-50 text-green-800 px-2.5 py-0.5 rounded-full text-xs font-medium">¡Gratis!</div>
         </div>
       </div>
     </div>
@@ -219,9 +383,9 @@ const tryBookFlight = () => {
           </div>
         </div>
         
-        <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-xl p-4">
-          <div class="flex items-center gap-2 text-red-700">
-            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+        <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-lg p-3">
+          <div class="flex items-center gap-2 text-red-700 text-sm">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
             </svg>
             {{ error }}
@@ -346,6 +510,229 @@ const tryBookFlight = () => {
               <p class="text-gray-600 leading-relaxed">Red global de centros médicos aeroportuarios con convenio AeroLinea para emergencias y atención especializada</p>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Caja de Compras (Aerolíneas) - MOVIDA ARRIBA -->
+    <div class="airline-card mb-8">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="w-10 h-10 airline-gradient-secondary rounded-full flex items-center justify-center">
+          <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z"/>
+          </svg>
+        </div>
+        <h2 class="airline-subtitle">Reserva tu vuelo</h2>
+      </div>
+
+      <form class="grid md:grid-cols-6 gap-4" @submit.prevent="submitBooking">
+        <!-- Tipo de vuelo -->
+        <div class="md:col-span-2 flex items-center gap-4">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" value="roundtrip" v-model="booking.flightType"> Ida y vuelta
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" value="oneway" v-model="booking.flightType"> Solo ida
+          </label>
+        </div>
+
+        <!-- Origen/Destino -->
+        <div class="md:col-span-2">
+          <label class="airline-form-label">Origen</label>
+          <select v-model="booking.origin" class="airline-input">
+            <option value="" disabled>Selecciona origen</option>
+            <option v-for="c in cities" :key="c.idCity" :value="c.idCity">{{ c.name }} ({{ c.country }})</option>
+          </select>
+        </div>
+        <div class="md:col-span-2">
+          <label class="airline-form-label">Destino</label>
+          <select v-model="booking.destination" class="airline-input">
+            <option value="" disabled>Selecciona destino</option>
+            <option v-for="c in cities" :key="c.idCity" :value="c.idCity">{{ c.name }} ({{ c.country }})</option>
+          </select>
+        </div>
+
+        <!-- Fechas -->
+        <div class="md:col-span-2">
+          <label class="airline-form-label">Fecha ida</label>
+          <input type="date" v-model="booking.departureDate" class="airline-input"/>
+        </div>
+        <div class="md:col-span-2" v-if="booking.flightType==='roundtrip'">
+          <label class="airline-form-label">Fecha vuelta</label>
+          <input type="date" v-model="booking.returnDate" class="airline-input"/>
+        </div>
+
+        <!-- Categoría / Pasajeros -->
+        <div>
+          <label class="airline-form-label">Asiento</label>
+          <select v-model="booking.seatCategory" class="airline-input">
+            <option value="ECONOMY">Turista (Economy)</option>
+            <option value="BUSINESS">Business</option>
+          </select>
+        </div>
+        <div>
+          <label class="airline-form-label">Pasajeros</label>
+          <input type="number" min="1" v-model.number="booking.passengers" class="airline-input"/>
+        </div>
+
+        <div class="md:col-span-2 flex items-end">
+          <button type="submit" class="btn-primary w-full">Buscar vuelos</button>
+        </div>
+      </form>
+    </div>
+    
+    <!-- Promos y Ofertas -->
+    <div class="airline-card mb-8">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="w-10 h-10 airline-gradient-accent rounded-full flex items-center justify-center">
+          <svg class="w-5 h-5 text-white" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3h14l-2 14-5 2-5-2L3 3z"/></svg>
+        </div>
+        <h2 class="airline-subtitle">Promociones activas</h2>
+      </div>
+      <div class="grid md:grid-cols-3 gap-4">
+        <div v-for="p in promos" :key="p.id" class="rounded-2xl p-5 text-white bg-gradient-to-br" :class="p.color">
+          <div class="text-xl font-bold mb-1">{{ p.title }}</div>
+          <div class="opacity-90">{{ p.desc }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mis Reservas -->
+    <div v-if="user" class="airline-card mb-8">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="airline-subtitle">Mis Reservas</h2>
+        <div class="flex gap-2">
+          <input v-model="reservationSearch" placeholder="Ingresa tu código de reservación" class="airline-input w-80" />
+          <button class="btn-primary" @click="searchReservation">Buscar</button>
+        </div>
+      </div>
+
+      <div v-if="loadingMyTickets" class="text-gray-500">Cargando tus reservas…</div>
+      <div v-else-if="!myTickets.length" class="text-gray-500">No tienes reservas.</div>
+      <div v-else class="space-y-4">
+        <div v-for="t in myTickets" :key="t.idTicket" class="p-4 rounded-xl border border-gray-200 flex items-center justify-between">
+          <div>
+            <div class="text-lg font-bold">Ticket #{{ t.idTicket }}</div>
+            <div class="text-sm text-gray-600">Vuelo: {{ t.flightNumber }} | Asiento: {{ t.seatNumber || '—' }} | {{ t.seatCategory }}</div>
+            <div class="text-sm text-gray-600">Estado: {{ t.status }} | Pago: {{ t.paymentStatus }}</div>
+            <div class="text-sm text-gray-700">Total: {{ t.totalAmount }}</div>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn-secondary" @click="router.push(`/reservation/${t.idTicket}`)">Ver detalle</button>
+            <button class="bg-blue-600 text-white px-4 py-2 rounded-lg" @click="downloadTicketPdf(t.idTicket)">PDF</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Detalle de Reserva -->
+    <div v-if="showTicketModal" class="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-xl font-semibold">Detalle de la Reserva</h3>
+          <button class="text-gray-500 hover:text-gray-700" @click="closeTicketModal">✕</button>
+        </div>
+        <div v-if="ticketDetail" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <div class="text-sm text-gray-500 mb-1">Ticket</div>
+            <div class="font-semibold">#{{ ticketDetail.idTicket }}</div>
+          </div>
+          <div>
+            <div class="text-sm text-gray-500 mb-1">Código</div>
+            <div class="font-semibold">{{ ticketDetail.reservationCode || '—' }}</div>
+          </div>
+          <div class="md:col-span-2 h-px bg-gray-100 my-2"></div>
+          <div>
+            <div class="text-sm text-gray-500 mb-1">Vuelo</div>
+            <div class="font-semibold">{{ ticketDetail.flightNumber }}</div>
+            <div class="text-sm text-gray-600">{{ ticketDetail.originCity }} → {{ ticketDetail.destinationCity }}</div>
+            <div class="text-sm text-gray-600">{{ ticketDetail.departureDate }} {{ ticketDetail.departureTime }}</div>
+          </div>
+          <div>
+            <div class="text-sm text-gray-500 mb-1">Pasajero</div>
+            <div class="font-semibold">{{ ticketDetail.passengerFirstName }} {{ ticketDetail.passengerLastName }}</div>
+            <div class="text-sm text-gray-600">Documento: {{ ticketDetail.passengerDocumentType }} {{ ticketDetail.passengerDocumentNumber }}</div>
+          </div>
+          <div>
+            <div class="text-sm text-gray-500 mb-1">Asiento</div>
+            <div class="font-semibold">{{ ticketDetail.seatNumber || 'Asignación pendiente' }}</div>
+            <div class="text-sm text-gray-600">Categoría: {{ ticketDetail.seatCategory }}</div>
+          </div>
+          <div>
+            <div class="text-sm text-gray-500 mb-1">Pago</div>
+            <div class="font-semibold">{{ ticketDetail.totalAmount }}</div>
+            <div class="text-sm text-gray-600">Estado: {{ ticketDetail.paymentStatus }} | Método: {{ ticketDetail.paymentMethod }}</div>
+          </div>
+        </div>
+        <div class="mt-6 flex justify-end gap-2">
+          <button class="btn-secondary" @click="closeTicketModal">Cerrar</button>
+          <button class="btn-primary" v-if="ticketDetail" @click="downloadTicketPdf(ticketDetail.idTicket)">Descargar PDF</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Estado de Vuelos (si hay usuario) -->
+    <div v-if="user" class="airline-card mb-8">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="w-10 h-10 airline-gradient-primary rounded-full flex items-center justify-center">
+          <svg class="w-5 h-5 text-white" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11l6-2 4-6 2 6 4 2-5 1-2 5-3-5-6-1z"/></svg>
+        </div>
+        <h2 class="airline-subtitle">Vuelos próximos</h2>
+      </div>
+      <div v-if="loadingUpcoming" class="text-gray-500">Cargando tus vuelos…</div>
+      <div v-else-if="upcomingTickets.length === 0" class="text-gray-500">No tienes vuelos próximos.</div>
+      <div v-else class="grid md:grid-cols-3 gap-4">
+        <div v-for="t in upcomingTickets" :key="t.idTicket || t.id" class="p-4 rounded-xl border border-gray-200">
+          <div class="text-sm text-gray-500 mb-1">{{ t.flight?.flightNumber || 'Vuelo' }}</div>
+          <div class="font-semibold">{{ t.flight?.originCity?.name || t.origin }} → {{ t.flight?.destinationCity?.name || t.destination }}</div>
+          <div class="text-gray-600 text-sm mt-1">{{ t.flight?.departureDate || t.departureDate }} {{ t.flight?.departureTime || t.departureTime }}</div>
+          <div class="mt-2 inline-flex items-center gap-2 text-xs px-2 py-1 rounded-full" :class="t.status==='CONFIRMED' ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'">{{ t.status || 'PENDING' }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Consejos de viaje -->
+    <div class="airline-card mb-8">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="w-10 h-10 airline-gradient-secondary rounded-full flex items-center justify-center">
+          <svg class="w-5 h-5 text-white" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l2 5 5 1-4 3 1 5-4-3-4 3 1-5-4-3 5-1 2-5z"/></svg>
+        </div>
+        <h2 class="airline-subtitle">Consejos de viaje</h2>
+      </div>
+      <div class="grid md:grid-cols-4 gap-4">
+        <div class="p-4 rounded-xl border border-gray-200"><div class="font-semibold mb-1">Documentos</div><div class="text-gray-600 text-sm">Verifica pasaporte y visas vigentes.</div></div>
+        <div class="p-4 rounded-xl border border-gray-200"><div class="font-semibold mb-1">Equipaje</div><div class="text-gray-600 text-sm">Etiqueta y respeta medidas permitidas.</div></div>
+        <div class="p-4 rounded-xl border border-gray-200"><div class="font-semibold mb-1">Tiempo</div><div class="text-gray-600 text-sm">Llega 2 h antes (nacional) / 3 h (internacional).</div></div>
+        <div class="p-4 rounded-xl border border-gray-200"><div class="font-semibold mb-1">Salud</div><div class="text-gray-600 text-sm">Hidrátate y camina si el vuelo es largo.</div></div>
+      </div>
+    </div>
+
+    <!-- Programa de fidelidad -->
+    <div class="airline-card airline-card-premium mb-8">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 airline-gradient-sunset rounded-full flex items-center justify-center">
+          <svg class="w-5 h-5 text-white" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 5H9v2H7v2h2v2h2v-2h2V9h-2V7z"/></svg>
+        </div>
+        <h2 class="airline-subtitle">AeroLinea Rewards</h2>
+      </div>
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div class="text-gray-700">Acumula millas, accede a salas VIP y obtén embarque prioritario.</div>
+        <button class="btn-primary">Conoce beneficios</button>
+      </div>
+    </div>
+
+    <!-- Alertas operativas -->
+    <div v-if="operationalAlerts.length" class="airline-card mb-8">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 airline-gradient-primary rounded-full flex items-center justify-center">
+          <svg class="w-5 h-5 text-white" viewBox="0 0 20 20" fill="currentColor"><path d="M8.257 3.099c.765-1.36 2.721-1.36 3.486 0l6.518 11.59c.75 1.335-.213 2.99-1.743 2.99H3.482c-1.53 0-2.493-1.655-1.743-2.99l6.518-11.59zM11 14H9v-2h2v2zm0-4H9V6h2v4z"/></svg>
+        </div>
+        <h2 class="airline-subtitle">Alertas operativas</h2>
+      </div>
+      <div class="space-y-3">
+        <div v-for="a in operationalAlerts" :key="a.id" class="p-3 rounded-lg border" :class="a.severity==='critical' ? 'border-red-300 bg-red-50' : a.severity==='warning' ? 'border-amber-300 bg-amber-50' : 'border-blue-300 bg-blue-50'">
+          <div class="font-semibold">{{ a.title }}</div>
+          <div class="text-sm text-gray-700">{{ a.description }}</div>
         </div>
       </div>
     </div>

@@ -13,6 +13,17 @@ public class HealthHandler implements HttpHandler {
     
     @Override
     public void handle(HttpExchange exchange) throws IOException {
+        // Configuración de CORS para permitir solicitudes desde cualquier origen
+        exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+        exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, OPTIONS");
+        exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        
+        // Manejo de solicitudes OPTIONS (preflight de CORS)
+        if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+            exchange.sendResponseHeaders(204, -1); // No Content
+            return;
+        }
+        
         if ("GET".equals(exchange.getRequestMethod())) {
             Map<String, Object> response = new HashMap<>();
             response.put("status", "ok");

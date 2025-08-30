@@ -1,20 +1,5 @@
 <template>
   <div class="cart-container">
-    <!-- Header con navegación -->
-    <header class="cart-header">
-      <div class="header-content">
-        <div class="logo-section">
-          <div class="logo">✈️</div>
-          <h1>AeroLinea</h1>
-        </div>
-        <nav class="nav-links">
-          <a href="/" class="nav-link">Inicio</a>
-          <a href="/flights" class="nav-link">Vuelos</a>
-          <a href="/profile" class="nav-link">Mi Cuenta</a>
-        </nav>
-      </div>
-    </header>
-
     <!-- Contenido principal -->
     <div class="main-content">
       <!-- Loading state -->
@@ -210,14 +195,9 @@
                 <span>Total tarifas:</span>
                 <span>${{ totalFares }}</span>
               </div>
-              <div class="summary-item">
-                <span>Total impuestos:</span>
-                <span>${{ totalTaxes }}</span>
-              </div>
-              <div class="summary-item">
-                <span>Total cargos:</span>
-                <span>${{ totalFees }}</span>
-              </div>
+              <!-- Impuestos y cargos deshabilitados por política actual -->
+              <!-- <div class="summary-item"><span>Total impuestos:</span><span>${{ totalTaxes }}</span></div>
+              <div class="summary-item"><span>Total cargos:</span><span>${{ totalFees }}</span></div> -->
               <div class="summary-item total">
                 <span>Total general:</span>
                 <span>${{ totalAmount }}</span>
@@ -283,21 +263,10 @@ const totalFares = computed(() => {
   }, 0)
 })
 
-const totalTaxes = computed(() => {
-  return cartItems.value.reduce((total, item) => {
-    return total + calculateTaxes((item.flight.fares?.[item.selectedCategory] || 0) * (item.quantity || 0))
-  }, 0)
-})
-
-const totalFees = computed(() => {
-  return cartItems.value.reduce((total, item) => {
-    return total + calculateFees((item.flight.fares?.[item.selectedCategory] || 0) * (item.quantity || 0))
-  }, 0)
-})
-
-const totalAmount = computed(() => {
-  return totalFares.value + totalTaxes.value + totalFees.value
-})
+// Impuestos y cargos deshabilitados
+const totalTaxes = computed(() => 0)
+const totalFees = computed(() => 0)
+const totalAmount = computed(() => totalFares.value)
 
 const canProceedToCheckout = computed(() => {
   return cartItems.value.length > 0 && 
@@ -414,8 +383,8 @@ const proceedToCheckout = async () => {
       items: cartItems.value,
       totalAmount: totalAmount.value,
       totalFares: totalFares.value,
-      totalTaxes: totalTaxes.value,
-      totalFees: totalFees.value,
+      totalTaxes: 0,
+      totalFees: 0,
       totalSeats: totalSeats.value
     }
     

@@ -1,21 +1,5 @@
 <template>
   <div class="flight-search-container">
-    <!-- Header con logo y navegación -->
-    <header class="flight-header">
-      <div class="header-content">
-        <div class="logo-section">
-          <div class="logo">✈️</div>
-          <h1>AeroLinea</h1>
-        </div>
-        <nav class="nav-links">
-          <a href="/" class="nav-link">Inicio</a>
-          <a href="/flights" class="nav-link active">Vuelos</a>
-          <CartCounter />
-          <a href="/profile" class="nav-link">Mi Cuenta</a>
-        </nav>
-      </div>
-    </header>
-
     <!-- Sección de búsqueda principal -->
     <div class="search-section">
       <div class="search-container">
@@ -33,7 +17,7 @@
               <label>Origen</label>
               <div class="input-with-icon">
                 <span class="input-icon">✈️</span>
-                <select v-model="searchParams.origin" class="form-select">
+                <select v-model.number="searchParams.origin" class="form-select">
                   <option value="">Seleccionar origen</option>
                   <option v-for="city in cities" :key="city.idCity" :value="city.idCity">
                     {{ city.name }}, {{ city.country }}
@@ -48,7 +32,7 @@
               <label>Destino</label>
               <div class="input-with-icon">
                 <span class="input-icon">✈️</span>
-                <select v-model="searchParams.destination" class="form-select">
+                <select v-model.number="searchParams.destination" class="form-select">
                   <option value="">Seleccionar destino</option>
                   <option v-for="city in cities" :key="city.idCity" :value="city.idCity">
                     {{ city.name }}, {{ city.country }}
@@ -61,14 +45,24 @@
             
             <div class="form-group date-range-group">
               <label>Fechas de viaje</label>
-              <DateRangePicker 
-                :departure-date="searchParams.departureDate"
-                :return-date="searchParams.returnDate"
-                :flight-type="searchParams.flightType"
-                @update:departure-date="searchParams.departureDate = $event"
-                @update:return-date="searchParams.returnDate = $event"
-                label="Seleccionar fechas"
-              />
+              <div class="form-row-horizontal" style="gap:.75rem;margin-bottom:0;align-items:stretch;">
+                <div class="input-with-icon" style="flex:1;">
+                  <span class="input-icon">📅</span>
+                  <input 
+                    class="form-input"
+                    type="date"
+                    v-model="searchParams.departureDate"
+                  />
+                </div>
+                <div v-if="searchParams.flightType==='round-trip'" class="input-with-icon" style="flex:1;">
+                  <span class="input-icon">🏠</span>
+                  <input 
+                    class="form-input"
+                    type="date"
+                    v-model="searchParams.returnDate"
+                  />
+                </div>
+              </div>
             </div>
             
             <div class="form-divider"></div>
@@ -77,7 +71,7 @@
               <label>Pasajeros</label>
               <div class="input-with-icon">
                 <span class="input-icon">👤</span>
-                <select v-model="searchParams.passengers" class="form-select">
+                <select v-model.number="searchParams.passengers" class="form-select">
                   <option value="1">1</option>
                   <option value="2">2</option>
                   <option value="3">3</option>
@@ -144,27 +138,7 @@
         </div>
       </div>
 
-      <!-- Filtros y ordenamiento -->
-      <div class="filters-section">
-        <div class="filter-buttons">
-          <button 
-            v-for="filter in filters" 
-            :key="filter.value"
-            @click="setActiveFilter(filter.value)"
-            :class="['filter-btn', { active: activeFilter === filter.value }]"
-          >
-            {{ filter.label }}
-          </button>
-        </div>
-        <div class="sort-section">
-          <label>Ordenar por:</label>
-          <select v-model="sortBy" class="sort-select">
-            <option value="price">Mejor precio</option>
-            <option value="duration">Duración</option>
-            <option value="departure">Hora de salida</option>
-          </select>
-        </div>
-      </div>
+      <!-- Barra de filtros inferior removida: usamos solo la cabecera superior -->
 
       <!-- Lista de vuelos -->
       <div class="flights-list">
@@ -272,21 +246,12 @@
       </div>
     </div>
 
-    <!-- Estado inicial -->
+    <!-- Estado inicial: solo cabecera, se removió el calendario inferior de disponibilidad -->
     <div v-if="!searchPerformed" class="initial-state">
       <div class="welcome-section">
         <div class="welcome-icon">✈️</div>
         <h2>Encuentra tu vuelo ideal</h2>
         <p>Busca entre miles de vuelos disponibles a destinos increíbles</p>
-      </div>
-      
-      <!-- Calendario de disponibilidad -->
-      <div class="availability-section">
-        <FlightAvailabilityCalendar 
-          :flights="flights"
-          :selected-date="searchParams.departureDate"
-          :on-date-select="handleDateSelect"
-        />
       </div>
     </div>
 
@@ -302,7 +267,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { airlineApi } from '../utils/airlineApi'
 import CartCounter from '../components/CartCounter.vue'
@@ -310,6 +275,7 @@ import DatePicker from '../components/DatePicker.vue'
 import DateRangePicker from '../components/DateRangePicker.vue'
 import FlightAvailabilityCalendar from '../components/FlightAvailabilityCalendar.vue'
 import FlightTypeSelector from '../components/FlightTypeSelector.vue'
+import eventBus from '../eventBus'
 
 const router = useRouter()
 
@@ -328,12 +294,13 @@ const searchParams = ref({
   departureDate: '',
   returnDate: '',
   passengers: 1,
-  flightType: 'round-trip' // 'one-way', 'return-only', 'round-trip'
+  flightType: 'round-trip' // 'one-way', 'round-trip'
 })
 
 // Filtros y ordenamiento
 const activeFilter = ref('all')
 const sortBy = ref('price')
+const destinationQuery = ref('')
 
 const filters = [
   { label: 'Todos', value: 'all' },
@@ -343,54 +310,142 @@ const filters = [
 ]
 
 // Computed properties
+const findCityIdByName = (name: string | number | undefined) => {
+  if (!name) return undefined
+  const nm = String(name).toLowerCase().trim()
+  const city = cities.value.find((c: any) => String(c.name).toLowerCase() === nm)
+  return city?.idCity
+}
+
+// Helpers para lógica de itinerarios
+const normalizeCityId = (flight: any, key: 'origin' | 'destination') => {
+  if (key === 'origin') {
+    return flight.originCityId ?? findCityIdByName(flight.originCity)
+  }
+  return flight.destinationCityId ?? findCityIdByName(flight.destinationCity)
+}
+
+const timeToMinutes = (hhmm?: string) => {
+  if (!hhmm) return undefined
+  const [h, m] = hhmm.split(':').map((x: string) => parseInt(x, 10))
+  if (Number.isNaN(h) || Number.isNaN(m)) return undefined
+  return h * 60 + m
+}
+
+const diffMinutesClock = (from?: string, to?: string) => {
+  const a = timeToMinutes(from)
+  const b = timeToMinutes(to)
+  if (a === undefined || b === undefined) return undefined
+  let d = b - a
+  if (d < 0) d += 24 * 60 // siguiente día
+  return d
+}
+
+type Itinerary = any // mantenemos forma compatible con UI existente
+
+// Construye vuelos directos y con UNA escala que conecte tiempos válidos
+const buildItinerariesForDirection = (
+  allFlights: any[],
+  originId: number,
+  destId: number,
+  date?: string
+): Itinerary[] => {
+  const MIN_CONNECTION_MIN = 30
+  const MAX_CONNECTION_MIN = 5 * 60
+
+  // Filtrar por fecha si viene definida
+  const sameDate = (f: any) => (!date || f.departureDate === date)
+
+  // Directos
+  const direct = allFlights.filter(f =>
+    normalizeCityId(f, 'origin') === originId &&
+    normalizeCityId(f, 'destination') === destId &&
+    sameDate(f)
+  )
+
+  // Candidatos por ciudad intermedia
+  const fromOrigin = allFlights.filter(f => normalizeCityId(f, 'origin') === originId && sameDate(f))
+  const toDest = allFlights.filter(f => normalizeCityId(f, 'destination') === destId)
+
+  const oneStops: Itinerary[] = []
+  for (const f1 of fromOrigin) {
+    const midId = normalizeCityId(f1, 'destination')
+    const arrTime = f1.arrivalTime
+    for (const f2 of toDest) {
+      if (normalizeCityId(f2, 'origin') !== midId) continue
+      // La segunda pierna puede ser el mismo día o al siguiente
+      // Si se provee fecha, permitimos que f2.departureDate sea igual a date o a la misma que f1.arrivalDate (si existiera)
+      if (date && f2.departureDate !== date && f2.departureDate !== f1.departureDate) continue
+
+      const conn = diffMinutesClock(arrTime, f2.departureTime)
+      if (conn === undefined) continue
+      if (conn < MIN_CONNECTION_MIN || conn > MAX_CONNECTION_MIN) continue
+
+      oneStops.push({
+        idFlight: `${f1.idFlight}-${f2.idFlight}`,
+        originCityId: originId,
+        destinationCityId: destId,
+        originCity: f1.originCity,
+        destinationCity: f2.destinationCity,
+        departureDate: f1.departureDate,
+        arrivalDate: f2.arrivalDate || f2.departureDate,
+        departureTime: f1.departureTime,
+        arrivalTime: f2.arrivalTime,
+        basePrice: (Number(f1.basePrice) || 0) + (Number(f2.basePrice) || 0),
+        availableSeats: Math.min(Number(f1.availableSeats) || 0, Number(f2.availableSeats) || 0),
+        hasStops: true,
+        flightLegs: [
+          {
+            cityId: midId,
+            arrivalTime: f1.arrivalTime,
+            departureTime: f2.departureTime,
+            connectionTimeMinutes: conn
+          }
+        ],
+        _legs: [f1, f2]
+      })
+    }
+  }
+
+  return [...direct, ...oneStops]
+}
+
 const filteredFlights = computed(() => {
   if (!searchPerformed.value) return []
-  
-  let filtered = flights.value.filter(flight => 
-    flight.status !== 'DRAFT' && flight.status !== 'CANCELLED'
-  )
-  
-  // Aplicar filtros de búsqueda si existen
-  if (searchParams.value.origin) {
-    filtered = filtered.filter(flight => 
-      flight.originCityId === searchParams.value.origin || 
-      flight.originCity === searchParams.value.origin
-    )
+
+  const all = flights.value.filter(f => f.status !== 'DRAFT' && f.status !== 'CANCELLED')
+  const originId = Number(searchParams.value.origin) || 0
+  const destId = Number(searchParams.value.destination) || 0
+  const depDate = searchParams.value.departureDate
+  const retDate = searchParams.value.returnDate
+  const type = searchParams.value.flightType
+
+  let result: any[] = []
+
+  if (type === 'one-way' || (!depDate && !retDate)) {
+    result = buildItinerariesForDirection(all, originId, destId, depDate)
+  } else {
+    const outbound = buildItinerariesForDirection(all, originId, destId, depDate)
+      .map(f => ({ ...f, __trip: 'OUTBOUND' }))
+
+    const inbound = (retDate && originId && destId)
+      ? buildItinerariesForDirection(all, destId, originId, retDate)
+          .map(f => ({ ...f, __trip: 'INBOUND' }))
+      : []
+
+    result = [...outbound, ...inbound]
   }
-  
-  if (searchParams.value.destination) {
-    filtered = filtered.filter(flight => 
-      flight.destinationCityId === searchParams.value.destination || 
-      flight.destinationCity === searchParams.value.destination
-    )
-  }
-  
-  if (searchParams.value.departureDate) {
-    filtered = filtered.filter(flight => 
-      flight.departureDate === searchParams.value.departureDate
-    )
-  }
-  
-  if (searchParams.value.returnDate) {
-    // Para vuelos de ida y vuelta, buscar vuelos que regresen en esa fecha
-    // Por ahora solo filtramos por fecha de salida
-    filtered = filtered.filter(flight => 
-      flight.departureDate === searchParams.value.returnDate
-    )
-  }
-  
-  // Aplicar filtros de tipo de vuelo
+
   if (activeFilter.value === 'direct') {
-    filtered = filtered.filter(flight => !flight.hasStops)
+    result = result.filter(f => !f.hasStops)
   } else if (activeFilter.value === 'stops') {
-    filtered = filtered.filter(flight => flight.hasStops)
+    result = result.filter(f => f.hasStops)
   } else if (activeFilter.value === 'economy') {
-    // Filtrar por vuelos económicos (precio menor al promedio)
-    const avgPrice = filtered.reduce((sum, f) => sum + f.basePrice, 0) / filtered.length
-    filtered = filtered.filter(flight => flight.basePrice <= avgPrice)
+    const avgPrice = result.length ? result.reduce((s, f) => s + f.basePrice, 0) / result.length : 0
+    result = result.filter(f => f.basePrice <= avgPrice)
   }
-  
-  return filtered
+
+  return result
 })
 
 const sortedFlights = computed(() => {
@@ -438,6 +493,21 @@ const loadInitialData = async () => {
       flights.value = flightsResponse.flights || []
       console.log('✅ Vuelos cargados:', flights.value.length)
     }
+
+    // Cargar criterios preseleccionados desde la home (si existen)
+    const pre = localStorage.getItem('preSearch')
+    if (pre) {
+      try {
+        const parsed = JSON.parse(pre)
+        searchParams.value.origin = parsed.origin ? Number(parsed.origin) : ''
+        searchParams.value.destination = parsed.destination ? Number(parsed.destination) : ''
+        searchParams.value.departureDate = parsed.departureDate || ''
+        searchParams.value.returnDate = parsed.returnDate || ''
+        searchParams.value.passengers = parsed.passengers ? Number(parsed.passengers) : 1
+        searchParams.value.flightType = parsed.flightType === 'oneway' ? 'one-way' : (parsed.flightType || 'round-trip')
+        searchPerformed.value = Boolean(searchParams.value.origin || searchParams.value.destination || searchParams.value.departureDate)
+      } catch {}
+    }
   } catch (e: any) {
     console.error('❌ Error cargando datos:', e)
     error.value = 'Error cargando datos: ' + (e?.message || 'Error desconocido')
@@ -447,11 +517,8 @@ const loadInitialData = async () => {
 }
 
 const searchFlights = async () => {
-  // Validar que al menos haya un criterio de búsqueda
-  const hasSearchCriteria = searchParams.value.origin || 
-                           searchParams.value.destination || 
-                           searchParams.value.departureDate ||
-                           searchParams.value.returnDate
+  // Validar que al menos haya un criterio de búsqueda (origen/destino o fecha)
+  const hasSearchCriteria = searchParams.value.origin || searchParams.value.destination || searchParams.value.departureDate
   
   if (!hasSearchCriteria) {
     // Si no hay criterios, mostrar todos los vuelos disponibles
@@ -491,13 +558,20 @@ const setActiveFilter = (filter: string) => {
   activeFilter.value = filter
 }
 
+// Navegación conservando itinerarios (directo o con escala)
 const bookFlight = (flight: any) => {
   console.log('🎫 Reservando vuelo:', flight)
+  try {
+    sessionStorage.setItem('selectedItinerary', JSON.stringify(flight))
+  } catch {}
   router.push(`/book-flight/${flight.idFlight}`)
 }
 
 const viewFlightDetails = (flight: any) => {
   console.log('📋 Viendo detalles del vuelo:', flight)
+  try {
+    sessionStorage.setItem('selectedItinerary', JSON.stringify(flight))
+  } catch {}
   router.push(`/flight-details/${flight.idFlight}`)
 }
 
@@ -559,8 +633,6 @@ const handleFlightTypeChange = (type: string) => {
   // Limpiar fechas según el tipo seleccionado
   if (type === 'one-way') {
     searchParams.value.returnDate = ''
-  } else if (type === 'return-only') {
-    searchParams.value.departureDate = ''
   }
   
   // Resetear búsqueda
@@ -653,6 +725,21 @@ const toggleDebug = () => {
 // Lifecycle
 onMounted(() => {
   loadInitialData()
+  eventBus.on('inventory:updated', (payload: any) => {
+    try {
+      const { flightId, availableSeats } = payload || {}
+      const f = flights.value.find((x: any) => x.idFlight === flightId)
+      if (f && availableSeats !== undefined) f.availableSeats = availableSeats
+    } catch {}
+  })
+})
+
+// Disparar búsqueda cuando cambian fechas u origen/destino desde el calendario o selects
+watch(() => [searchParams.value.departureDate, searchParams.value.returnDate, searchParams.value.origin, searchParams.value.destination], () => {
+  if (searchParams.value.departureDate || searchParams.value.returnDate || searchParams.value.origin || searchParams.value.destination) {
+    searchPerformed.value = true
+    error.value = ''
+  }
 })
 </script>
 
@@ -724,11 +811,11 @@ onMounted(() => {
 }
 
 .search-form {
-  background: white;
-  border-radius: 1.5rem;
-  padding: 2rem;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.08);
-  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  border-radius: 1.25rem;
+  padding: 1.5rem 1.75rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+  border: 1px solid #e5e7eb;
 }
 
 .form-row-horizontal {
@@ -804,14 +891,19 @@ onMounted(() => {
 .form-select,
 .form-input {
   width: 100%;
-  padding: 0.875rem 2.5rem;
+  height: 56px;
+  padding: 0 2.25rem 0 2.5rem;
   border: 2px solid #e5e7eb;
   border-radius: 0.75rem;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   transition: all 0.2s;
-  background: white;
-  color: #1f2937;
-  font-weight: 500;
+  background: #ffffff;
+  color: #111827;
+  font-weight: 600;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.03) inset;
 }
 
 .form-select:focus,
@@ -841,23 +933,24 @@ onMounted(() => {
 }
 
 .search-btn {
-  background: #1f2937;
-  color: white;
+  background: #111827;
+  color: #ffffff;
   border: none;
-  padding: 0.875rem 2rem;
-  border-radius: 2rem;
-  font-size: 1rem;
-  font-weight: 600;
+  padding: 0.9rem 1.75rem;
+  border-radius: 9999px;
+  font-size: 0.95rem;
+  font-weight: 800;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   white-space: nowrap;
   min-width: 120px;
+  box-shadow: 0 6px 16px rgba(17,24,39,0.18);
 }
 
 .search-btn:hover:not(:disabled) {
-  background: #111827;
+  background: #0b1220;
   transform: translateY(-1px);
-  box-shadow: 0 10px 20px rgba(31, 41, 55, 0.2);
+  box-shadow: 0 12px 24px rgba(17,24,39,0.22);
 }
 
 .search-btn:disabled {
@@ -1028,6 +1121,17 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.filters-right { display: flex; align-items: center; gap: 0.75rem; }
+.destination-search { position: relative; }
+.search-icon {
+  position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  color: #6b7280; font-size: 0.9rem; pointer-events: none;
+}
+.dest-input {
+  padding: 0.5rem 0.75rem 0.5rem 2rem; border: 1px solid #d1d5db; border-radius: 0.5rem;
+  font-size: 0.9rem; min-width: 200px;
 }
 
 .sort-section label {

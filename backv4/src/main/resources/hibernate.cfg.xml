@@ -53,6 +53,7 @@
         <mapping class="com.sources.app.entities.FlightLeg"/>
         <mapping class="com.sources.app.entities.FlightInventory"/>
         <mapping class="com.sources.app.entities.FlightFare"/>
+        <mapping class="com.sources.app.entities.FlightReview"/>
 
     </session-factory>
 </hibernate-configuration>

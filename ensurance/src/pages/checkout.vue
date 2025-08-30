@@ -1,20 +1,5 @@
 <template>
   <div class="checkout-container">
-    <!-- Header con navegación -->
-    <header class="checkout-header">
-      <div class="header-content">
-        <div class="logo-section">
-          <div class="logo">✈️</div>
-          <h1>AeroLinea</h1>
-        </div>
-        <nav class="nav-links">
-          <a href="/" class="nav-link">Inicio</a>
-          <a href="/flights" class="nav-link">Vuelos</a>
-          <a href="/cart" class="nav-link">🛒 Carrito</a>
-        </nav>
-      </div>
-    </header>
-
     <!-- Contenido principal -->
     <div class="main-content">
       <!-- Loading state -->
@@ -56,6 +41,24 @@
             <div class="summary-item">
               <span>Fecha de reserva:</span>
               <span class="value">{{ formatDate(new Date()) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tickets generados -->
+        <div class="booking-summary">
+          <h3>Boletos generados</h3>
+          <div v-for="t in bookingResult.tickets" :key="t.ticketId" class="summary-details">
+            <div class="summary-item">
+              <span>Ticket:</span>
+              <span class="value">#{{ t.ticketId }}</span>
+            </div>
+            <div class="summary-item">
+              <span>Código:</span>
+              <span class="value">{{ t.reservationCode || '—' }}</span>
+            </div>
+            <div class="summary-item">
+              <button class="primary-btn" @click="downloadTicketPdf(t.ticketId)">Descargar PDF</button>
             </div>
           </div>
         </div>
@@ -491,9 +494,10 @@ const processPayment = async () => {
       const bookingDate = now.toISOString().split('T')[0] // YYYY-MM-DD
       const bookingTime = now.toTimeString().slice(0, 5) // HH:MM
       
+      const currentUser = JSON.parse(localStorage.getItem('user') || 'null')
       const ticketData = {
         flightId: item.flight.idFlight,
-        userId: 1, // This should come from user context
+        userId: currentUser?.idUser || currentUser?.id || 1,
         seatNumber: `${item.flight.flightNumber.slice(-2)}${item.selectedCategory.slice(0, 1)}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`, // Generar número automático de 6 caracteres
         seatCategory: item.selectedCategory,
         fare: item.flight.fares?.[item.selectedCategory] || 0,
@@ -538,7 +542,7 @@ const processPayment = async () => {
     localStorage.removeItem('checkout_data')
     
     bookingSuccess.value = true
-    
+ 
   } catch (err) {
     error.value = 'Error procesando el pago: ' + (err as Error).message
     console.error(err)
@@ -557,6 +561,20 @@ const goToMyBookings = () => {
 
 const goToFlights = () => {
   router.push('/flights')
+}
+
+const downloadTicketPdf = async (ticketId: number) => {
+  try {
+    const blob = await airlineApi.downloadTicketPdf(ticketId)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Ticket-${ticketId}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    alert('No se pudo descargar el PDF')
+  }
 }
 
 // Utility functions

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
+import { airlineApi } from "../utils/airlineApi";
 
 const router = useRouter();
 const route = useRoute();
@@ -24,35 +25,34 @@ const checkAuth = () => {
   }
 };
 
-// Cargar detalles de la reserva
+// Cargar detalles reales de la reserva
 const loadBookingDetails = async () => {
   try {
-    const bookingId = route.params.bookingId;
-    
-    // Simular datos de reserva
+    const bookingId = Number(route.params.bookingId);
+    const res = await airlineApi.getTicketById(bookingId)
+    const t = res?.ticket || null
+    if (!t) throw new Error('Ticket no encontrado')
     booking.value = {
-      id: bookingId,
-      status: 'confirmed',
-      confirmationNumber: bookingId,
+      id: t.idTicket,
+      confirmationNumber: t.reservationCode || String(t.idTicket),
       bookingDate: new Date().toISOString(),
       flight: {
-        flightNumber: "AE001",
-        origin: "Ciudad de Guatemala",
-        destination: "Miami",
-        departureTime: "08:00",
-        arrivalTime: "11:30",
-        date: "2025-01-15",
-        aircraft: "Boeing 737",
-        gate: "A12",
-        terminal: "Terminal 1"
+        flightNumber: t.flightNumber,
+        origin: t.originCity,
+        destination: t.destinationCity,
+        departureTime: t.departureTime,
+        arrivalTime: t.arrivalTime || '',
+        date: t.departureDate,
+        aircraft: '—',
+        gate: '—',
+        terminal: '—'
       },
       passengers: 1,
-      seatNumbers: ["12A"],
-      totalPrice: 450.00,
-      paymentMethod: "Tarjeta de crédito",
-      specialRequests: "Comida vegetariana"
-    };
-    
+      seatNumbers: [t.seatNumber || '—'],
+      totalPrice: Number(t.totalAmount || 0),
+      paymentMethod: 'Tarjeta',
+      specialRequests: ''
+    }
   } catch (err) {
     console.error("Error al cargar detalles de la reserva:", err);
     error.value = "No se pudieron cargar los detalles de la reserva.";
@@ -82,6 +82,20 @@ const formatDate = (dateString: string) => {
 const printTicket = () => {
   window.print();
 };
+
+const downloadPdf = async () => {
+  try {
+    const blob = await airlineApi.downloadTicketPdf(booking.value.id)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Ticket-${booking.value.id}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    alert('No se pudo descargar el PDF')
+  }
+}
 
 // Enviar por email
 const sendByEmail = () => {
@@ -149,12 +163,8 @@ onMounted(() => {
             <p class="text-sm text-green-600 mt-1">Guarda este número para futuras consultas</p>
           </div>
           <div>
-            <h3 class="text-lg font-semibold text-green-800 mb-2">Estado de la Reserva</h3>
-            <div class="flex items-center gap-2">
-              <div class="w-3 h-3 bg-green-500 rounded-full"></div>
-              <span class="text-green-700 font-semibold">Confirmada</span>
-            </div>
-            <p class="text-sm text-green-600 mt-1">Reservado el {{ formatDate(booking.bookingDate) }}</p>
+            <h3 class="text-lg font-semibold text-green-800 mb-2">Descargar PDF</h3>
+            <button @click="downloadPdf" class="btn-airline-primary">Descargar boleto</button>
           </div>
         </div>
       </div>

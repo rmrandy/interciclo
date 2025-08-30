@@ -8,6 +8,7 @@ import InsuranceServices from "./pages/admin/insurance-services.vue";
 import HospitalServices from "./pages/admin/hospital-services.vue";
 import HospitalServicesImport from "./pages/admin/hospital-services-import.vue";
 import HospitalConfiguration from "./pages/admin/hospital-configuration.vue";
+import FlightManagement from "./components/FlightManagement.vue";
 import ProfileCompletion from "./pages/profile-completion.vue";
 import CatalogInsuranceServices from "./pages/catalog/insurance-services.vue";
 import CatalogHospitals from "./pages/catalog/hospitals.vue";
@@ -16,6 +17,7 @@ import Policies from "./pages/admin/policies.vue";
 import RegisterClient from "./pages/employee/register-client.vue";
 import ClientManagement from "./pages/admin/client-management.vue";
 import SystemConfiguration from "./pages/admin/system-configuration.vue";
+import AircraftSeatConfig from "./pages/admin/aircraft-seat-config.vue";
 import UserServices from "./pages/user-services.vue";
 import { checkMissingRequiredFields } from "./utils/profile-utils";
 
@@ -175,6 +177,17 @@ const routes = [
     component: Policies,
     beforeEnter: requireAdmin
   },
+  // Gestión completa de vuelos (admin)
+  {
+    path: "/admin/flight-management",
+    component: FlightManagement,
+    beforeEnter: requireAdmin
+  },
+  {
+    path: "/admin/aircraft-seat-config",
+    component: AircraftSeatConfig,
+    beforeEnter: requireAdmin
+  },
   // Gestión de ciudades (admin)
   {
     path: "/admin/flight-operations",
@@ -190,6 +203,11 @@ const routes = [
   {
     path: '/admin/client-management',
     component: ClientManagement,
+    beforeEnter: requireAdmin
+  },
+  {
+    path: "/admin/purchases",
+    component: () => import('./pages/admin/bookings.vue'),
     beforeEnter: requireAdmin
   },
 
@@ -269,7 +287,12 @@ const routes = [
   },
   {
     path: '/my-bookings',
-    component: import('./pages/my-bookings.vue'),
+    component: () => import('./pages/my-bookings.vue'),
+    beforeEnter: requireAuth
+  }
+  ,{
+    path: '/reservation/:id',
+    component: () => import('./pages/reservation-detail.vue'),
     beforeEnter: requireAuth
   }
 ];

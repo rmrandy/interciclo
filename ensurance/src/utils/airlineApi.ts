@@ -6,7 +6,7 @@ export class AirlineApiConfig {
   private ip: string = (import.meta as any).env?.VITE_IP || window.location.hostname || 'localhost'
 
   private constructor() {
-    this.loadConfig()
+    this.loadConfig() // Cargar configuración desde localStorage o usar valores por defecto
   }
 
   public static getInstance(): AirlineApiConfig {
@@ -64,15 +64,17 @@ export class AirlineApiClient {
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
     const url = `${this.config.getBaseUrl()}${endpoint}`
     
-    const defaultOptions: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+    // Construir headers dinámicos: solo forzar JSON si el body no es FormData
+    const headers: Record<string, string> = { ...(options.headers as any) }
+    const isFormData = typeof FormData !== 'undefined' && (options as any).body instanceof FormData
+    if (!isFormData) {
+      headers['Content-Type'] = headers['Content-Type'] || 'application/json'
     }
 
+    const finalOptions: RequestInit = { ...options, headers }
+
     try {
-      const response = await fetch(url, { ...defaultOptions, ...options })
+      const response = await fetch(url, finalOptions)
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -120,6 +122,58 @@ export class AirlineApiClient {
     return this.makeRequest('/api/airline/flights', {
       method: 'POST',
       body: JSON.stringify(flightData),
+    })
+  }
+
+  // Creación masiva de vuelos
+  async bulkCreateFlights(payload: any) {
+    return this.makeRequest('/api/airline/flights/bulk', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  }
+
+  // Carga masiva desde archivo JSON (multipart/form-data)
+  async bulkCreateFlightsFromFile(file: File) {
+    const form = new FormData()
+    form.append('file', file)
+    return this.makeRequest('/api/airline/flights/bulk', {
+      method: 'POST',
+      body: form
+    })
+  }
+
+  // ===== AERONAVES =====
+  async getAircrafts() {
+    return this.makeRequest('/api/airline/aircrafts', { method: 'GET' })
+  }
+
+  async createAircraft(payload: { registration: string; model: string; manufacturer: string; seatCapacity: number }) {
+    return this.makeRequest('/api/airline/aircrafts', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  }
+
+  async updateAircraft(id: number, payload: Partial<{ registration: string; model: string; manufacturer: string; seatCapacity: number }>) {
+    return this.makeRequest(`/api/airline/aircrafts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    })
+  }
+
+  async deleteAircraft(id: number) {
+    return this.makeRequest(`/api/airline/aircrafts/${id}`, { method: 'DELETE' })
+  }
+
+  async getSeatConfig(aircraftId: number) {
+    return this.makeRequest(`/api/airline/aircrafts/${aircraftId}/seat-config`, { method: 'GET' })
+  }
+
+  async updateSeatConfig(aircraftId: number, config: Record<string, { seats: number; priceMultiplier: number }>) {
+    return this.makeRequest(`/api/airline/aircrafts/${aircraftId}/seat-config`, {
+      method: 'PUT',
+      body: JSON.stringify({ config })
     })
   }
 
@@ -176,6 +230,19 @@ export class AirlineApiClient {
     }
   }
 
+  // Obtener detalle de un vuelo por ID
+  async getFlight(flightId: number): Promise<any> {
+    try {
+      const response = await this.makeRequest(`/api/airline/flights/${flightId}`, {
+        method: 'GET'
+      })
+      return response
+    } catch (error) {
+      console.error('Error obteniendo vuelo por id:', error)
+      throw error
+    }
+  }
+
   // Obtener asientos disponibles de un vuelo (método legacy mantenido por compatibilidad)
   async getAvailableSeats(flightId: number): Promise<any> {
     try {
@@ -219,11 +286,129 @@ export class AirlineApiClient {
     }
   }
 
+  // Obtener ticket por id
+  async getTicketById(ticketId: number): Promise<any> {
+    return this.makeRequest(`/api/airline/tickets/${ticketId}`, { method: 'GET' })
+  }
+
+  // Consultar por código de reservación
+  async getTicketByCode(code: string): Promise<any> {
+    return this.makeRequest(`/api/airline/tickets/code/${code}`, { method: 'GET' })
+  }
+
+  // Descargar PDF del ticket
+  async downloadTicketPdf(ticketId: number): Promise<Blob> {
+    const url = `${this.config.getBaseUrl()}/api/airline/tickets/${ticketId}/pdf`
+    const res = await fetch(url, { method: 'GET' })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.blob()
+  }
+
+  // ===== Reseñas de vuelos =====
+  async getFlightReviews(flightId: number, options?: { mode?: 'tree' | 'flat' }): Promise<any> {
+    const query = options?.mode ? `?mode=${options.mode}` : ''
+    const res = await this.makeRequest(`/api/airline/flights/${flightId}/reviews${query}`, { method: 'GET' })
+    return res
+  }
+
+  async createFlightReview(flightId: number, payload: { userId: number; rating: number; comment?: string }): Promise<any> {
+    return this.makeRequest(`/api/airline/flights/${flightId}/reviews`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    })
+  }
+
   async updateFlightStatus(flightId: number, status: string) {
     return this.makeRequest(`/api/airline/flights/${flightId}/status`, {
       method: 'PUT',
       body: JSON.stringify({ status }),
     })
+  }
+
+  // ===== NUEVOS MÉTODOS PARA GESTIÓN COMPLETA DE VUELOS =====
+  
+  /**
+   * Edita un vuelo completo
+   */
+  async updateFlight(flightId: number, flightData: any) {
+    try {
+      const response = await this.makeRequest(`/api/airline/flights/${flightId}`, {
+        method: 'PUT',
+        body: JSON.stringify(flightData),
+      })
+      console.log('🔍 Respuesta de updateFlight:', response)
+      return response
+    } catch (error) {
+      console.error('❌ Error en updateFlight:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Cancela un vuelo
+   */
+  async cancelFlight(flightId: number, cancellationReason: string, cancelledBy: number) {
+    try {
+      const response = await this.makeRequest(`/api/airline/flights/${flightId}/cancel`, {
+        method: 'PUT',
+        body: JSON.stringify({ cancellationReason, cancelledBy }),
+      })
+      console.log('🔍 Respuesta de cancelFlight:', response)
+      return response
+    } catch (error) {
+      console.error('❌ Error en cancelFlight:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Actualiza solo el estado de un vuelo
+   */
+  async updateFlightStatusWithUser(flightId: number, status: string, updatedBy: number) {
+    try {
+      const response = await this.makeRequest(`/api/airline/flights/${flightId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status, updatedBy }),
+      })
+      console.log('🔍 Respuesta de updateFlightStatusWithUser:', response)
+      return response
+    } catch (error) {
+      console.error('❌ Error en updateFlightStatusWithUser:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Elimina un vuelo
+   */
+  async deleteFlight(flightId: number) {
+    try {
+      const response = await this.makeRequest(`/api/airline/flights/${flightId}`, {
+        method: 'DELETE',
+      })
+      console.log('🔍 Respuesta de deleteFlight:', response)
+      return response
+    } catch (error) {
+      console.error('❌ Error en deleteFlight:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Crea escalas para un vuelo existente
+   */
+  async createFlightLeg(flightId: number, legData: any) {
+    try {
+      const response = await this.makeRequest(`/api/admin/flights/${flightId}/legs`, {
+        method: 'POST',
+        body: JSON.stringify(legData),
+      })
+      console.log('🔍 Respuesta de createFlightLeg:', response)
+      return response
+    } catch (error) {
+      console.error('❌ Error en createFlightLeg:', error)
+      throw error
+    }
   }
 
   // ===== USUARIOS =====

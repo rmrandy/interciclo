@@ -2,10 +2,8 @@ package com.sources.app.entities;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.util.List;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "FLIGHTS")
@@ -26,6 +24,10 @@ public class Flight {
     @ManyToOne(optional = false)
     @JoinColumn(name = "DESTINATION_CITY_ID", referencedColumnName = "ID_CITY")
     private City destinationCity;
+
+    @ManyToOne(optional = true)
+    @JoinColumn(name = "AIRCRAFT_ID", referencedColumnName = "ID_AIRCRAFT")
+    private Aircraft aircraft;
 
     @Column(name = "DEPARTURE_DATE")
     private String departureDate; // Cambiado de LocalDate a String
@@ -137,6 +139,9 @@ public class Flight {
 
     public City getDestinationCity() { return destinationCity; }
     public void setDestinationCity(City destinationCity) { this.destinationCity = destinationCity; }
+
+    public Aircraft getAircraft() { return aircraft; }
+    public void setAircraft(Aircraft aircraft) { this.aircraft = aircraft; }
 
     public String getDepartureDate() { return departureDate; }
     public void setDepartureDate(String departureDate) { this.departureDate = departureDate; }

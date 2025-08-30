@@ -4,12 +4,12 @@
       <div class="date-range-display">
         <div class="date-range-label">{{ label }}</div>
         <div class="date-range-values">
-          <div v-if="props.flightType !== 'return-only'" class="date-item">
+          <div class="date-item">
             <span class="date-icon">✈️</span>
             <span class="date-text">{{ departureDisplay || 'Ida' }}</span>
           </div>
           <div v-if="props.flightType === 'round-trip'" class="date-separator">→</div>
-          <div v-if="props.flightType !== 'one-way'" class="date-item">
+          <div v-if="props.flightType === 'round-trip'" class="date-item">
             <span class="date-icon">🏠</span>
             <span class="date-text">{{ returnDisplay || 'Vuelta' }}</span>
           </div>
@@ -44,7 +44,7 @@
         <div
           v-for="day in calendarDays"
           :key="day.key"
-          @click="selectDate(day)"
+          @mousedown.prevent.stop="selectDate(day)"
           class="calendar-day"
           :class="{
             'other-month': day.otherMonth,
@@ -77,15 +77,9 @@
 
       <!-- Acciones rápidas -->
       <div class="quick-actions">
-        <button @click="selectToday" class="quick-btn" type="button">
-          Hoy
-        </button>
-        <button @click="selectNextWeek" class="quick-btn" type="button">
-          Próxima semana
-        </button>
-        <button @click="clearDates" class="quick-btn clear" type="button">
-          Limpiar
-        </button>
+        <button @click="selectToday" class="quick-btn" type="button">Hoy</button>
+        <button @click="selectNextWeek" class="quick-btn" type="button">Próxima semana</button>
+        <button @click="clearDates" class="quick-btn clear" type="button">Limpiar</button>
       </div>
     </div>
   </div>
@@ -99,7 +93,7 @@ interface Props {
   returnDate?: string
   label?: string
   disabled?: boolean
-  flightType?: 'one-way' | 'return-only' | 'round-trip'
+  flightType?: 'one-way' | 'round-trip'
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -109,6 +103,10 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<{
+  // Compatibilidad con padres que usan kebab-case en el template
+  'update:departure-date': [value: string]
+  'update:return-date': [value: string]
+  // Compatibilidad con camelCase si fuese usado en algún lugar
   'update:departureDate': [value: string]
   'update:returnDate': [value: string]
 }>()
@@ -140,6 +138,15 @@ const departureDisplay = computed(() => {
   })
 })
 
+const departureDisplayDDMM = computed(() => {
+  if (!departureDate.value) return ''
+  const d = departureDate.value
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const yyyy = d.getFullYear()
+  return `${dd}/${mm}/${yyyy}`
+})
+
 const returnDisplay = computed(() => {
   if (!returnDate.value) return ''
   return returnDate.value.toLocaleDateString('es-ES', {
@@ -147,6 +154,15 @@ const returnDisplay = computed(() => {
     day: 'numeric',
     month: 'short'
   })
+})
+
+const returnDisplayDDMM = computed(() => {
+  if (!returnDate.value) return ''
+  const d = returnDate.value
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const yyyy = d.getFullYear()
+  return `${dd}/${mm}/${yyyy}`
 })
 
 const calendarDays = computed(() => {
@@ -248,19 +264,18 @@ const selectDate = (day: any) => {
   if (props.flightType === 'one-way') {
     // Solo ida: solo seleccionar fecha de salida
     departureDate.value = day.date
-    emit('update:departureDate', day.date.toISOString().split('T')[0])
-    closeCalendar()
-  } else if (props.flightType === 'return-only') {
-    // Solo regreso: solo seleccionar fecha de regreso
-    returnDate.value = day.date
-    emit('update:returnDate', day.date.toISOString().split('T')[0])
+    const iso = day.date.toISOString().split('T')[0]
+    emit('update:departure-date', iso)
+    emit('update:departureDate', iso)
     closeCalendar()
   } else {
     // Vuelo redondo: selección secuencial
     if (selectionMode.value === 'departure') {
       departureDate.value = day.date
       selectionMode.value = 'return'
-      emit('update:departureDate', day.date.toISOString().split('T')[0])
+      const iso = day.date.toISOString().split('T')[0]
+      emit('update:departure-date', iso)
+      emit('update:departureDate', iso)
     } else {
       // Validar que la fecha de vuelta sea posterior a la de ida
       if (departureDate.value && day.date <= departureDate.value) {
@@ -268,11 +283,16 @@ const selectDate = (day: any) => {
       }
       returnDate.value = day.date
       selectionMode.value = 'departure'
-      emit('update:returnDate', day.date.toISOString().split('T')[0])
+      const isoR = day.date.toISOString().split('T')[0]
+      emit('update:return-date', isoR)
+      emit('update:returnDate', isoR)
       closeCalendar()
     }
   }
 }
+
+const focusDeparture = () => { selectionMode.value = 'departure'; isOpen.value = true }
+const focusReturn = () => { if (props.flightType === 'round-trip') { selectionMode.value = 'return'; isOpen.value = true } }
 
 const selectToday = () => {
   const today = new Date()
@@ -281,7 +301,9 @@ const selectToday = () => {
   tomorrow.setDate(tomorrow.getDate() + 1)
   returnDate.value = tomorrow
   
+  emit('update:departure-date', today.toISOString().split('T')[0])
   emit('update:departureDate', today.toISOString().split('T')[0])
+  emit('update:return-date', tomorrow.toISOString().split('T')[0])
   emit('update:returnDate', tomorrow.toISOString().split('T')[0])
   closeCalendar()
 }
@@ -296,7 +318,9 @@ const selectNextWeek = () => {
   departureDate.value = nextWeek
   returnDate.value = returnDate
   
+  emit('update:departure-date', nextWeek.toISOString().split('T')[0])
   emit('update:departureDate', nextWeek.toISOString().split('T')[0])
+  emit('update:return-date', returnDate.toISOString().split('T')[0])
   emit('update:returnDate', returnDate.toISOString().split('T')[0])
   closeCalendar()
 }
@@ -305,7 +329,9 @@ const clearDates = () => {
   departureDate.value = null
   returnDate.value = null
   selectionMode.value = 'departure'
+  emit('update:departure-date', '')
   emit('update:departureDate', '')
+  emit('update:return-date', '')
   emit('update:returnDate', '')
   closeCalendar()
 }
@@ -401,16 +427,17 @@ onMounted(() => {
 
 .date-range-input {
   cursor: pointer;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
+  border: 2px solid #dfe6ef;
+  border-radius: 16px;
   background: white;
   transition: all 0.2s ease;
-  min-height: 56px;
-  padding: 12px 16px;
+  min-height: 64px;
+  padding: 8px 12px 0 12px;
+  box-shadow: 0 6px 16px rgba(17,24,39,0.06);
 }
 
 .date-range-input:hover {
-  border-color: #cbd5e1;
+  border-color: #d4dbe6;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -465,6 +492,52 @@ onMounted(() => {
   font-weight: 600;
 }
 
+/* Nuevo layout compacto con dos segmentos (Ida / Vuelta) */
+.dual-display {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.segment {
+  flex: 1;
+  padding: 8px 10px 12px;
+  border-radius: 10px;
+  position: relative;
+}
+
+.segment.active::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 0;
+  height: 3px;
+  background: #16a34a; /* verde más sobrio */
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+
+.seg-label { font-size: 12px; color: #6b7280; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .02em; }
+
+.seg-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.seg-icon { font-size: 16px; }
+.seg-date {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #111827;
+}
+
+.segment.active { background: #f8fafc; }
+
+.divider { width: 1px; background: #e5e7eb; margin: 0 4px; }
+
 .calendar-arrow {
   position: absolute;
   right: 16px;
@@ -488,7 +561,7 @@ onMounted(() => {
   border-radius: 16px;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   border: 1px solid #e2e8f0;
-  z-index: 1000;
+  z-index: 9999;
   min-width: 360px;
   animation: slideDown 0.2s ease;
 }
@@ -564,16 +637,20 @@ onMounted(() => {
   padding: 8px 20px 16px;
 }
 
+.calendar-grid.compact {
+  gap: 6px;
+}
+
 .calendar-day {
   aspect-ratio: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: #1e293b;
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: 12px;
   transition: all 0.2s ease;
   position: relative;
 }
@@ -587,29 +664,13 @@ onMounted(() => {
   color: #cbd5e1;
 }
 
-.calendar-day.today {
-  background: #dbeafe;
-  color: #1d4ed8;
-  font-weight: 600;
-}
+.calendar-day.today { color: #1d4ed8; font-weight: 700; }
 
-.calendar-day.departure {
-  background: #3b82f6;
-  color: white;
-  font-weight: 600;
-}
+.calendar-day.departure { background: #111827; color: #fff; font-weight: 700; }
 
-.calendar-day.return {
-  background: #10b981;
-  color: white;
-  font-weight: 600;
-}
+.calendar-day.return { background: #111827; color: #fff; font-weight: 700; }
 
-.calendar-day.in-range {
-  background: #dbeafe;
-  color: #1d4ed8;
-  font-weight: 500;
-}
+.calendar-day.in-range { background: #f1f5f9; color: #111827; font-weight: 600; }
 
 .calendar-day.disabled {
   color: #cbd5e1;

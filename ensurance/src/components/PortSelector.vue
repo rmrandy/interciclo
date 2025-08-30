@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue';
 import { configureApiPorts, loadPortConfiguration } from '../utils/api';
 
 // Estado
-const ensurancePort = ref('8082');
+const ensurancePort = ref('8080');
 const pharmacyPort = ref('8080');
 const showDialog = ref(true);
 const savePreference = ref(true);

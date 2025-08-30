@@ -25,6 +25,17 @@ public class UserProfileHandler implements HttpHandler {
     
     @Override
     public void handle(HttpExchange exchange) throws IOException {
+        // Configuración de CORS para permitir solicitudes desde cualquier origen
+        exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+        exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, PUT, OPTIONS, POST, DELETE");
+        exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        
+        // Manejo de solicitudes OPTIONS (preflight de CORS)
+        if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+            exchange.sendResponseHeaders(204, -1); // No Content
+            return;
+        }
+        
         String method = exchange.getRequestMethod();
         
         try {
@@ -43,12 +54,12 @@ public class UserProfileHandler implements HttpHandler {
     
     private void handleGetProfile(HttpExchange exchange) throws IOException {
         String query = exchange.getRequestURI().getQuery();
-        if (query == null || !query.contains("userId=")) {
-            sendErrorResponse(exchange, 400, "userId es requerido");
+        if (query == null || !query.contains("ID_USER=")) {
+            sendErrorResponse(exchange, 400, "Se requiere el parámetro ID_USER");
             return;
         }
         
-        String userIdStr = query.split("userId=")[1];
+        String userIdStr = query.split("ID_USER=")[1];
         try {
             int userId = Integer.parseInt(userIdStr);
             User user = userDAO.findById((long) userId);
@@ -65,7 +76,7 @@ public class UserProfileHandler implements HttpHandler {
             sendSuccessResponse(exchange, response);
             
         } catch (NumberFormatException e) {
-            sendErrorResponse(exchange, 400, "userId debe ser un número válido");
+            sendErrorResponse(exchange, 400, "ID_USER debe ser un número válido");
         }
     }
     
@@ -75,7 +86,7 @@ public class UserProfileHandler implements HttpHandler {
         JsonObject jsonRequest = JsonParser.parseString(body).getAsJsonObject();
         
         try {
-            int userId = jsonRequest.get("userId").getAsInt();
+            int userId = jsonRequest.get("ID_USER").getAsInt();
             User user = userDAO.findById((long) userId);
             
             if (user == null) {

@@ -1,21 +1,5 @@
 <template>
   <div class="flight-details-container">
-    <!-- Header con navegación -->
-    <header class="flight-header">
-      <div class="header-content">
-        <div class="logo-section">
-          <div class="logo">✈️</div>
-          <h1>AeroLinea</h1>
-        </div>
-        <nav class="nav-links">
-          <a href="/" class="nav-link">Inicio</a>
-          <a href="/flights" class="nav-link">Vuelos</a>
-          <CartCounter />
-          <a href="/profile" class="nav-link">Mi Cuenta</a>
-        </nav>
-      </div>
-    </header>
-
     <!-- Contenido principal -->
     <div class="main-content">
       <!-- Loading state -->
@@ -67,7 +51,10 @@
 
         <!-- Flight itinerary -->
         <div class="itinerary-section">
-          <h2>Itinerario del Vuelo</h2>
+          <h2>
+            Itinerario del Vuelo
+            <span v-if="flight && flight._legs && flight._legs.length === 2" class="badge-one-stop">1 escala</span>
+          </h2>
           
           <!-- Main flight info -->
           <div class="main-flight-card">
@@ -200,21 +187,21 @@
           <h2>Precios por Categoría de Asiento</h2>
           <div class="fares-grid">
             <div 
-              v-for="(price, category) in flight.fares" 
-              :key="category"
+              v-for="(price, categoryKey) in flight.fares" 
+              :key="String(categoryKey)"
               class="fare-card"
-              :class="{ 'economy': category === 'ECONOMY', 'business': category === 'BUSINESS', 'first-class': category === 'FIRST_CLASS' }"
+              :class="{ 'economy': String(categoryKey) === 'ECONOMY', 'business': String(categoryKey) === 'BUSINESS', 'first-class': String(categoryKey) === 'FIRST_CLASS' }"
             >
               <div class="fare-header">
-                <div class="category-name">{{ getCategoryName(category as string) }}</div>
-                <div class="category-icon">{{ getCategoryIcon(category as string) }}</div>
+                <div class="category-name">{{ getCategoryName(String(categoryKey)) }}</div>
+                <div class="category-icon">{{ getCategoryIcon(String(categoryKey)) }}</div>
               </div>
               <div class="fare-price">
                 <span class="currency">USD</span>
                 <span class="amount">{{ formatPrice(price) }}</span>
               </div>
               <div class="fare-features">
-                <div class="feature">{{ getCategoryFeatures(category as string) }}</div>
+                <div class="feature">{{ getCategoryFeatures(String(categoryKey)) }}</div>
               </div>
             </div>
           </div>
@@ -239,6 +226,20 @@
           </div>
           <div class="checkin-note">
             <p>ℹ️ La información de check-in se confirma 24 horas antes del vuelo</p>
+          </div>
+        </div>
+
+        <!-- Reviews -->
+        <div class="details-section">
+          <h2>Comentarios y Calificaciones</h2>
+          <div v-if="!reviews.length" class="text-gray-600">Aún no hay comentarios para este vuelo.</div>
+          <CommentsThread v-else :items="reviews" :flight-id="Number(flight.idFlight)" :current-user-id="currentUserId" @refresh="loadReviews" />
+          <div class="mt-4">
+            <div class="flex items-center gap-2 text-yellow-500 mb-2">
+              <button v-for="i in 5" :key="i" @click="newRating = i">{{ i <= newRating ? '★' : '☆' }}</button>
+            </div>
+            <textarea v-model="newComment" rows="3" class="form-textarea w-full" placeholder="Escribe tu comentario (opcional)"></textarea>
+            <button class="btn-primary mt-2" @click="submitReview">Publicar</button>
           </div>
         </div>
 
@@ -399,31 +400,31 @@
                   <p>Cargando asientos disponibles...</p>
                 </div>
                 
-                <div v-else class="category-options">
+                <div v-else class="category-options" v-if="!(flight && flight._legs && flight._legs.length === 2)">
                   <div
-                    v-for="(seats, category) in availableSeats"
-                    :key="category"
+                    v-for="(seats, categoryKey) in availableSeats"
+                    :key="String(categoryKey)"
                     class="category-option"
                     :class="{ 
-                      'selected': selectedCategory === category,
+                      'selected': selectedCategory === String(categoryKey),
                       'unavailable': seats.length === 0
                     }"
-                    @click="seats.length > 0 ? selectCategory(category) : null"
+                    @click="seats.length > 0 ? selectCategory(String(categoryKey)) : null"
                   >
                     <div class="category-info">
-                      <div class="category-name">{{ getCategoryName(category) }}</div>
-                      <div class="category-price">USD {{ formatPrice(flight.fares?.[category] || 0) }}</div>
+                      <div class="category-name">{{ getCategoryName(String(categoryKey)) }}</div>
+                      <div class="category-price">USD {{ formatPrice(flight.fares?.[String(categoryKey)] || 0) }}</div>
                       <div class="category-availability">
                         {{ seats.length }} asientos disponibles
                       </div>
                     </div>
-                    <div class="category-icon">{{ getCategoryIcon(category) }}</div>
+                    <div class="category-icon">{{ getCategoryIcon(String(categoryKey)) }}</div>
                   </div>
                 </div>
               </div>
               
               <!-- Seat Number Selection -->
-              <div v-if="selectedCategory" class="seat-number-selection">
+              <div v-if="selectedCategory && !(flight && flight._legs && flight._legs.length === 2)" class="seat-number-selection">
                 <h4>Número de Asiento</h4>
                 
                 <!-- Seat map legend -->
@@ -621,14 +622,33 @@
           <p v-else>{{ passengerCount }} boletos han sido reservados exitosamente.</p>
           
           <div class="booking-details">
-            <div v-if="passengerCount === 1">
-              <p><strong>ID de Boleto:</strong> {{ bookingResult.tickets[0].ticketId }}</p>
-              <p><strong>Total Pagado:</strong> USD {{ formatPrice(bookingResult.totalAmount) }}</p>
+            <div v-if="flight && flight._legs && flight._legs.length === 2" class="itinerary-summary">
+              <p><strong>Itinerario:</strong> 1 escala</p>
+              <ul class="itinerary-list">
+                <li>
+                  Tramo 1: {{ flight._legs[0]?.originCity }} → {{ flight._legs[0]?.destinationCity }}
+                </li>
+                <li>
+                  Tramo 2: {{ flight._legs[1]?.originCity }} → {{ flight._legs[1]?.destinationCity }}
+                </li>
+              </ul>
             </div>
-            <div v-else>
-              <p><strong>Número de Boletos:</strong> {{ passengerCount }}</p>
-              <p><strong>Total Pagado:</strong> USD {{ formatPrice(bookingResult.totalAmount) }}</p>
-              <p><strong>Precio por Boleto:</strong> USD {{ formatPrice(bookingResult.totalAmount / passengerCount) }}</p>
+
+            <div class="tickets-summary">
+              <template v-if="passengerCount === 1">
+                <p v-if="bookingResult.tickets && bookingResult.tickets.length === 1">
+                  <strong>ID de Boleto:</strong> {{ bookingResult.tickets[0].ticketId }}
+                </p>
+                <p v-else>
+                  <strong>Boletos creados:</strong> {{ bookingResult.tickets?.map((t:any)=>t.ticketId).join(', ') }}
+                </p>
+                <p><strong>Total Pagado:</strong> USD {{ formatPrice(bookingResult.totalAmount) }}</p>
+              </template>
+              <template v-else>
+                <p><strong>Boletos creados:</strong> {{ bookingResult.tickets?.length }}</p>
+                <p><strong>Total Pagado:</strong> USD {{ formatPrice(bookingResult.totalAmount) }}</p>
+                <p><strong>Precio promedio por boleto:</strong> USD {{ formatPrice(bookingResult.totalAmount / bookingResult.tickets?.length) }}</p>
+              </template>
             </div>
           </div>
           
@@ -646,7 +666,9 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { airlineApi } from '../utils/airlineApi'
-import CartCounter from '../components/CartCounter.vue'
+import CommentsThread from '../components/CommentsThread.vue'
+// import CartCounter from '../components/CartCounter.vue'
+import eventBus from '../eventBus'
 
 const route = useRoute()
 const router = useRouter()
@@ -657,6 +679,10 @@ const error = ref('')
 const flight = ref<any>(null)
 const cities = ref<any[]>([])
 const flightId = route.params.id as string
+const reviews = ref<any[]>([])
+const newRating = ref(5)
+const newComment = ref('')
+const currentUserId = ref<number | null>(null)
 
 // Booking state
 const showBookingForm = ref(false)
@@ -687,10 +713,7 @@ const currentUser = ref<any>(null)
 // Auto-select credit card as default payment method
 selectedPaymentMethod.value = 'CREDIT_CARD'
 
-// Payment methods - Solo tarjeta de crédito como solicitaste
-const paymentMethods = [
-  { value: 'CREDIT_CARD', name: 'Tarjeta de Crédito', icon: '💳' }
-]
+// Payment methods (solo tarjeta de crédito)
 
 // Computed properties
 const selectedPrice = computed(() => flight.value?.fares?.[selectedCategory.value] || 0)
@@ -699,30 +722,71 @@ const fees = computed(() => selectedPrice.value * 0.05) // 5% fees
 const totalAmount = computed(() => selectedPrice.value + taxes.value + fees.value)
 
 const canSubmit = computed(() => {
-  return selectedSeat.value && 
-         selectedCategory.value && 
-         selectedPaymentMethod.value &&
-         passengerForms.value.every(passenger => 
-           passenger.firstName &&
-           passenger.lastName &&
-           passenger.documentType &&
-           passenger.documentNumber &&
-           passenger.email &&
-           passenger.phone
-         )
+  // Permitir compra sin asiento seleccionado (se usará 'AUTO')
+  return Boolean(selectedCategory.value && selectedPaymentMethod.value) &&
+    passengerForms.value.every(passenger => 
+      passenger.firstName &&
+      passenger.lastName &&
+      passenger.documentType &&
+      passenger.documentNumber &&
+      passenger.email &&
+      passenger.phone
+    )
 })
 
 // Methods
 const loadFlightDetails = async () => {
   try {
     loading.value = true
-    const response = await airlineApi.getFlights()
-    if (response.success) {
-      const flightIdNum = parseInt(flightId)
-      flight.value = response.flights.find((f: any) => f.idFlight === flightIdNum)
-      if (flight.value) {
-        await loadAvailableSeats()
+    // Intentar usar un itinerario seleccionado previamente (directo o con escala)
+    try {
+      const cached = sessionStorage.getItem('selectedItinerary')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (parsed && (parsed.idFlight || parsed._legs)) {
+          flight.value = parsed
+        }
       }
+    } catch {}
+
+    if (!flight.value) {
+      const response = await airlineApi.getFlights()
+      if (response.success) {
+        const flightIdNum = parseInt(flightId)
+        flight.value = response.flights.find((f: any) => f.idFlight === flightIdNum)
+      }
+    }
+
+    if (flight.value) {
+      // Si es itinerario con escala, combinar tarifas y preparar selección automática
+      const isOneStop = !!(flight.value._legs && flight.value._legs.length === 2)
+      if (isOneStop) {
+        const leg1 = flight.value._legs[0] || {}
+        const leg2 = flight.value._legs[1] || {}
+        const keys = new Set<string>([
+          ...Object.keys(leg1.fares || {}),
+          ...Object.keys(leg2.fares || {})
+        ])
+        const combinedFares: Record<string, number> = {}
+        if (keys.size === 0) {
+          // Fallback: usar basePrice sumado como ECONOMY
+          combinedFares['ECONOMY'] = Number(leg1.basePrice || 0) + Number(leg2.basePrice || 0)
+        } else {
+          keys.forEach((k) => {
+            const a = Number((leg1.fares || {})[k] ?? leg1.basePrice ?? 0)
+            const b = Number((leg2.fares || {})[k] ?? leg2.basePrice ?? 0)
+            combinedFares[k] = a + b
+          })
+        }
+        flight.value.fares = combinedFares
+        if (!selectedCategory.value) {
+          selectedCategory.value = combinedFares['ECONOMY'] !== undefined
+            ? 'ECONOMY'
+            : Object.keys(combinedFares)[0] || ''
+        }
+      }
+      await loadAvailableSeats()
+      await loadReviews()
     }
   } catch (err) {
     error.value = 'Error cargando detalles del vuelo'
@@ -732,20 +796,47 @@ const loadFlightDetails = async () => {
   }
 }
 
-const loadCities = async () => {
+const loadReviews = async () => {
   try {
-    const response = await airlineApi.getCities()
-    if (response.success) {
-      cities.value = response.cities
-    }
-  } catch (err) {
-    console.error('Error cargando ciudades:', err)
+    if (!flight.value) return
+    const res = await airlineApi.getFlightReviews(flight.value.idFlight, { mode: 'tree' })
+    reviews.value = Array.isArray(res?.reviews) ? res.reviews : []
+  } catch (e) {
+    console.warn('No se pudieron cargar reseñas', e)
+    reviews.value = []
   }
 }
+
+const submitReview = async () => {
+  try {
+    if (!flight.value) return
+    if (!currentUserId.value) {
+      router.push('/login?redirect=' + encodeURIComponent(`/flight-details/${flight.value.idFlight}`))
+      return
+    }
+    await airlineApi.createFlightReview(flight.value.idFlight, {
+      userId: currentUserId.value,
+      rating: newRating.value,
+      comment: newComment.value
+    })
+    newComment.value = ''
+    newRating.value = 5
+    await loadReviews()
+  } catch (e) {
+    alert('No se pudo publicar tu reseña')
+  }
+}
+
+// Carga de ciudades (no utilizada actualmente)
 
 const loadAvailableSeats = async () => {
   try {
     console.log('🔍 Cargando asientos para vuelo:', flight.value.idFlight)
+    if (flight.value && flight.value._legs && flight.value._legs.length === 2) {
+      // Para itinerarios con escala, omitimos carga de asientos por tramo y usamos asignación AUTO
+      availableSeats.value = {}
+      return
+    }
     const response = await airlineApi.getAvailableSeats(flight.value.idFlight)
     console.log('📡 Respuesta de asientos:', response)
     
@@ -907,9 +998,7 @@ const selectSeat = (seat: string) => {
   }
 }
 
-const selectPaymentMethod = (method: string) => {
-  selectedPaymentMethod.value = method
-}
+// selectPaymentMethod no utilizado; mantenemos método de pago por defecto
 
 const isSeatOccupied = (seat: string) => {
   if (!availableSeats.value || !selectedCategory.value) return false
@@ -928,50 +1017,98 @@ const submitBooking = async () => {
     loading.value = true
     error.value = ''
     
-    // Create tickets for all passengers
-    const tickets = []
-    
+    const isOneStop = !!(flight.value && flight.value._legs && flight.value._legs.length === 2)
+    const tickets: any[] = []
+
     for (let i = 0; i < passengerForms.value.length; i++) {
       const passenger = passengerForms.value[i]
-      
-      const bookingData = {
-        flightId: flight.value.idFlight,
-        userId: currentUser.value?.idUser || 1,
-        seatNumber: `${selectedSeat.value}${i > 0 ? i + 1 : ''}`, // Generate seat numbers
-        seatCategory: selectedCategory.value,
-        fare: selectedPrice.value,
-        passengerFirstName: passenger.firstName,
-        passengerLastName: passenger.lastName,
-        passengerDocumentType: passenger.documentType,
-        passengerDocumentNumber: passenger.documentNumber,
-        passengerEmail: passenger.email,
-        passengerPhone: passenger.phone,
-        specialRequests: passenger.specialRequests,
-        paymentMethod: selectedPaymentMethod.value,
-        taxes: taxes.value,
-        fees: fees.value,
-        totalAmount: totalAmount.value
-      }
-      
-      const response = await airlineApi.createTicket(bookingData)
-      console.log('Respuesta del API para boleto:', response)
-      
-      // Verificar si la respuesta es exitosa
-      if (response && (response.success || response.ticketId)) {
-        tickets.push(response)
+
+      if (isOneStop) {
+        // Dos tramos: crear dos boletos (uno por cada segmento)
+        for (let legIndex = 0; legIndex < 2; legIndex++) {
+          const seg = flight.value._legs[legIndex]
+          const legFare = Number(seg?.fares?.[selectedCategory.value] || seg?.basePrice || 0)
+          const bookingData = {
+            flightId: seg.idFlight,
+            userId: currentUser.value?.idUser || 1,
+            seatNumber: selectedSeat.value ? `${selectedSeat.value}${i > 0 ? i + 1 : ''}` : 'AUTO',
+            seatCategory: selectedCategory.value,
+            fare: legFare,
+            passengerFirstName: passenger.firstName,
+            passengerLastName: passenger.lastName,
+            passengerDocumentType: passenger.documentType,
+            passengerDocumentNumber: passenger.documentNumber,
+            passengerEmail: passenger.email,
+            passengerPhone: passenger.phone,
+            specialRequests: passenger.specialRequests,
+            paymentMethod: selectedPaymentMethod.value,
+            totalAmount: legFare
+          }
+          const resp = await airlineApi.createTicket(bookingData)
+          if (resp && (resp.success || resp.ticketId)) {
+            tickets.push(resp)
+          } else {
+            throw new Error(`Error creando boleto (tramo ${legIndex + 1}) para ${passenger.firstName}: ${resp?.error || 'Respuesta inválida'}`)
+          }
+        }
       } else {
-        throw new Error(`Error creando boleto para ${passenger.firstName}: ${response?.error || 'Respuesta inválida del servidor'}`)
+        // Vuelo directo: un boleto
+        const bookingData = {
+          flightId: flight.value.idFlight,
+          userId: currentUser.value?.idUser || 1,
+          seatNumber: selectedSeat.value ? `${selectedSeat.value}${i > 0 ? i + 1 : ''}` : 'AUTO',
+          seatCategory: selectedCategory.value,
+          fare: selectedPrice.value,
+          passengerFirstName: passenger.firstName,
+          passengerLastName: passenger.lastName,
+          passengerDocumentType: passenger.documentType,
+          passengerDocumentNumber: passenger.documentNumber,
+          passengerEmail: passenger.email,
+          passengerPhone: passenger.phone,
+          specialRequests: passenger.specialRequests,
+          paymentMethod: selectedPaymentMethod.value,
+          totalAmount: selectedPrice.value
+        }
+        const response = await airlineApi.createTicket(bookingData)
+        if (response && (response.success || response.ticketId)) {
+          tickets.push(response)
+        } else {
+          throw new Error(`Error creando boleto para ${passenger.firstName}: ${response?.error || 'Respuesta inválida del servidor'}`)
+        }
       }
     }
-    
-    // All tickets created successfully
+
+    // Totales (si es con escala, sumar tarifas de ambos tramos)
+    const totalPerPassenger = isOneStop
+      ? (Number(flight.value?._legs?.[0]?.fares?.[selectedCategory.value] || flight.value?._legs?.[0]?.basePrice || 0) +
+         Number(flight.value?._legs?.[1]?.fares?.[selectedCategory.value] || flight.value?._legs?.[1]?.basePrice || 0))
+      : selectedPrice.value
+
     bookingResult.value = {
       success: true,
-      tickets: tickets,
-      totalAmount: totalAmount.value * passengerForms.value.length
+      tickets,
+      totalAmount: totalPerPassenger * passengerForms.value.length
     }
     bookingSuccess.value = true
     closeBookingForm()
+    
+    // Refrescar availableSeats del vuelo desde backend y emitir evento global
+    try {
+      const fresh = await airlineApi.getFlight(flight.value.idFlight)
+      if (fresh && (fresh.flight || fresh)) {
+        const updated = fresh.flight ? fresh.flight : fresh
+        if (updated.availableSeats !== undefined) {
+          flight.value.availableSeats = updated.availableSeats
+          // Notificar a otras vistas (listado, etc.)
+          eventBus.emit('inventory:updated', {
+            flightId: flight.value.idFlight,
+            availableSeats: updated.availableSeats
+          })
+        }
+      }
+    } catch (e) {
+      console.warn('No se pudo refrescar availableSeats:', e)
+    }
     
   } catch (err) {
     error.value = 'Error procesando la reserva: ' + (err as Error).message
@@ -1020,10 +1157,10 @@ const getCityCode = (cityName: string) => {
   return cityName.split(' ').map(word => word.charAt(0)).join('').toUpperCase().substring(0, 3)
 }
 
-const formatDate = (dateStr: string) => {
-  if (!dateStr) return '--'
+const formatDate = (dateStr: string | number | null | undefined) => {
+  if (!dateStr && dateStr !== 0) return '--'
   try {
-    const date = new Date(dateStr)
+    const date = new Date(String(dateStr))
     return date.toLocaleDateString('es-ES', { 
       weekday: 'short', 
       day: 'numeric', 
@@ -1034,13 +1171,15 @@ const formatDate = (dateStr: string) => {
   }
 }
 
-const formatTime = (timeStr: string) => {
-  if (!timeStr) return '--:--'
-  return timeStr
+const formatTime = (timeStr: string | number | null | undefined) => {
+  if (!timeStr && timeStr !== 0) return '--:--'
+  return String(timeStr)
 }
 
-const formatPrice = (price: number) => {
-  return price.toFixed(2)
+const formatPrice = (price: number | string) => {
+  const n = Number(price)
+  if (Number.isNaN(n)) return '0.00'
+  return n.toFixed(2)
 }
 
 const calculateDuration = (flight: any) => {
@@ -1203,15 +1342,19 @@ const getSeatLocation = (seat: string) => {
   return `${row}${number}`
 }
 
-const getAvailableSeatsCount = (category: string) => {
-  if (!availableSeats.value || !availableSeats.value[category]) return 0
-  return availableSeats.value[category].length
-}
+// const getAvailableSeatsCount = (category: string) => {
+//   if (!availableSeats.value || !availableSeats.value[category]) return 0
+//   return availableSeats.value[category].length
+// }
 
 // Lifecycle
 onMounted(() => {
   console.log('🚀 Componente flight-details montado')
   console.log('🔍 Flight ID de la URL:', flightId)
+  try {
+    const u = localStorage.getItem('user')
+    if (u) currentUserId.value = JSON.parse(u)?.idUser || null
+  } catch {}
   loadFlightDetails()
 })
 
@@ -1578,6 +1721,16 @@ watch(error, (newError) => {
   color: #1f2937;
   margin-bottom: 1.5rem;
   font-size: 1.5rem;
+}
+
+.badge-one-stop {
+  display: inline-block;
+  margin-left: 0.5rem;
+  font-size: 0.875rem;
+  background: #f59e0b;
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.375rem;
 }
 
 .main-flight-card {

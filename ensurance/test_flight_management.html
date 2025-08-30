@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Pruebas de Gestión de Vuelos</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .test-section {
+            background: white;
+            margin-bottom: 20px;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .test-section h3 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            margin-right: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary { background: #3498db; color: white; }
+        .btn-primary:hover { background: #2980b9; }
+        
+        .btn-success { background: #27ae60; color: white; }
+        .btn-success:hover { background: #229954; }
+        
+        .btn-warning { background: #f39c12; color: white; }
+        .btn-warning:hover { background: #e67e22; }
+        
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-danger:hover { background: #c0392b; }
+        
+        .btn-info { background: #17a2b8; color: white; }
+        .btn-info:hover { background: #138496; }
+        
+        .response {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 15px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .response.success { border-color: #28a745; background: #d4edda; }
+        .response.error { border-color: #dc3545; background: #f8d7da; }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-success { background: #28a745; }
+        .status-error { background: #dc3545; }
+        .status-pending { background: #ffc107; }
+        
+        .config-section {
+            background: #e8f4fd;
+            border: 1px solid #bee5eb;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .config-section h4 {
+            margin-top: 0;
+            color: #0c5460;
+        }
+        
+        .config-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .config-row input {
+            flex: 1;
+        }
+        
+        .config-row button {
+            padding: 8px 16px;
+            background: #17a2b8;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧪 Pruebas de Gestión de Vuelos</h1>
+        <p>Sistema completo de gestión CRUD para vuelos de aerolínea</p>
+    </div>
+
+    <!-- Configuración de API -->
+    <div class="config-section">
+        <h4>⚙️ Configuración de API</h4>
+        <div class="config-row">
+            <label>IP del servidor:</label>
+            <input type="text" id="apiIp" value="localhost" placeholder="localhost">
+            <label>Puerto:</label>
+            <input type="text" id="apiPort" value="8080" placeholder="8080">
+            <button onclick="updateConfig()">Actualizar Config</button>
+        </div>
+        <div class="config-row">
+            <label>URL Base:</label>
+            <input type="text" id="baseUrl" readonly>
+            <button onclick="testConnection()">Probar Conexión</button>
+        </div>
+    </div>
+
+    <!-- Prueba de Conexión -->
+    <div class="test-section">
+        <h3>🔌 Estado de la API</h3>
+        <button class="btn btn-info" onclick="checkApiStatus()">Verificar Estado</button>
+        <div id="apiStatus" class="response"></div>
+    </div>
+
+    <!-- Obtener Vuelos -->
+    <div class="test-section">
+        <h3>📋 Obtener Vuelos</h3>
+        <button class="btn btn-primary" onclick="getFlights()">Obtener Todos los Vuelos</button>
+        <div id="getFlightsResponse" class="response"></div>
+    </div>
+
+    <!-- Crear Vuelo -->
+    <div class="test-section">
+        <h3>✈️ Crear Nuevo Vuelo</h3>
+        <form id="createFlightForm">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Número de Vuelo:</label>
+                    <input type="text" id="flightNumber" value="TEST001" required>
+                </div>
+                <div class="form-group">
+                    <label>Estado:</label>
+                    <select id="flightStatus" required>
+                        <option value="DRAFT">DRAFT</option>
+                        <option value="PUBLISHED">PUBLISHED</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Ciudad Origen ID:</label>
+                    <input type="number" id="originCityId" value="1" required>
+                </div>
+                <div class="form-group">
+                    <label>Ciudad Destino ID:</label>
+                    <input type="number" id="destinationCityId" value="2" required>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Fecha Salida:</label>
+                    <input type="date" id="departureDate" required>
+                </div>
+                <div class="form-group">
+                    <label>Hora Salida:</label>
+                    <input type="time" id="departureTime" value="10:00" required>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Fecha Llegada:</label>
+                    <input type="date" id="arrivalDate" required>
+                </div>
+                <div class="form-group">
+                    <label>Hora Llegada:</label>
+                    <input type="time" id="arrivalTime" value="12:00" required>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Precio Base:</label>
+                    <input type="number" id="basePrice" value="150.00" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Asientos Disponibles:</label>
+                    <input type="number" id="availableSeats" value="100" min="0" required>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Puerta:</label>
+                    <input type="text" id="gate" value="A1">
+                </div>
+                <div class="form-group">
+                    <label>Terminal:</label>
+                    <input type="text" id="terminal" value="T1">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Tarifas (JSON):</label>
+                <textarea id="fares" rows="3" required>{"ECONOMY": 150.00, "BUSINESS": 300.00, "FIRST_CLASS": 500.00}</textarea>
+            </div>
+            
+            <button type="submit" class="btn btn-success">Crear Vuelo</button>
+        </form>
+        <div id="createFlightResponse" class="response"></div>
+    </div>
+
+    <!-- Editar Vuelo -->
+    <div class="test-section">
+        <h3>✏️ Editar Vuelo</h3>
+        <div class="form-row">
+            <div class="form-group">
+                <label>ID del Vuelo:</label>
+                <input type="number" id="editFlightId" placeholder="Ingrese el ID del vuelo">
+            </div>
+            <div class="form-group">
+                <label>Nuevo Estado:</label>
+                <select id="editFlightStatus">
+                    <option value="DRAFT">DRAFT</option>
+                    <option value="PUBLISHED">PUBLISHED</option>
+                    <option value="CANCELLED">CANCELLED</option>
+                    <option value="COMPLETED">COMPLETED</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label>Nuevo Precio Base:</label>
+                <input type="number" id="editBasePrice" step="0.01" min="0" placeholder="Nuevo precio">
+            </div>
+            <div class="form-group">
+                <label>Nuevos Asientos:</label>
+                <input type="number" id="editAvailableSeats" min="0" placeholder="Nuevos asientos">
+            </div>
+        </div>
+        
+        <button class="btn btn-warning" onclick="editFlight()">Editar Vuelo</button>
+        <div id="editFlightResponse" class="response"></div>
+    </div>
+
+    <!-- Cancelar Vuelo -->
+    <div class="test-section">
+        <h3>🚫 Cancelar Vuelo</h3>
+        <div class="form-row">
+            <div class="form-group">
+                <label>ID del Vuelo:</label>
+                <input type="number" id="cancelFlightId" placeholder="Ingrese el ID del vuelo">
+            </div>
+            <div class="form-group">
+                <label>Motivo de Cancelación:</label>
+                <input type="text" id="cancellationReason" placeholder="Motivo obligatorio" required>
+            </div>
+        </div>
+        <button class="btn btn-danger" onclick="cancelFlight()">Cancelar Vuelo</button>
+        <div id="cancelFlightResponse" class="response"></div>
+    </div>
+
+    <!-- Cambiar Estado -->
+    <div class="test-section">
+        <h3>🔄 Cambiar Estado del Vuelo</h3>
+        <div class="form-row">
+            <div class="form-group">
+                <label>ID del Vuelo:</label>
+                <input type="number" id="statusFlightId" placeholder="Ingrese el ID del vuelo">
+            </div>
+            <div class="form-group">
+                <label>Nuevo Estado:</label>
+                <select id="newFlightStatus">
+                    <option value="DRAFT">DRAFT</option>
+                    <option value="PUBLISHED">PUBLISHED</option>
+                    <option value="CANCELLED">CANCELLED</option>
+                    <option value="COMPLETED">COMPLETED</option>
+                </select>
+            </div>
+        </div>
+        <button class="btn btn-info" onclick="changeFlightStatus()">Cambiar Estado</button>
+        <div id="changeStatusResponse" class="response"></div>
+    </div>
+
+    <!-- Eliminar Vuelo -->
+    <div class="test-section">
+        <h3>🗑️ Eliminar Vuelo</h3>
+        <div class="form-group">
+            <label>ID del Vuelo:</label>
+            <input type="number" id="deleteFlightId" placeholder="Ingrese el ID del vuelo">
+        </div>
+        <button class="btn btn-danger" onclick="deleteFlight()">Eliminar Vuelo</button>
+        <div id="deleteFlightResponse" class="response"></div>
+    </div>
+
+    <script>
+        // Configuración inicial
+        let baseUrl = 'http://localhost:8080';
+        
+        // Establecer fechas por defecto
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date();
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            
+            document.getElementById('departureDate').value = today.toISOString().split('T')[0];
+            document.getElementById('arrivalDate').value = tomorrow.toISOString().split('T')[0];
+            
+            updateBaseUrl();
+        });
+        
+        function updateBaseUrl() {
+            const ip = document.getElementById('apiIp').value;
+            const port = document.getElementById('apiPort').value;
+            baseUrl = `http://${ip}:${port}`;
+            document.getElementById('baseUrl').value = baseUrl;
+        }
+        
+        function updateConfig() {
+            updateBaseUrl();
+            showResponse('apiStatus', 'Configuración actualizada: ' + baseUrl, 'success');
+        }
+        
+        function testConnection() {
+            checkApiStatus();
+        }
+        
+        async function checkApiStatus() {
+            try {
+                const response = await fetch(`${baseUrl}/api/health`);
+                const isOk = response.ok;
+                const status = isOk ? 'success' : 'error';
+                const message = isOk ? 
+                    '✅ API funcionando correctamente' : 
+                    '❌ Error conectando con la API';
+                
+                showResponse('apiStatus', message, status);
+            } catch (error) {
+                showResponse('apiStatus', '❌ Error de conexión: ' + error.message, 'error');
+            }
+        }
+        
+        async function getFlights() {
+            try {
+                const response = await fetch(`${baseUrl}/api/airline/flights`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResponse('getFlightsResponse', 
+                        `✅ Vuelos obtenidos exitosamente\nTotal: ${data.flights.length}\n\n${JSON.stringify(data, null, 2)}`, 
+                        'success');
+                } else {
+                    showResponse('getFlightsResponse', 
+                        `❌ Error obteniendo vuelos: ${data.error}`, 
+                        'error');
+                }
+            } catch (error) {
+                showResponse('getFlightsResponse', '❌ Error de conexión: ' + error.message, 'error');
+            }
+        }
+        
+        // Crear vuelo
+        document.getElementById('createFlightForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const flightData = {
+                flightNumber: document.getElementById('flightNumber').value,
+                status: document.getElementById('flightStatus').value,
+                originCityId: parseInt(document.getElementById('originCityId').value),
+                destinationCityId: parseInt(document.getElementById('destinationCityId').value),
+                departureDate: document.getElementById('departureDate').value,
+                departureTime: document.getElementById('departureTime').value,
+                arrivalDate: document.getElementById('arrivalDate').value,
+                arrivalTime: document.getElementById('arrivalTime').value,
+                basePrice: parseFloat(document.getElementById('basePrice').value),
+                availableSeats: parseInt(document.getElementById('availableSeats').value),
+                gate: document.getElementById('gate').value,
+                terminal: document.getElementById('terminal').value,
+                fares: JSON.parse(document.getElementById('fares').value),
+                createdBy: 1
+            };
+            
+            try {
+                const response = await fetch(`${baseUrl}/api/airline/flights`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(flightData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResponse('createFlightResponse', 
+                        `✅ Vuelo creado exitosamente\n\n${JSON.stringify(data, null, 2)}`, 
+                        'success');
+                    // Limpiar formulario
+                    document.getElementById('createFlightForm').reset();
+                    // Restablecer fechas por defecto
+                    const today = new Date();
+                    const tomorrow = new Date(today);
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    document.getElementById('departureDate').value = today.toISOString().split('T')[0];
+                    document.getElementById('arrivalDate').value = tomorrow.toISOString().split('T')[0];
+                } else {
+                    showResponse('createFlightResponse', 
+                        `❌ Error creando vuelo: ${data.error}`, 
+                        'error');
+                }
+            } catch (error) {
+                showResponse('createFlightResponse', '❌ Error de conexión: ' + error.message, 'error');
+            }
+        });
+        
+        async function editFlight() {
+            const flightId = document.getElementById('editFlightId').value;
+            const newStatus = document.getElementById('editFlightStatus').value;
+            const newBasePrice = document.getElementById('editBasePrice').value;
+            const newAvailableSeats = document.getElementById('editAvailableSeats').value;
+            
+            if (!flightId) {
+                showResponse('editFlightResponse', '❌ Ingrese el ID del vuelo', 'error');
+                return;
+            }
+            
+            const updateData = {
+                updatedBy: 1
+            };
+            
+            if (newStatus) updateData.status = newStatus;
+            if (newBasePrice) updateData.basePrice = parseFloat(newBasePrice);
+            if (newAvailableSeats) updateData.availableSeats = parseInt(newAvailableSeats);
+            
+            try {
+                const response = await fetch(`${baseUrl}/api/airline/flights/${flightId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(updateData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResponse('editFlightResponse', 
+                        `✅ Vuelo editado exitosamente\n\n${JSON.stringify(data, null, 2)}`, 
+                        'success');
+                } else {
+                    showResponse('editFlightResponse', 
+                        `❌ Error editando vuelo: ${data.error}`, 
+                        'error');
+                }
+            } catch (error) {
+                showResponse('editFlightResponse', '❌ Error de conexión: ' + error.message, 'error');
+            }
+        }
+        
+        async function cancelFlight() {
+            const flightId = document.getElementById('cancelFlightId').value;
+            const reason = document.getElementById('cancellationReason').value;
+            
+            if (!flightId || !reason) {
+                showResponse('cancelFlightResponse', '❌ Ingrese el ID del vuelo y el motivo de cancelación', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${baseUrl}/api/airline/flights/${flightId}/cancel`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        cancellationReason: reason,
+                        cancelledBy: 1
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResponse('cancelFlightResponse', 
+                        `✅ Vuelo cancelado exitosamente\n\n${JSON.stringify(data, null, 2)}`, 
+                        'success');
+                } else {
+                    showResponse('cancelFlightResponse', 
+                        `❌ Error cancelando vuelo: ${data.error}`, 
+                        'error');
+                }
+            } catch (error) {
+                showResponse('cancelFlightResponse', '❌ Error de conexión: ' + error.message, 'error');
+            }
+        }
+        
+        async function changeFlightStatus() {
+            const flightId = document.getElementById('statusFlightId').value;
+            const newStatus = document.getElementById('newFlightStatus').value;
+            
+            if (!flightId) {
+                showResponse('changeStatusResponse', '❌ Ingrese el ID del vuelo', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${baseUrl}/api/airline/flights/${flightId}/status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        status: newStatus,
+                        updatedBy: 1
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResponse('changeStatusResponse', 
+                        `✅ Estado del vuelo cambiado exitosamente\n\n${JSON.stringify(data, null, 2)}`, 
+                        'success');
+                } else {
+                    showResponse('changeStatusResponse', 
+                        `❌ Error cambiando estado: ${data.error}`, 
+                        'error');
+                }
+            } catch (error) {
+                showResponse('changeStatusResponse', '❌ Error de conexión: ' + error.message, 'error');
+            }
+        }
+        
+        async function deleteFlight() {
+            const flightId = document.getElementById('deleteFlightId').value;
+            
+            if (!flightId) {
+                showResponse('deleteFlightResponse', '❌ Ingrese el ID del vuelo', 'error');
+                return;
+            }
+            
+            if (!confirm(`¿Está seguro de que desea eliminar el vuelo ${flightId}? Esta acción no se puede deshacer.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${baseUrl}/api/airline/flights/${flightId}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResponse('deleteFlightResponse', 
+                        `✅ Vuelo eliminado exitosamente\n\n${JSON.stringify(data, null, 2)}`, 
+                        'success');
+                } else {
+                    showResponse('deleteFlightResponse', 
+                        `❌ Error eliminando vuelo: ${data.error}`, 
+                        'error');
+                }
+            } catch (error) {
+                showResponse('deleteFlightResponse', '❌ Error de conexión: ' + error.message, 'error');
+            }
+        }
+        
+        function showResponse(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `response ${type}`;
+            element.scrollTop = 0;
+        }
+    </script>
+</body>
+</html>
+
