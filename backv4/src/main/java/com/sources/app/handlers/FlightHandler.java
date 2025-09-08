@@ -1043,7 +1043,7 @@ public class FlightHandler implements HttpHandler {
     /**
      * Maneja la cancelación de un vuelo
      */
-    private String handleCancelFlight(HttpExchange exchange, String flightId) throws IOException {
+    public String handleCancelFlight(HttpExchange exchange, String flightId) throws IOException {
         try {
             String requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
             System.out.println("DEBUG: 🚫 Cancelando vuelo: " + flightId);

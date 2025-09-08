@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.time.LocalDate;
 
 public class TicketDAO {
@@ -442,6 +443,23 @@ public class TicketDAO {
         } catch (Exception e) {
             e.printStackTrace();
             return null;
+        }
+    }
+    
+    /**
+     * Obtiene todos los tickets activos para un vuelo específico
+     * @param flightId ID del vuelo
+     * @return Lista de tickets activos
+     */
+    public List<Ticket> getActiveTicketsByFlightId(Integer flightId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            String hql = "FROM Ticket t WHERE t.flight.idFlight = :flightId AND t.status IN ('RESERVED', 'CONFIRMED')";
+            return session.createQuery(hql, Ticket.class)
+                    .setParameter("flightId", flightId)
+                    .getResultList();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ArrayList<>();
         }
     }
 }

@@ -447,19 +447,37 @@ public class FlightDAO {
      * Cancela un vuelo
      */
     public boolean cancelFlight(Integer flightId, String cancellationReason, Integer cancelledBy) {
+        System.out.println("🚀 FlightDAO.cancelFlight() - Iniciando cancelación");
+        System.out.println("   - Flight ID: " + flightId);
+        System.out.println("   - Reason: " + cancellationReason);
+        System.out.println("   - Cancelled by: " + cancelledBy);
+        
         Transaction tx = null;
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
             tx = session.beginTransaction();
             
             Flight flight = session.get(Flight.class, flightId);
             if (flight == null) {
+                System.out.println("❌ Vuelo no encontrado con ID: " + flightId);
                 return false;
             }
             
             // Verificar que el vuelo puede ser cancelado
-            if (!flight.canBeCancelled()) {
+            System.out.println("🔍 Verificando si el vuelo puede ser cancelado:");
+            System.out.println("   - ID del vuelo: " + flight.getIdFlight());
+            System.out.println("   - Estado actual: " + flight.getStatus());
+            System.out.println("   - Fecha de salida: " + flight.getDepartureDate());
+            System.out.println("   - Fecha actual: " + LocalDate.now());
+            
+            boolean canCancel = flight.canBeCancelled();
+            System.out.println("   - ¿Puede ser cancelado?: " + canCancel);
+            
+            if (!canCancel) {
+                System.out.println("❌ El vuelo no puede ser cancelado");
                 return false;
             }
+            
+            System.out.println("✅ El vuelo puede ser cancelado, procediendo...");
             
             // Actualizar estado del vuelo
             flight.setStatus(Flight.STATUS_CANCELLED);
@@ -472,6 +490,22 @@ public class FlightDAO {
             
             session.merge(flight);
             tx.commit();
+            
+            // Enviar notificaciones por correo a los pasajeros
+            try {
+                System.out.println("📧 Iniciando envío de notificaciones de cancelación...");
+                com.sources.app.services.SimpleEmailService emailService = new com.sources.app.services.SimpleEmailService();
+                boolean emailsSent = emailService.sendFlightCancellationNotifications(flightId, cancellationReason);
+                
+                if (emailsSent) {
+                    System.out.println("✅ Notificaciones de cancelación enviadas exitosamente");
+                } else {
+                    System.out.println("⚠️ Algunas notificaciones no se pudieron enviar");
+                }
+            } catch (Exception emailException) {
+                System.err.println("❌ Error enviando notificaciones de cancelación: " + emailException.getMessage());
+                // No fallar la cancelación si hay error en el correo
+            }
             
             return true;
             

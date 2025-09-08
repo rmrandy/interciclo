@@ -31,6 +31,7 @@ import com.sources.app.dao.InsuranceServiceDAO;
 import com.sources.app.dao.HospitalInsuranceServiceDAO;
 import com.sources.app.dao.EnsuranceAppointmentDAO;
 import com.sources.app.dao.PrescriptionApprovalDAO;
+import com.sources.app.dao.FlightDAO;
 import com.sources.app.entities.User;
 import com.sources.app.handlers.LoginHandler;
 import com.sources.app.handlers.UserHandler;
@@ -123,6 +124,7 @@ public class AirlineServer {
     private HospitalInsuranceServiceDAO hospitalInsuranceServiceDAO;
     private EnsuranceAppointmentDAO ensuranceAppointmentDAO;
     private PrescriptionApprovalDAO prescriptionApprovalDAO;
+    private FlightDAO flightDAO;
     
     // Nuevos handlers
     private LoginHandler loginHandler;
@@ -195,6 +197,7 @@ public class AirlineServer {
         this.hospitalInsuranceServiceDAO = new HospitalInsuranceServiceDAO();
         this.ensuranceAppointmentDAO = new EnsuranceAppointmentDAO();
         this.prescriptionApprovalDAO = new PrescriptionApprovalDAO();
+        this.flightDAO = new FlightDAO();
         
         // Inicializar nuevos handlers
         this.loginHandler = new LoginHandler(userDAO);
@@ -594,13 +597,19 @@ public class AirlineServer {
                 return gson.toJson(Map.of("success", false, "error", "Endpoint temporalmente deshabilitado"));
             }
             
-            // Actualizar vuelo - DESHABILITADO
-            if (path.startsWith("/api/admin/flights/") && method.equals("PUT")) {
-                return gson.toJson(Map.of("success", false, "error", "Endpoint temporalmente deshabilitado"));
+            // Cancelar vuelo - HABILITADO (debe ir ANTES del endpoint general de PUT)
+            if (path.startsWith("/api/admin/flights/") && path.endsWith("/cancel") && method.equals("PUT")) {
+                String[] pathParts = path.split("/");
+                if (pathParts.length >= 6) {
+                    String flightId = pathParts[4];
+                    return handleCancelFlight(body, flightId);
+                } else {
+                    return gson.toJson(Map.of("success", false, "error", "ID de vuelo no válido"));
+                }
             }
             
-            // Cancelar vuelo - DESHABILITADO
-            if (path.startsWith("/api/admin/flights/") && path.endsWith("/cancel") && method.equals("POST")) {
+            // Actualizar vuelo - DESHABILITADO
+            if (path.startsWith("/api/admin/flights/") && method.equals("PUT")) {
                 return gson.toJson(Map.of("success", false, "error", "Endpoint temporalmente deshabilitado"));
             }
             
@@ -1493,5 +1502,49 @@ public class AirlineServer {
         Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
         
         server.start();
+    }
+    
+    /**
+     * Maneja la cancelación de un vuelo
+     */
+    private String handleCancelFlight(String requestBody, String flightId) {
+        try {
+            System.out.println("DEBUG: 🚫 Cancelando vuelo: " + flightId);
+            System.out.println("DEBUG: 📝 Body recibido: " + requestBody);
+            
+            JsonObject jsonRequest = JsonParser.parseString(requestBody).getAsJsonObject();
+            
+            // Validar campos requeridos para cancelación
+            if (!jsonRequest.has("cancellationReason") || jsonRequest.get("cancellationReason").getAsString().trim().isEmpty()) {
+                return gson.toJson(Map.of("success", false, "error", "Motivo de cancelación es requerido"));
+            }
+            
+            if (!jsonRequest.has("cancelledBy") || jsonRequest.get("cancelledBy").getAsInt() <= 0) {
+                return gson.toJson(Map.of("success", false, "error", "ID del usuario que cancela es requerido"));
+            }
+            
+            Integer id = Integer.parseInt(flightId);
+            String cancellationReason = jsonRequest.get("cancellationReason").getAsString();
+            Integer cancelledBy = jsonRequest.get("cancelledBy").getAsInt();
+            
+            // Cancelar el vuelo usando el DAO
+            boolean success = flightDAO.cancelFlight(id, cancellationReason, cancelledBy);
+            
+            if (success) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", true);
+                response.put("message", "Vuelo cancelado exitosamente");
+                response.put("flightId", id);
+                return gson.toJson(response);
+            } else {
+                return gson.toJson(Map.of("success", false, "error", "No se pudo cancelar el vuelo"));
+            }
+            
+        } catch (NumberFormatException e) {
+            return gson.toJson(Map.of("success", false, "error", "ID de vuelo inválido"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return gson.toJson(Map.of("success", false, "error", "Error cancelando vuelo: " + e.getMessage()));
+        }
     }
 }

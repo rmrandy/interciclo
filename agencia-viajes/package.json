@@ -1,0 +1,29 @@
+{
+  "name": "agencia-viajes",
+  "version": "1.0.0",
+  "description": "Sistema completo de agencia de viajes con React + Node.js + MongoDB",
+  "main": "index.js",
+  "scripts": {
+    "start": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "backend": "cd backend && npm run dev",
+    "frontend": "cd frontend && npm start",
+    "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "build": "cd backend && npm run build && cd ../frontend && npm run build",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "setup": "npm run install-all && echo 'Setup completado. Ejecuta npm start para iniciar ambos servicios.'"
+  },
+  "keywords": [
+    "travel",
+    "agency",
+    "flights",
+    "react",
+    "nodejs",
+    "mongodb",
+    "typescript"
+  ],
+  "author": "Agencia de Viajes",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

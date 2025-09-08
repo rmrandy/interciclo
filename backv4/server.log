@@ -2,37 +2,23 @@ WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
 WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.google.inject.internal.aop.HiddenClassDefiner (file:/opt/homebrew/Cellar/maven/3.9.10/libexec/lib/guice-5.1.0-classes.jar)
 WARNING: Please consider reporting this to the maintainers of class com.google.inject.internal.aop.HiddenClassDefiner
 WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
-Aug 24, 2025 8:00:30 PM org.hibernate.Version logVersion
-INFO: HHH000412: Hibernate ORM core version 6.6.6.Final
-Aug 24, 2025 8:00:30 PM org.hibernate.cache.internal.RegionFactoryInitiator initiateService
-INFO: HHH000026: Second-level cache disabled
-Aug 24, 2025 8:00:30 PM org.hibernate.engine.jdbc.connections.internal.ConnectionProviderInitiator instantiateC3p0Provider
-WARN: HHH000022: c3p0 properties were encountered, but the c3p0 provider class was not found on the classpath; these properties are going to be ignored.
-Aug 24, 2025 8:00:30 PM org.hibernate.engine.jdbc.connections.internal.DriverManagerConnectionProviderImpl configure
-WARN: HHH10001002: Using built-in connection pool (not intended for production use)
-Aug 24, 2025 8:00:31 PM org.hibernate.engine.jdbc.dialect.internal.DialectFactoryImpl constructDialect
-WARN: HHH90000025: OracleDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
-Aug 24, 2025 8:00:31 PM org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator initiateService
-INFO: HHH10001005: Database info:
-	Database JDBC URL [jdbc:oracle:thin:@//64.225.58.196:1521/XEPDB1]
-	Database driver: oracle.jdbc.driver.OracleDriver
-	Database version: 21.0
-	Autocommit mode: false
-	Isolation level: READ_COMMITTED
-	Minimum pool size: 1
-	Maximum pool size: 10
-Aug 24, 2025 8:00:32 PM org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator initiateService
-INFO: HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
-Conexión exitosa a la base de datos!
-Iniciando servidor en puerto: 8080
-Verificando servicios expirados...
-Hibernate: select u1_0.ID_USER,u1_0.ADDRESS,u1_0.AGE,u1_0.BIRTHDATE,u1_0.COUNTRY,u1_0.CREATED_AT,u1_0.CUI,u1_0.EMAIL,u1_0.ENABLED,u1_0.EXPIRATION_DATE,u1_0.FIRST_NAME,u1_0.LAST_NAME,u1_0.NAME,u1_0.PAID_SERVICE,u1_0.PASSPORT_NUMBER,u1_0.PASSWORD,u1_0.PHONE,u1_0.ROL from USERS u1_0 where u1_0.PAID_SERVICE=1 and u1_0.EXPIRATION_DATE<?
-Servicios expirados actualizados: 0
-Se actualizaron 0 usuarios con servicios expirados.
-[ERROR] Failed to execute goal org.codehaus.mojo:exec-maven-plugin:3.5.1:java (default-cli) on project backv4: An exception occurred while executing the Java class. Address already in use -> [Help 1]
-[ERROR] 
-[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
-[ERROR] Re-run Maven using the -X switch to enable full debug logging.
-[ERROR] 
-[ERROR] For more information about the errors and possible solutions, please read the following articles:
-[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -----------------------< com.sources.app:backv4 >-----------------------
+[INFO] Building backv4 1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- exec:3.5.1:java (default-cli) @ backv4 ---
+Sep 04, 2025 3:16:30 PM com.sources.app.handlers.NotificationHandler loadMailProperties
+INFO: Propiedades de correo cargadas correctamente desde mail.properties
+Sep 04, 2025 3:16:30 PM com.sources.app.handlers.NotificationHandler <init>
+INFO: NotificationHandler inicializado.
+Error al iniciar el servidor: Address already in use
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  0.309 s
+[INFO] Finished at: 2025-09-04T15:16:30-06:00
+[INFO] ------------------------------------------------------------------------
+🛑 Servidor detenido

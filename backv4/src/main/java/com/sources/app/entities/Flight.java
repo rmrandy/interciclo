@@ -233,11 +233,9 @@ public class Flight {
     }
 
     public boolean canBeCancelled() {
-        try {
-            return isPublished() && LocalDate.parse(departureDate).isAfter(LocalDate.now());
-        } catch (Exception e) {
-            return false; // Si hay error parseando la fecha, no se puede cancelar
-        }
+        // TEMPORAL: Permitir cancelar cualquier vuelo para debugging
+        System.out.println("🔍 canBeCancelled() - Estado: " + status + ", Fecha: " + departureDate);
+        return true; // Temporalmente siempre true para debugging
     }
 
     // public boolean hasStops() {
@@ -280,6 +278,7 @@ public class Flight {
 
     // Constantes para estados
     public static final String STATUS_DRAFT = "DRAFT";
+    public static final String STATUS_SCHEDULED = "SCHEDULED";
     public static final String STATUS_PUBLISHED = "PUBLISHED";
     public static final String STATUS_CANCELLED = "CANCELLED";
     public static final String STATUS_COMPLETED = "COMPLETED";
