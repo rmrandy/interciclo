@@ -474,6 +474,121 @@ def proxy_airline_ticket_by_id(request, ticket_id: str):
         return JsonResponse({ 'success': False, 'message': data['error'] }, status=502)
     return JsonResponse(data)
 
+
+@csrf_exempt
+def proxy_airline_flight_reviews(request, flight_id: str):
+    if request.method != 'GET':
+        return JsonResponse({ 'success': False, 'message': 'Método no permitido' }, status=405)
+    base = airline_origin_base()
+    params = request.GET.dict()
+    # forzar mode=tree si se solicita tree
+    qs = {}
+    qs.update(params)
+    data = safe_get(f"{base}/airline/flights/{flight_id}/reviews", params=qs)
+    if 'error' in data:
+        return JsonResponse({ 'success': False, 'message': data['error'] }, status=502)
+    # normalizar campos para front
+    try:
+        def normalize_node(r):
+            # El backend puede usar 'reviewText' para el comentario, y datos del usuario dentro de 'user'
+            author = r.get('authorName') or ( (r.get('user') or {}).get('firstName', '') + ' ' + (r.get('user') or {}).get('lastName','') ).strip() or (r.get('user') or {}).get('name') or 'Usuario'
+            children = r.get('children') or []
+            return {
+                'id': r.get('idReview') or r.get('id'),
+                'authorName': author,
+                'rating': r.get('rating') or 0,
+                'comment': r.get('comment') or r.get('reviewText') or r.get('text') or '',
+                'children': [ normalize_node(c) for c in children ]
+            }
+        items = data.get('reviews') if isinstance(data, dict) else data
+        norm = [ normalize_node(r) for r in (items or []) ]
+        return JsonResponse({ 'success': True, 'reviews': norm })
+    except Exception:
+        return JsonResponse(data if isinstance(data, dict) else { 'success': True, 'reviews': data })
+
+
+# ================== REVIEWS PROPIAS DE LA AGENCIA (Mongo) ==================
+
+def build_tree(items):
+    by_id = {str(i.get('_id')): i for i in items}
+    for it in items:
+        it['id'] = str(it.get('_id'))
+        it.pop('_id', None)
+        it['children'] = []
+    roots = []
+    for it in items:
+        pid = it.get('parentId')
+        if pid and str(pid) in by_id:
+            by_id[str(pid)]['children'].append(it)
+        else:
+            roots.append(it)
+    return roots
+
+
+@csrf_exempt
+def agency_reviews_view(request):
+    db = get_db()
+    col = db.get_collection('agency_reviews')
+    if request.method == 'POST':
+        try:
+            data = parse_request_data(request)
+            doc = {
+                'flightId': data.get('flightId'),
+                'ticketId': data.get('ticketId'),
+                'parentId': data.get('parentId'),
+                'authorName': (data.get('authorName') or 'Usuario'),
+                'rating': int(data.get('rating') or 0),
+                'comment': (data.get('comment') or '').strip(),
+                'createdAt': datetime.utcnow(),
+            }
+            res = col.insert_one(doc)
+            out = {
+                'id': str(res.inserted_id),
+                'flightId': doc.get('flightId'),
+                'ticketId': doc.get('ticketId'),
+                'parentId': doc.get('parentId'),
+                'authorName': doc.get('authorName'),
+                'rating': doc.get('rating'),
+                'comment': doc.get('comment'),
+                'createdAt': doc['createdAt'].isoformat() + 'Z',
+            }
+            return JsonResponse({ 'success': True, 'data': out }, status=201)
+        except Exception as e:
+            return JsonResponse({ 'success': False, 'message': f'Error creando comentario: {type(e).__name__}' }, status=500)
+    if request.method == 'GET':
+        q = {}
+        if request.GET.get('flightId'):
+            q['flightId'] = request.GET.get('flightId')
+        if request.GET.get('ticketId'):
+            q['ticketId'] = request.GET.get('ticketId')
+        cur = col.find(q).sort('createdAt', 1)
+        items = list(cur)
+        for it in items:
+            it['_id'] = str(it['_id'])
+        mode = (request.GET.get('mode') or '').strip().lower()
+        if mode == 'tree':
+            tree = build_tree(items)
+            return JsonResponse({ 'success': True, 'reviews': tree, 'mode': 'tree' })
+        return JsonResponse({ 'success': True, 'reviews': items, 'mode': 'flat' })
+    return JsonResponse({ 'success': False, 'message': 'Método no permitido' }, status=405)
+
+
+# --------- Debug: información de conexión a Mongo ---------
+def db_info_view(request):
+    try:
+        db = get_db()
+        cols = sorted(db.list_collection_names())
+        uri = getattr(settings, 'MONGODB_URI', '')
+        safe_uri = uri.split('@')[-1] if '@' in uri else uri
+        return JsonResponse({
+            'success': True,
+            'database': db.name,
+            'collections': cols,
+            'uri_hint': safe_uri,
+        })
+    except Exception as e:
+        return JsonResponse({ 'success': False, 'error': str(e) }, status=500)
+
 @csrf_exempt
 def users_list_view(request):
     db = get_db()

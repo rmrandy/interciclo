@@ -217,6 +217,12 @@ export const integrationsApi = {
     ticketsList: (params) => apiGet(`/integrations/airline/tickets-list${toQuery(params)}`),
     ticketPdf: (ticketId) => apiGetBlob(`/integrations/airline/tickets/${encodeURIComponent(ticketId)}/pdf`),
     ticketById: (ticketId) => apiGet(`/integrations/airline/tickets/${encodeURIComponent(ticketId)}`),
+    flightReviews: (flightId, params) => apiGet(`/integrations/airline/flights/${encodeURIComponent(flightId)}/reviews${toQuery(params)}`),
+};
+
+export const agencyReviewsApi = {
+    list: (params) => apiGet(`/agency/reviews${toQuery(params)}`),
+    create: (payload) => apiPost('/agency/reviews', payload),
 };
 
 // Informative pages (agencia)

@@ -25,6 +25,8 @@ export default function Compra() {
     const [airlineUser, setAirlineUser] = useState(null);
     const [airlineLogin, setAirlineLogin] = useState({ email: '', password: '' });
     const [airlineLoggingIn, setAirlineLoggingIn] = useState(false);
+    const [quantity, setQuantity] = useState(1);
+    const [payment, setPayment] = useState({ cardNumber: '', cardName: '', expiry: '', cvv: '' });
 
 	function update(field, value) { setForm(prev => ({ ...prev, [field]: value })); }
 
@@ -117,6 +119,32 @@ export default function Compra() {
             .finally(() => setAirlineLoggingIn(false));
     }
 
+    function formatCardNumber(value) {
+        const digits = (value || '').replace(/\D+/g, '').slice(0, 16);
+        return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
+    }
+
+    function onCardNumberChange(e) {
+        const v = formatCardNumber(e.target.value);
+        setPayment(prev => ({ ...prev, cardNumber: v }));
+    }
+
+    function onCardNameChange(e) {
+        const v = (e.target.value || '').toUpperCase().slice(0, 26);
+        setPayment(prev => ({ ...prev, cardName: v }));
+    }
+
+    function onExpiryChange(e) {
+        let v = (e.target.value || '').replace(/\D+/g, '').slice(0, 4);
+        if (v.length >= 3) v = v.slice(0, 2) + '/' + v.slice(2);
+        setPayment(prev => ({ ...prev, expiry: v }));
+    }
+
+    function onCvvChange(e) {
+        const v = (e.target.value || '').replace(/\D+/g, '').slice(0, 4);
+        setPayment(prev => ({ ...prev, cvv: v }));
+    }
+
 	function comprar(e) {
 		e.preventDefault();
         setError(''); setSuccess(null);
@@ -134,6 +162,7 @@ export default function Compra() {
             seatNumber: form.seatNumber || 'AUTO',
             seatCategory: form.seatCategory,
             fare:  Number(params.get('precio') || 0) || 0,
+            quantity: Number.isFinite(Number(quantity)) ? Math.max(1, Math.min(9, Number(quantity))) : 1,
             passengerFirstName: form.firstName,
             passengerLastName: form.lastName,
             passengerDocumentType: 'ID_CARD',
@@ -142,7 +171,7 @@ export default function Compra() {
             passengerPhone: form.phone || '',
             specialRequests: '',
             paymentMethod: 'CREDIT_CARD',
-            totalAmount: Number(params.get('precio') || 0) || 0,
+            totalAmount: (Number(params.get('precio') || 0) || 0) * (Number(quantity) || 1),
         };
         setLoading(true);
         integrationsApi.createTicket(payload)
@@ -230,24 +259,32 @@ export default function Compra() {
                         {seatsError && <div className="small" style={{ color:'salmon', marginTop:4 }}>{seatsError}</div>}
                     </label>
                 </div>
+                <label className="field">
+                    <span className="label">Cantidad</span>
+                    <input className="input" inputMode="numeric" value={quantity} onChange={e => setQuantity(() => {
+                        const v = (e.target.value || '').replace(/\D+/g, '');
+                        const n = Math.max(1, Math.min(9, Number(v || 1)));
+                        return n;
+                    })} />
+                </label>
                 <div className="card" style={{ border:'1px dashed #d1d5db' }}>
                     <h3>Pago con tarjeta</h3>
                     <div className="grid-2">
                         <label className="field">
                             <span className="label">Número de tarjeta</span>
-                            <input className="input" inputMode="numeric" placeholder="4111 1111 1111 1111" required />
+                            <input className="input" inputMode="numeric" value={payment.cardNumber} onChange={onCardNumberChange} placeholder="4111 1111 1111 1111" required />
                         </label>
                         <label className="field">
                             <span className="label">Nombre en la tarjeta</span>
-                            <input className="input" placeholder="Como aparece en la tarjeta" required />
+                            <input className="input" value={payment.cardName} onChange={onCardNameChange} placeholder="Como aparece en la tarjeta" required />
                         </label>
                         <label className="field">
                             <span className="label">Expira (MM/AA)</span>
-                            <input className="input" placeholder="12/30" required />
+                            <input className="input" inputMode="numeric" value={payment.expiry} onChange={onExpiryChange} placeholder="MM/AA" required />
                         </label>
                         <label className="field">
                             <span className="label">CVV</span>
-                            <input className="input" inputMode="numeric" placeholder="123" required />
+                            <input className="input" inputMode="numeric" value={payment.cvv} onChange={onCvvChange} placeholder="123" required />
                         </label>
                     </div>
                 </div>

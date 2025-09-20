@@ -3,6 +3,7 @@ package com.sources.app.util;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
 import com.sources.app.entities.User;
+import com.sources.app.entities.ClickEvent;
 
 /**
  * Clase de utilidad para gestionar la SessionFactory de Hibernate.
@@ -21,6 +22,7 @@ public class HibernateUtil {
             return new Configuration()
                     .configure() // Carga hibernate.cfg.xml
                     .addAnnotatedClass(User.class) // Registra la entidad User
+                    .addAnnotatedClass(ClickEvent.class) // Registra la entidad de analítica
                     .buildSessionFactory();
         } catch (Throwable ex) {
             throw new ExceptionInInitializerError(ex);

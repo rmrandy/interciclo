@@ -24,7 +24,7 @@ public class AnalyticsDAO {
 
     public java.util.List<ClickEvent> listClicks(String fromIso, String toIso, Integer userId, String pathLike, int limit) {
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
-            StringBuilder hql = new StringBuilder("FROM ClickEvent ce WHERE 1=1");
+            StringBuilder hql = new StringBuilder("FROM com.sources.app.entities.ClickEvent ce WHERE 1=1");
             java.util.Map<String, Object> params = new java.util.HashMap<>();
 
             if (fromIso != null && !fromIso.isBlank()) {

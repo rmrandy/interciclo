@@ -54,6 +54,8 @@
         <mapping class="com.sources.app.entities.FlightInventory"/>
         <mapping class="com.sources.app.entities.FlightFare"/>
         <mapping class="com.sources.app.entities.FlightReview"/>
+        <!-- Entidad para analítica de clics -->
+        <mapping class="com.sources.app.entities.ClickEvent"/>
 
     </session-factory>
 </hibernate-configuration>

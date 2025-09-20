@@ -478,16 +478,36 @@ public class TicketHandler implements HttpHandler {
                 return;
             }
 
-            // Sin dependencia de PDFBox, responder 501
-            String json = gson.toJson(Map.of(
-                "success", false,
-                "error", "Generación de PDF no disponible"
-            ));
-            byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().add("Content-Type", "application/json; charset=UTF-8");
-            exchange.sendResponseHeaders(501, bytes.length);
-            try (OutputStream os = exchange.getResponseBody()) { os.write(bytes); }
-            return;
+            // Generar PDF sencillo con PDFBox
+            org.apache.pdfbox.pdmodel.PDDocument doc = new org.apache.pdfbox.pdmodel.PDDocument();
+            org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage();
+            doc.addPage(page);
+
+            org.apache.pdfbox.pdmodel.PDPageContentStream cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(doc, page);
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 18);
+            cs.newLineAtOffset(72, 720);
+            cs.showText("Ticket de vuelo #" + t.getIdTicket());
+            cs.endText();
+
+            float y = 700;
+            y = writeLine(cs, 12, 72, y, "Vuelo: " + t.getFlight().getFlightNumber());
+            y = writeLine(cs, 12, 72, y, "Ruta: " + t.getFlight().getOriginCity().getName() + " → " + t.getFlight().getDestinationCity().getName());
+            y = writeLine(cs, 12, 72, y, "Salida: " + t.getFlight().getDepartureDate() + " " + t.getFlight().getDepartureTime());
+            y = writeLine(cs, 12, 72, y, "Pasajero: " + t.getPassengerFirstName() + " " + t.getPassengerLastName());
+            y = writeLine(cs, 12, 72, y, "Categoría: " + t.getSeatCategory() + "  Asiento: " + (t.getSeatNumber() != null ? t.getSeatNumber() : "AUTO"));
+            y = writeLine(cs, 12, 72, y, "Total: $" + t.getTotalAmount());
+            cs.close();
+
+            java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+            doc.save(baos);
+            doc.close();
+            byte[] pdf = baos.toByteArray();
+
+            exchange.getResponseHeaders().add("Content-Type", "application/pdf");
+            exchange.getResponseHeaders().add("Content-Disposition", "attachment; filename=Ticket-" + t.getIdTicket() + ".pdf");
+            exchange.sendResponseHeaders(200, pdf.length);
+            try (OutputStream os = exchange.getResponseBody()) { os.write(pdf); }
         } catch (Exception e) {
             e.printStackTrace();
             String err = gson.toJson(Map.of("success", false, "error", "Error generando PDF: " + e.getMessage()));
@@ -496,6 +516,16 @@ public class TicketHandler implements HttpHandler {
             exchange.sendResponseHeaders(500, bytes.length);
             try (OutputStream os = exchange.getResponseBody()) { os.write(bytes); }
         }
+    }
+
+    private float writeLine(org.apache.pdfbox.pdmodel.PDPageContentStream cs, int fontSize, float x, float y, String text) throws IOException {
+        y -= 18;
+        cs.beginText();
+        cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, fontSize);
+        cs.newLineAtOffset(x, y);
+        cs.showText(text);
+        cs.endText();
+        return y;
     }
     
     private boolean validateCreateTicketRequest(JsonObject jsonRequest) {

@@ -37,7 +37,10 @@ public class AnalyticsHandler implements HttpHandler {
                 ClickEvent ev = new ClickEvent();
                 ev.setUserId(json.has("userId") && !json.get("userId").isJsonNull() ? json.get("userId").getAsInt() : null);
                 ev.setSessionId(json.has("sessionId") ? json.get("sessionId").getAsString() : null);
-                ev.setEventTime(java.time.OffsetDateTime.now().toString());
+                java.time.OffsetDateTime now = java.time.OffsetDateTime.now().withNano(0);
+                String iso = now.format(java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+                // Por seguridad, recortar a 30 caracteres si excede
+                ev.setEventTime(iso.length() > 30 ? iso.substring(0, 30) : iso);
                 ev.setUrlPath(json.has("urlPath") ? json.get("urlPath").getAsString() : null);
                 ev.setFullUrl(json.has("fullUrl") ? json.get("fullUrl").getAsString() : null);
                 ev.setPageTitle(json.has("pageTitle") ? json.get("pageTitle").getAsString() : null);

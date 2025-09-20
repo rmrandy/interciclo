@@ -70,7 +70,7 @@ export default function MyBookings() {
 						</div>
 						<div className="small">Vuelo: {t.flightNumber} • Fecha: {t.departureDate} {t.departureTime}</div>
 						<div className="small">Pasajero: {t.passengerName} • Categoría: {t.seatCategory} • Asiento: {t.seatNumber || 'AUTO'}</div>
-						<div className="small">Total: ${t.totalAmount}</div>
+						<div className="small">Total: ${t.totalAmount} {t.reservationCode ? `• Código: ${t.reservationCode}` : ''}</div>
 						<div style={{ display:'flex', gap:8, marginTop:8, justifyContent:'flex-end' }}>
 							<Link className="btn" to={`/reserva/${t.idTicket}`}>Ver detalle</Link>
 							<button className="btn" onClick={() => downloadPdf(t.idTicket)}>Descargar PDF</button>

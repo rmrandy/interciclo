@@ -434,6 +434,15 @@ function navigateToInformativePages() {
                 </svg>
                 Páginas Informativas
               </button>
+              <button 
+                @click="() => router.push('/admin/analytics')" 
+                class="block w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              >
+                <svg class="w-4 h-4 text-fuchsia-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M3 3h2v14H3zM7 9h2v8H7zM11 6h2v11h-2zM15 12h2v5h-2z"/>
+                </svg>
+                Analítica
+              </button>
             </div>
           </div>
         
