@@ -9,8 +9,9 @@ export default function ProtectedRoute({ children, roles }) {
 		return <Navigate to="/login" state={{ from: location }} replace />;
 	}
 	if (roles && Array.isArray(roles) && roles.length > 0) {
-		const role = user.role || 'user';
-		if (!roles.includes(role)) {
+        const role = String(user.role || 'user').toLowerCase();
+        const allowed = roles.map(r => String(r).toLowerCase());
+        if (!allowed.includes(role)) {
 			return <Navigate to="/forbidden" replace />;
 		}
 	}

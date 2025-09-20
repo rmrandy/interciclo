@@ -20,6 +20,13 @@ export FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 export DJANGO_DEBUG=1
 export DJANGO_SECRET_KEY="dev-secret-key"
 
+# Forzar destino del backend de Aerolínea (proxy) según petición del usuario
+# Estos valores son leídos por airline_origin_base() en api/views.py
+export AIRLINE_PROTOCOL="http"
+export AIRLINE_HOST="172.16.56.36"
+export AIRLINE_PORT="8080"
+export AIRLINE_BASE_PATH="/api"
+
 echo "🌐 Django servirá API en http://${IP}:5001"
 
 # Verificar que Django esté instalado

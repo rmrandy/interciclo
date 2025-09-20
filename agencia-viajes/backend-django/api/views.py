@@ -427,10 +427,18 @@ def proxy_airline_login(request):
         return JsonResponse({ 'success': False, 'message': 'Método no permitido' }, status=405)
     base = airline_origin_base(request)
     payload = parse_request_data(request)
-    data = safe_post(f"{base}/airline/login", json_body=payload)
-    if 'error' in data:
-        return JsonResponse({ 'success': False, 'message': data['error'] }, status=502)
-    return JsonResponse(data)
+    try:
+        r = requests.post(f"{base}/airline/login", json=payload, timeout=(3.0, airline_timeout_seconds()))
+        content_type = r.headers.get('content-type', 'application/json')
+        if 'application/json' in content_type:
+            try:
+                body = r.json()
+            except Exception:
+                body = {}
+            return JsonResponse(body, status=r.status_code)
+        return HttpResponse(r.content, content_type=content_type, status=r.status_code)
+    except Exception as e:
+        return JsonResponse({ 'success': False, 'message': str(e) }, status=502)
 
 
 @csrf_exempt
@@ -439,10 +447,18 @@ def proxy_airline_register(request):
         return JsonResponse({ 'success': False, 'message': 'Método no permitido' }, status=405)
     base = airline_origin_base(request)
     payload = parse_request_data(request)
-    data = safe_post(f"{base}/airline/register", json_body=payload)
-    if 'error' in data:
-        return JsonResponse({ 'success': False, 'message': data['error'] }, status=502)
-    return JsonResponse(data)
+    try:
+        r = requests.post(f"{base}/airline/register", json=payload, timeout=(3.0, airline_timeout_seconds()))
+        content_type = r.headers.get('content-type', 'application/json')
+        if 'application/json' in content_type:
+            try:
+                body = r.json()
+            except Exception:
+                body = {}
+            return JsonResponse(body, status=r.status_code)
+        return HttpResponse(r.content, content_type=content_type, status=r.status_code)
+    except Exception as e:
+        return JsonResponse({ 'success': False, 'message': str(e) }, status=502)
 
 
 @csrf_exempt

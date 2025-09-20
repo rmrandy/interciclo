@@ -37,8 +37,9 @@ export function AuthProvider({ children }) {
         const userObj = res?.user || res?.data?.user;
         const tokenVal = res?.token || res?.data?.token || null;
         if (userObj) {
-            try { localStorage.setItem('user', JSON.stringify(userObj)); } catch {}
-            setAuth({ token: tokenVal, user: userObj });
+            const normalizedUser = { ...userObj, role: String(userObj.role || 'user').toLowerCase() };
+            try { localStorage.setItem('user', JSON.stringify(normalizedUser)); } catch {}
+            setAuth({ token: tokenVal, user: normalizedUser });
             return { ok: true };
         }
         return { ok: false, message: res?.message || 'Credenciales inválidas' };
@@ -49,8 +50,9 @@ export function AuthProvider({ children }) {
         const userObj = res?.user || res?.data?.user;
         const tokenVal = res?.token || res?.data?.token || null;
         if (userObj) {
-            try { localStorage.setItem('user', JSON.stringify(userObj)); } catch {}
-            setAuth({ token: tokenVal, user: userObj });
+            const normalizedUser = { ...userObj, role: String(userObj.role || 'user').toLowerCase() };
+            try { localStorage.setItem('user', JSON.stringify(normalizedUser)); } catch {}
+            setAuth({ token: tokenVal, user: normalizedUser });
             return { ok: true };
         }
         return { ok: false, message: res?.message || 'Registro fallido' };
