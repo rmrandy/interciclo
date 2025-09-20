@@ -18,9 +18,15 @@ public class AnalyticsHandler implements HttpHandler {
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
-        exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "POST, OPTIONS");
-        exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type");
+        String origin = getHeader(exchange, "Origin");
+        if (origin == null || origin.isBlank()) origin = "*";
+        // CORS dinámico: reflejar Origin cuando existe y permitir credenciales
+        exchange.getResponseHeaders().set("Vary", "Origin");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", origin);
+        exchange.getResponseHeaders().set("Access-Control-Allow-Credentials", "true");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        exchange.getResponseHeaders().set("Access-Control-Max-Age", "86400");
         if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
             exchange.sendResponseHeaders(204, -1);
             return;
@@ -35,24 +41,24 @@ public class AnalyticsHandler implements HttpHandler {
                 JsonObject json = JsonParser.parseString(body).getAsJsonObject();
 
                 ClickEvent ev = new ClickEvent();
-                ev.setUserId(json.has("userId") && !json.get("userId").isJsonNull() ? json.get("userId").getAsInt() : null);
-                ev.setSessionId(json.has("sessionId") ? json.get("sessionId").getAsString() : null);
+                ev.setUserId(getAsInteger(json, "userId"));
+                ev.setSessionId(truncate(getAsString(json, "sessionId"), 100));
                 java.time.OffsetDateTime now = java.time.OffsetDateTime.now().withNano(0);
                 String iso = now.format(java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME);
                 // Por seguridad, recortar a 30 caracteres si excede
                 ev.setEventTime(iso.length() > 30 ? iso.substring(0, 30) : iso);
-                ev.setUrlPath(json.has("urlPath") ? json.get("urlPath").getAsString() : null);
-                ev.setFullUrl(json.has("fullUrl") ? json.get("fullUrl").getAsString() : null);
-                ev.setPageTitle(json.has("pageTitle") ? json.get("pageTitle").getAsString() : null);
-                ev.setElementTag(json.has("elementTag") ? json.get("elementTag").getAsString() : null);
-                ev.setElementIdAttr(json.has("elementId") ? json.get("elementId").getAsString() : null);
-                ev.setElementClasses(json.has("elementClasses") ? json.get("elementClasses").getAsString() : null);
-                ev.setTextSnippet(json.has("textSnippet") ? json.get("textSnippet").getAsString() : null);
-                ev.setCssSelector(json.has("cssSelector") ? json.get("cssSelector").getAsString() : null);
-                ev.setxPos(json.has("x") ? json.get("x").getAsInt() : null);
-                ev.setyPos(json.has("y") ? json.get("y").getAsInt() : null);
-                ev.setViewportWidth(json.has("vpW") ? json.get("vpW").getAsInt() : null);
-                ev.setViewportHeight(json.has("vpH") ? json.get("vpH").getAsInt() : null);
+                ev.setUrlPath(truncate(getAsString(json, "urlPath"), 500));
+                ev.setFullUrl(truncate(getAsString(json, "fullUrl"), 1000));
+                ev.setPageTitle(truncate(getAsString(json, "pageTitle"), 500));
+                ev.setElementTag(truncate(getAsString(json, "elementTag"), 50));
+                ev.setElementIdAttr(truncate(getAsString(json, "elementId"), 200));
+                ev.setElementClasses(truncate(getAsString(json, "elementClasses"), 500));
+                ev.setTextSnippet(truncate(getAsString(json, "textSnippet"), 500));
+                ev.setCssSelector(truncate(getAsString(json, "cssSelector"), 1000));
+                ev.setxPos(getAsInteger(json, "x"));
+                ev.setyPos(getAsInteger(json, "y"));
+                ev.setViewportWidth(getAsInteger(json, "vpW"));
+                ev.setViewportHeight(getAsInteger(json, "vpH"));
                 ev.setUserAgent(getHeader(exchange, "User-Agent"));
                 ev.setIpAddress(exchange.getRemoteAddress() != null ? exchange.getRemoteAddress().getAddress().getHostAddress() : null);
 
@@ -129,6 +135,29 @@ public class AnalyticsHandler implements HttpHandler {
 
     private static String getHeader(HttpExchange ex, String name) {
         try { return ex.getRequestHeaders().getFirst(name); } catch (Exception ignore) { return null; }
+    }
+
+    private static String getAsString(JsonObject json, String key) {
+        try {
+            if (!json.has(key)) return null;
+            var el = json.get(key);
+            if (el == null || el.isJsonNull()) return null;
+            return el.getAsString();
+        } catch (Exception e) { return null; }
+    }
+
+    private static Integer getAsInteger(JsonObject json, String key) {
+        try {
+            if (!json.has(key)) return null;
+            var el = json.get(key);
+            if (el == null || el.isJsonNull()) return null;
+            return el.getAsInt();
+        } catch (Exception e) { return null; }
+    }
+
+    private static String truncate(String s, int max) {
+        if (s == null) return null;
+        return s.length() > max ? s.substring(0, max) : s;
     }
 
     private static void write(HttpExchange ex, int status, String body) throws IOException {

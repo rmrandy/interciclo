@@ -45,11 +45,7 @@ public class AirlineUserHandler {
         try {
             JsonObject jsonRequest = JsonParser.parseString(requestBody).getAsJsonObject();
             
-            // Validar captcha
-            String captchaToken = jsonRequest.get("captchaToken").getAsString();
-            if (!validateCaptcha(captchaToken)) {
-                return createErrorResponse("Captcha inválido. Por favor, inténtelo de nuevo.");
-            }
+            // Captcha deshabilitado: no validar (permite registro sin fricción para la integración)
 
             // Extraer datos del usuario
             String firstName = jsonRequest.get("firstName").getAsString();

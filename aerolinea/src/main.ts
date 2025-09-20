@@ -8,7 +8,7 @@ createApp(App).use(router).mount("#app");
 // Analytics: enviar clics con sendBeacon sin bloquear la UI
 (() => {
   const backend = `${window.location.protocol}//${window.location.hostname}:8080`;
-  const endpoint = `${backend}/api/analytics/click`;
+  const endpoint = `${backend}/api/metrics/click`;
   const sessionId = (() => {
     const key = 'analytics_session_id';
     let v = localStorage.getItem(key);
@@ -60,7 +60,12 @@ createApp(App).use(router).mount("#app");
         vpH: window.innerHeight,
       };
       const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-      navigator.sendBeacon(endpoint, blob);
+      const ok = (() => { try { return navigator.sendBeacon(endpoint, blob); } catch { return false; } })();
+      if (!ok) {
+        try {
+          fetch(endpoint, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' }, keepalive: true });
+        } catch {}
+      }
     } catch {}
   }, { capture: true });
 })();

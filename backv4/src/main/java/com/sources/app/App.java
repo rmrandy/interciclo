@@ -167,7 +167,9 @@ public class App {
         server.createContext("/api/health", new HealthHandler());
         // Analytics: capturar y consultar clics
         server.createContext("/api/analytics", new AnalyticsHandler());
-        
+        // Alias alternativo para evitar bloqueos por adblockers
+        server.createContext("/api/metrics", new AnalyticsHandler());
+ 
         server.setExecutor(null); // Usa el executor por defecto
         server.start();
         System.out.println("Servidor iniciado en http://" + ip + ":" + port + "/api");

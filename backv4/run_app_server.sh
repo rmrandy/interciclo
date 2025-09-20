@@ -10,6 +10,7 @@ echo "🔨 Compilando..."
 mvn -q -e -DskipTests clean compile
 
 echo "📡 Ejecutando en puerto ${PORT} (IP autodetectada)"
+echo "⚙️  Con RECAPTCHA_SECRET_KEY=${RECAPTCHA_SECRET_KEY:-<no-definido>}"
 printf "%s\n" "$PORT" | mvn -q exec:java -Dexec.mainClass="com.sources.app.App"
 
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
 
@@ -18,6 +18,37 @@ export default function Register() {
 	});
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState('');
+	const [success, setSuccess] = useState('');
+	const [captchaToken, setCaptchaToken] = useState('');
+	const captchaRef = useRef(null);
+	const siteKey = (import.meta && import.meta.env && import.meta.env.VITE_RECAPTCHA_SITE_KEY) || '';
+
+	// Cargar script de reCAPTCHA v2 (checkbox) y renderizar
+	useEffect(() => {
+		if (!siteKey) return; // si no hay site key, no renderizamos (backend puede aceptar sin captcha)
+		function loadScript() {
+			if (document.getElementById('recaptcha-api-js')) return Promise.resolve();
+			return new Promise((resolve, reject) => {
+				const s = document.createElement('script');
+				s.id = 'recaptcha-api-js';
+				s.src = 'https://www.google.com/recaptcha/api.js?onload=__onRecaptchaLoaded&render=explicit';
+				s.async = true; s.defer = true;
+				s.onerror = reject; s.onload = () => {};
+				document.body.appendChild(s);
+				window.__onRecaptchaLoaded = () => resolve();
+			});
+		}
+		loadScript().then(() => {
+			if (window.grecaptcha && captchaRef.current) {
+				window.grecaptcha.render(captchaRef.current, {
+					sitekey: siteKey,
+					callback: (token) => setCaptchaToken(token || ''),
+					'expired-callback': () => setCaptchaToken(''),
+					'error-callback': () => setCaptchaToken(''),
+				});
+			}
+		}).catch(() => {});
+	}, [siteKey]);
 
 	function updateField(field, value) {
 		setForm(prev => ({ ...prev, [field]: value }));
@@ -35,6 +66,7 @@ export default function Register() {
 	async function handleSubmit(e) {
 		e.preventDefault();
 		setError('');
+		setSuccess('');
 		setLoading(true);
 		try {
 			const res = await register({
@@ -47,8 +79,12 @@ export default function Register() {
 				passportNumber: form.passportNumber,
 				phone: form.phone || undefined,
 				address: form.address || undefined,
+				captchaToken: captchaToken || undefined,
 			});
-			if (res.ok) navigate('/');
+			if (res.ok) {
+				setSuccess('¡Registro exitoso! Te hemos autenticado en la Aerolínea.');
+				setTimeout(() => navigate('/'), 1200);
+			}
 			else setError(res.message || 'Error de registro');
 		} catch (err) {
 			setError(err.message || 'Error de registro');
@@ -105,9 +141,18 @@ export default function Register() {
 						<input className="input" value={form.address} onChange={e => updateField('address', e.target.value)} />
 					</label>
 				</div>
+				{/* reCAPTCHA v2 (opcional) */}
+				{siteKey && (
+					<div className="field">
+						<span className="label">Verificación</span>
+						<div ref={captchaRef} />
+					</div>
+				)}
+
 				<button className="btn btn-primary" disabled={loading || !isValid}>{loading ? 'Creando...' : 'Crear cuenta'}</button>
 				{!isValid && <p className="small" style={{ color: '#a94442' }}>Completa los campos requeridos con formato válido.</p>}
-				{error && <p className="small" style={{ color: 'salmon' }}>{error}</p>}
+				{error && <div className="card" style={{ borderColor:'#fecaca', background:'#fef2f2' }}><strong style={{ color:'#b91c1c' }}>Error:</strong> {error}</div>}
+				{success && <div className="card" style={{ borderColor:'#bbf7d0', background:'#f0fdf4' }}><strong style={{ color:'#166534' }}>¡Registro exitoso!</strong><div className="small" style={{ color:'#166534' }}>Serás redirigido en un momento…</div></div>}
 			</form>
 		</section>
 	);

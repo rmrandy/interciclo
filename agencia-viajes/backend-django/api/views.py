@@ -297,11 +297,20 @@ def airlines_detail_view(request, airline_id: str):
 
 # --------- Proxy hacia backend de aerolínea ---------
 
-def airline_origin_base():
-    protocol = os.environ.get('AIRLINE_PROTOCOL', 'http').strip()
-    host = os.environ.get('AIRLINE_HOST', '192.168.0.20').strip()
-    port = os.environ.get('AIRLINE_PORT', '8080').strip()
-    base = os.environ.get('AIRLINE_BASE_PATH', '/api').strip()
+def airline_origin_base(request=None):
+    protocol = (os.environ.get('AIRLINE_PROTOCOL') or (getattr(request, 'scheme', None) or 'http')).strip()
+    host = (os.environ.get('AIRLINE_HOST') or '').strip()
+    if not host:
+        try:
+            forwarded = request.META.get('HTTP_X_FORWARDED_HOST') if request else None
+            raw_host = forwarded or (request.get_host() if request else '')
+            host = (raw_host or '').split(':')[0] or 'localhost'
+        except Exception:
+            host = 'localhost'
+    port = (os.environ.get('AIRLINE_PORT') or '8080').strip()
+    base = (os.environ.get('AIRLINE_BASE_PATH') or '/api').strip()
+    if not base.startswith('/'):
+        base = '/' + base
     return f"{protocol}://{host}:{port}{base}"
 
 
@@ -358,7 +367,7 @@ def normalize_flights_response(data):
 
 @csrf_exempt
 def proxy_airline_cities(request):
-    base = airline_origin_base()
+    base = airline_origin_base(request)
     data = safe_get(f"{base}/airline/cities")
     if 'error' in data:
         return JsonResponse({ 'success': False, 'message': data['error'] }, status=502)
@@ -368,7 +377,7 @@ def proxy_airline_cities(request):
 
 @csrf_exempt
 def proxy_airline_flights(request):
-    base = airline_origin_base()
+    base = airline_origin_base(request)
     params = request.GET.dict()
     data = safe_get(f"{base}/airline/flights", params=params)
     if 'error' in data:
@@ -384,7 +393,7 @@ def proxy_airline_seats(request):
     flight_id = (request.GET.get('flightId') or '').strip()
     if not flight_id:
         return JsonResponse({ 'success': False, 'message': 'flightId requerido' }, status=400)
-    base = airline_origin_base()
+    base = airline_origin_base(request)
     # Usar el endpoint de Aerolínea que devuelve seatsByCategory
     url = f"{base}/airline/flights/{flight_id}/seats"
     data = safe_get(url)
@@ -398,7 +407,7 @@ def proxy_airline_seats(request):
 def proxy_airline_create_ticket(request):
     if request.method != 'POST':
         return JsonResponse({ 'success': False, 'message': 'Método no permitido' }, status=405)
-    base = airline_origin_base()
+    base = airline_origin_base(request)
     try:
         payload = parse_request_data(request)
     except Exception:
@@ -416,7 +425,7 @@ def proxy_airline_create_ticket(request):
 def proxy_airline_login(request):
     if request.method != 'POST':
         return JsonResponse({ 'success': False, 'message': 'Método no permitido' }, status=405)
-    base = airline_origin_base()
+    base = airline_origin_base(request)
     payload = parse_request_data(request)
     data = safe_post(f"{base}/airline/login", json_body=payload)
     if 'error' in data:
@@ -428,7 +437,7 @@ def proxy_airline_login(request):
 def proxy_airline_register(request):
     if request.method != 'POST':
         return JsonResponse({ 'success': False, 'message': 'Método no permitido' }, status=405)
-    base = airline_origin_base()
+    base = airline_origin_base(request)
     payload = parse_request_data(request)
     data = safe_post(f"{base}/airline/register", json_body=payload)
     if 'error' in data:
@@ -441,7 +450,7 @@ def proxy_airline_tickets(request):
     # Listado de tickets con filtros (userId, flightId, status)
     if request.method != 'GET':
         return JsonResponse({ 'success': False, 'message': 'Método no permitido' }, status=405)
-    base = airline_origin_base()
+    base = airline_origin_base(request)
     params = request.GET.dict()
     data = safe_get(f"{base}/airline/tickets", params=params)
     if 'error' in data:
@@ -454,7 +463,7 @@ def proxy_airline_ticket_pdf(request, ticket_id: str):
     # Descarga/puente del PDF
     if request.method != 'GET':
         return JsonResponse({ 'success': False, 'message': 'Método no permitido' }, status=405)
-    base = airline_origin_base()
+    base = airline_origin_base(request)
     res = stream_get(f"{base}/airline/tickets/{ticket_id}/pdf")
     if isinstance(res, Exception):
         return JsonResponse({ 'success': False, 'message': str(res) }, status=502)
@@ -468,7 +477,7 @@ def proxy_airline_ticket_pdf(request, ticket_id: str):
 def proxy_airline_ticket_by_id(request, ticket_id: str):
     if request.method != 'GET':
         return JsonResponse({ 'success': False, 'message': 'Método no permitido' }, status=405)
-    base = airline_origin_base()
+    base = airline_origin_base(request)
     data = safe_get(f"{base}/airline/tickets/{ticket_id}")
     if 'error' in data:
         return JsonResponse({ 'success': False, 'message': data['error'] }, status=502)
@@ -479,7 +488,7 @@ def proxy_airline_ticket_by_id(request, ticket_id: str):
 def proxy_airline_flight_reviews(request, flight_id: str):
     if request.method != 'GET':
         return JsonResponse({ 'success': False, 'message': 'Método no permitido' }, status=405)
-    base = airline_origin_base()
+    base = airline_origin_base(request)
     params = request.GET.dict()
     # forzar mode=tree si se solicita tree
     qs = {}

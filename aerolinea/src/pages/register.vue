@@ -134,35 +134,7 @@
           </div>
         </div>
 
-        <!-- Captcha -->
-        <div class="bg-gray-50 p-4 rounded-lg">
-          <label class="airline-form-label mb-3 block">Verificación de Seguridad *</label>
-          <div class="flex items-center justify-center">
-            <div class="captcha-container">
-              <div class="captcha-display bg-white p-3 rounded border text-center font-mono text-lg">
-                {{ captchaText }}
-              </div>
-              <button
-                type="button"
-                @click="generateCaptcha"
-                class="mt-2 text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-              >
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/>
-                </svg>
-                Generar nuevo código
-              </button>
-            </div>
-          </div>
-          <input
-            v-model="form.captchaInput"
-            type="text"
-            required
-            class="airline-form-input mt-3"
-            placeholder="Ingresa el código de arriba"
-            maxlength="6"
-          />
-        </div>
+        <!-- Captcha deshabilitado para simplificar el registro -->
 
         <!-- Términos y condiciones -->
         <div class="flex items-start">
@@ -249,7 +221,6 @@ const form = ref({
   passportNumber: '',
   phone: '',
   address: '',
-  captchaInput: '',
   acceptTerms: false
 })
 
@@ -257,30 +228,13 @@ const form = ref({
 const loading = ref(false)
 const error = ref('')
 const success = ref('')
-const captchaText = ref('')
+// reCAPTCHA deshabilitado
 
-// Generar captcha
-const generateCaptcha = () => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-  let result = ''
-  for (let i = 0; i < 6; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  captchaText.value = result
-}
-
-// Validar captcha
-const validateCaptcha = () => {
-  return form.value.captchaInput.toUpperCase() === captchaText.value
-}
+const loadRecaptcha = async () => {}
 
 // Manejar registro
 const handleRegister = async () => {
-  // Validaciones
-  if (!validateCaptcha()) {
-    error.value = 'Código de verificación incorrecto'
-    return
-  }
+  let captchaToken = ''
 
   if (form.value.age < 18) {
     error.value = 'Debes ser mayor de 18 años para registrarte'
@@ -306,7 +260,7 @@ const handleRegister = async () => {
       passportNumber: form.value.passportNumber,
       phone: form.value.phone || '',
       address: form.value.address || '',
-      captchaToken: 'development-token' // En producción usar reCAPTCHA
+      captchaToken: captchaToken || 'development-token'
     })
 
     if (data.success) {
@@ -334,22 +288,12 @@ const handleRegister = async () => {
   }
 }
 
-// Generar captcha al montar el componente
-onMounted(() => {
-  generateCaptcha()
+// Renderizar reCAPTCHA al montar
+onMounted(async () => {
+  await loadRecaptcha()
 })
 </script>
 
 <style scoped>
-.captcha-container {
-  width: 100%;
-}
-
-.captcha-display {
-  background: linear-gradient(45deg, #f0f0f0, #e0e0e0);
-  border: 2px solid #d0d0d0;
-  font-weight: bold;
-  letter-spacing: 2px;
-  user-select: none;
-}
+/* sin estilos extra: lo maneja el widget reCAPTCHA */
 </style>
