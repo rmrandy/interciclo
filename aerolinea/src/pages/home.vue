@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import axios from "axios";
 import { AirlineApiClient } from "../utils/airlineApi";
 import { getAirlineApiUrl, getInsuranceApiUrl } from "../utils/api";
+import { informativePagesApi } from "../utils/informativePagesApi";
 
 const router = useRouter();
 const user = ref<any>(null);
@@ -32,6 +33,24 @@ const promos = ref([
   { id: 3, title: 'Business Upgrade', desc: 'Upgrade a Business desde Q399', color: 'from-amber-500 to-orange-500' }
 ])
 const error = ref<string | null>(null);
+// Contenido dinámico del Home (misma dinámica que páginas informativas)
+const pageTitle = ref<string>('¡Bienvenido a AeroLinea!')
+const pageDescription = ref<string>('Tu compañía de seguros aeronáuticos de confianza')
+
+const loadHomeContent = async (): Promise<void> => {
+  try {
+    const page = await informativePagesApi.getPageBySlug('home')
+    if (page?.title) pageTitle.value = page.title
+    if (page?.description) pageDescription.value = page.description
+  } catch (e) {
+    console.warn('No se pudo cargar contenido de Home (slug=home)', e)
+  } finally {
+    // Actualizar meta tags independientemente del resultado
+    document.title = `${pageTitle.value} - AeroLinea`
+    const metaDescription = document.querySelector('meta[name="description"]')
+    if (metaDescription) metaDescription.setAttribute('content', pageDescription.value)
+  }
+}
 
 const fetchUserPolicyDetails = async () => {
   if (!user.value || !user.value.policy || !user.value.policy.idPolicy) {
@@ -54,6 +73,8 @@ const fetchUserPolicyDetails = async () => {
 };
 
 onMounted(() => {
+  // Cargar contenido del Home desde páginas informativas
+  loadHomeContent()
   // Obtener datos de usuario del localStorage (opcional para página pública)
   const userData = localStorage.getItem("user");
   if (userData) {
@@ -256,8 +277,8 @@ const downloadTicketPdf = async (id: number) => {
         </svg>
       </div>
       <div class="relative z-10">
-        <h1 class="text-3xl md:text-4xl font-bold mb-3 animate-fade-in-up">¡Bienvenido a AeroLinea!</h1>
-        <p class="text-lg md:text-xl mb-5 text-blue-100 animate-fade-in-up" style="animation-delay: 0.2s;">Tu compañía de seguros aeronáuticos de confianza</p>
+        <h1 class="text-3xl md:text-4xl font-bold mb-3 animate-fade-in-up">{{ pageTitle }}</h1>
+        <p class="text-lg md:text-xl mb-5 text-blue-100 animate-fade-in-up" style="animation-delay: 0.2s;">{{ pageDescription }}</p>
         <div class="flex flex-wrap gap-3 animate-fade-in-up" style="animation-delay: 0.4s;">
           <div class="bg-white bg-opacity-20 px-4 py-2 rounded-full backdrop-blur-sm">
             <span class="font-semibold">🛡️ Protección Total</span>

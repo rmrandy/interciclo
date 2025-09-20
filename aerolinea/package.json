@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "python3 getip.py && vite --host",
+    "start:ip": "./scripts/start-ip.sh",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview"
   },

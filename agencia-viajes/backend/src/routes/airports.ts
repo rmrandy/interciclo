@@ -74,7 +74,7 @@ router.get('/', async (req, res) => {
 });
 
 // Obtener aeropuerto por ID
-router.get('/:id', mongoIdValidation, async (req, res) => {
+router.get('/:id', mongoIdValidation, async (req: any, res: any) => {
   try {
     const airport = await Airport.findById(req.params.id);
 
@@ -131,7 +131,7 @@ router.get('/search/:query', async (req, res) => {
 });
 
 // Crear aeropuerto (solo administradores)
-router.post('/', authenticate, authorize('admin'), airportValidation, async (req, res) => {
+router.post('/', authenticate, authorize('admin'), airportValidation, async (req: any, res: any) => {
   try {
     const airport = await Airport.create(req.body);
 
@@ -150,7 +150,7 @@ router.post('/', authenticate, authorize('admin'), airportValidation, async (req
 });
 
 // Actualizar aeropuerto (solo administradores)
-router.put('/:id', authenticate, authorize('admin'), mongoIdValidation, airportValidation, async (req, res) => {
+router.put('/:id', authenticate, authorize('admin'), mongoIdValidation, airportValidation, async (req: any, res: any) => {
   try {
     const airport = await Airport.findByIdAndUpdate(
       req.params.id,
@@ -180,7 +180,7 @@ router.put('/:id', authenticate, authorize('admin'), mongoIdValidation, airportV
 });
 
 // Eliminar aeropuerto (solo administradores)
-router.delete('/:id', authenticate, authorize('admin'), mongoIdValidation, async (req, res) => {
+router.delete('/:id', authenticate, authorize('admin'), mongoIdValidation, async (req: any, res: any) => {
   try {
     const airport = await Airport.findByIdAndDelete(req.params.id);
 

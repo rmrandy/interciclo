@@ -17,6 +17,7 @@ import Policies from "./pages/admin/policies.vue";
 import RegisterClient from "./pages/employee/register-client.vue";
 import ClientManagement from "./pages/admin/client-management.vue";
 import SystemConfiguration from "./pages/admin/system-configuration.vue";
+import Analytics from "./pages/admin/analytics.vue";
 import AircraftSeatConfig from "./pages/admin/aircraft-seat-config.vue";
 import UserServices from "./pages/user-services.vue";
 import { checkMissingRequiredFields } from "./utils/profile-utils";
@@ -175,6 +176,11 @@ const routes = [
   {
     path: "/admin/policies",
     component: Policies,
+    beforeEnter: requireAdmin
+  },
+  {
+    path: "/admin/analytics",
+    component: Analytics,
     beforeEnter: requireAdmin
   },
   // Gestión completa de vuelos (admin)

@@ -10,10 +10,16 @@ export const PORTS = {
   EXTERNAL_SERVICES: 8080,
 } as const;
 
-// Obtener la IP del entorno o usar la IP local del usuario
+// Obtener la IP del entorno o el hostname actual, sin caer en localhost
 const getServerIP = (): string => {
-  // Usar la IP del entorno si está configurada, sino usar la IP local del usuario
-  return import.meta.env.VITE_IP || '192.168.0.26';
+  const envIp = (import.meta.env.VITE_IP as string | undefined)?.trim();
+  if (envIp && envIp !== 'localhost' && envIp !== '127.0.0.1') return envIp;
+
+  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  if (host && host !== 'localhost' && host !== '127.0.0.1') return host;
+
+  console.warn('[PORTS] No se detectó IP LAN válida. Sirve el frontend mediante IP (no localhost).');
+  return host || '';
 };
 
 // Función para obtener la URL base de un servicio

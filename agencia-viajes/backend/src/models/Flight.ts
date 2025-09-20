@@ -1,7 +1,7 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import { IFlight } from '../types';
 
-export interface IFlightDocument extends IFlight, Document {}
+export interface IFlightDocument extends Omit<IFlight, '_id'>, Document {}
 
 const FlightSchema = new Schema<IFlightDocument>({
   flightNumber: {
@@ -24,23 +24,11 @@ const FlightSchema = new Schema<IFlightDocument>({
   },
   departure: {
     type: Date,
-    required: [true, 'La fecha de salida es requerida'],
-    validate: {
-      validator: function(value: Date) {
-        return value > new Date();
-      },
-      message: 'La fecha de salida debe ser futura'
-    }
+    required: [true, 'La fecha de salida es requerida']
   },
   arrival: {
     type: Date,
-    required: [true, 'La fecha de llegada es requerida'],
-    validate: {
-      validator: function(value: Date) {
-        return value > this.departure;
-      },
-      message: 'La fecha de llegada debe ser posterior a la salida'
-    }
+    required: [true, 'La fecha de llegada es requerida']
   },
   aircraft: {
     model: {
@@ -128,7 +116,8 @@ FlightSchema.index({ 'inventory.firstClass.available': 1 });
 
 // Middleware pre-save para validar disponibilidad
 FlightSchema.pre('save', function(next) {
-  const inventory = this.inventory;
+  const doc = this as any;
+  const inventory = doc.inventory;
   
   // Validar que los asientos disponibles no excedan el total
   if (inventory.economy.available > inventory.economy.total) {
@@ -146,12 +135,14 @@ FlightSchema.pre('save', function(next) {
 
 // Virtual para duración del vuelo
 FlightSchema.virtual('duration').get(function() {
-  return this.arrival.getTime() - this.departure.getTime();
+  const doc = this as any;
+  return doc.arrival.getTime() - doc.departure.getTime();
 });
 
 // Virtual para verificar si hay asientos disponibles
 FlightSchema.virtual('hasAvailableSeats').get(function() {
-  const inventory = this.inventory;
+  const doc = this as any;
+  const inventory = doc.inventory;
   return inventory.economy.available > 0 || 
          inventory.business.available > 0 || 
          inventory.firstClass.available > 0;

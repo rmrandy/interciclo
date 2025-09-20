@@ -108,9 +108,35 @@ export class AirlineApiClient {
   }
 
   // ===== VUELOS =====
-  async getFlights() {
+  async getFlights(params?: {
+    origin?: number | string
+    destination?: number | string
+    departureDate?: string
+    returnDate?: string
+    passengers?: number | string
+    minPrice?: number | string
+    maxPrice?: number | string
+    minRating?: number | string
+    seatCategory?: string
+    nonstop?: boolean | string
+  }) {
     try {
-      const response = await this.makeRequest('/api/airline/flights', { method: 'GET' })
+      const queryParams: Record<string, string> = {}
+      if (params) {
+        const entries: [string, any][] = Object.entries(params)
+        for (const [key, value] of entries) {
+          if (value === undefined || value === null || value === '') continue
+          if (typeof value === 'boolean') {
+            queryParams[key] = value ? 'true' : 'false'
+          } else {
+            queryParams[key] = String(value)
+          }
+        }
+      }
+      const qs = Object.keys(queryParams).length
+        ? `?${new URLSearchParams(queryParams).toString()}`
+        : ''
+      const response = await this.makeRequest(`/api/airline/flights${qs}`, { method: 'GET' })
       console.log('🔍 Respuesta de getFlights:', response)
       return response
     } catch (error) {

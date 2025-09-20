@@ -73,7 +73,7 @@ public class FlightHandler implements HttpHandler {
             if (path.equals("/api/airline/flights")) {
                 System.out.println("DEBUG: ✅ Patrón 1: /api/airline/flights");
                 if ("GET".equals(method)) {
-                    response = getAllFlightsJson();
+                    response = getFlightsWithOptionalFilters(exchange);
                 } else if ("POST".equals(method)) {
                     response = handleCreateFlight(exchange);
                 } else {
@@ -622,6 +622,77 @@ public class FlightHandler implements HttpHandler {
             return gson.toJson(response);
         }
     }
+
+    private String getFlightsWithOptionalFilters(HttpExchange exchange) {
+        try {
+            String query = exchange.getRequestURI().getQuery();
+            Map<String, String> q = new HashMap<>();
+            if (query != null) {
+                for (String p : query.split("&")) {
+                    String[] kv = p.split("=");
+                    if (kv.length == 2) q.put(kv[0], java.net.URLDecoder.decode(kv[1], java.nio.charset.StandardCharsets.UTF_8));
+                }
+            }
+
+            Integer origin = q.containsKey("origin") && !q.get("origin").isBlank() ? Integer.parseInt(q.get("origin")) : null;
+            Integer dest   = q.containsKey("destination") && !q.get("destination").isBlank() ? Integer.parseInt(q.get("destination")) : null;
+            String depDate = q.getOrDefault("departureDate", null);
+            String retDate = q.getOrDefault("returnDate", null); // futuro
+            Integer pax    = q.containsKey("passengers") && !q.get("passengers").isBlank() ? Integer.parseInt(q.get("passengers")) : null;
+            java.math.BigDecimal minPrice = q.containsKey("minPrice") && !q.get("minPrice").isBlank() ? new java.math.BigDecimal(q.get("minPrice")) : null;
+            java.math.BigDecimal maxPrice = q.containsKey("maxPrice") && !q.get("maxPrice").isBlank() ? new java.math.BigDecimal(q.get("maxPrice")) : null;
+            String seatCat = q.getOrDefault("seatCategory", null);
+            Boolean nonstop = q.containsKey("nonstop") ? Boolean.valueOf(q.get("nonstop")) : null;
+            Integer minRating = q.containsKey("minRating") && !q.get("minRating").isBlank() ? Integer.parseInt(q.get("minRating")) : null;
+
+            List<Flight> flights = flightDAO.searchFlights(origin, dest, depDate, retDate, pax, minPrice, maxPrice, seatCat, nonstop);
+
+            // Armar respuesta incluyendo fares y rating promedio si se pidió minRating
+            List<Map<String, Object>> flightMaps = new ArrayList<>();
+            for (Flight flight : flights) {
+                Map<String, Object> m = new HashMap<>();
+                m.put("idFlight", flight.getIdFlight());
+                m.put("flightNumber", flight.getFlightNumber());
+                m.put("originCity", flight.getOriginCity() != null ? flight.getOriginCity().getName() : "N/A");
+                m.put("destinationCity", flight.getDestinationCity() != null ? flight.getDestinationCity().getName() : "N/A");
+                m.put("departureDate", flight.getDepartureDate());
+                m.put("departureTime", flight.getDepartureTime());
+                m.put("arrivalDate", flight.getArrivalDate());
+                m.put("arrivalTime", flight.getArrivalTime());
+                m.put("basePrice", flight.getBasePrice());
+                m.put("availableSeats", flight.getAvailableSeats());
+                m.put("status", flight.getStatus());
+
+                // Fares activos
+                Map<String, java.math.BigDecimal> fares = flightDAO.getFlightFares(flight.getIdFlight());
+                m.put("fares", fares);
+
+                // Rating promedio (sólo si se usa filtrado por rating o para enriquecer la respuesta)
+                if (minRating != null && minRating > 0) {
+                    Double avg = flightDAO.getAverageRating(flight.getIdFlight());
+                    m.put("averageRating", avg);
+                    if (avg == null || Math.round(avg) < minRating) {
+                        // Saltar este vuelo si no cumple rating mínimo
+                        continue;
+                    }
+                } else {
+                    // opcional: incluir sin filtrar
+                    Double avg = flightDAO.getAverageRating(flight.getIdFlight());
+                    m.put("averageRating", avg);
+                }
+
+                flightMaps.add(m);
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("flights", flightMaps);
+            return gson.toJson(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return gson.toJson(Map.of("success", false, "error", e.getMessage()));
+        }
+    }
     
     public String getFlightByIdJson(String flightId) {
         try {
@@ -1160,10 +1231,7 @@ public class FlightHandler implements HttpHandler {
                 return gson.toJson(Map.of("success", false, "error", "Vuelo no encontrado"));
             }
             
-            // Verificar que el vuelo puede ser modificado
-            if (!existingFlight.canBeModified()) {
-                return gson.toJson(Map.of("success", false, "error", "El vuelo no puede ser modificado en su estado actual"));
-            }
+            // Permitir modificación independientemente del estado
             
             // Actualizar el vuelo usando el DAO
             Flight updatedFlight = flightDAO.updateFlight(id, jsonRequest);

@@ -2,8 +2,23 @@
  * Utilidades para manejar las URLs de las APIs con puertos configurables
  */
 
-// Importar las variables de entorno
-const ip = import.meta.env.VITE_IP || "localhost";
+// Resolver IP de forma dinámica: prioriza VITE_IP, luego el hostname del navegador.
+// Nunca forzar "localhost"; si el frontend se sirve como localhost, se advertirá.
+const resolveHostIP = (): string => {
+  // 1) Variable de entorno (inyectada por Vite, p.ej. desde getip.py)
+  const envIp = (import.meta.env.VITE_IP as string | undefined)?.trim();
+  if (envIp && envIp !== 'localhost' && envIp !== '127.0.0.1') return envIp;
+
+  // 2) Hostname desde la URL donde se sirve el frontend
+  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  if (host && host !== 'localhost' && host !== '127.0.0.1') return host;
+
+  // 3) Sin IP válida: advertir para que el usuario abra el frontend mediante IP LAN
+  console.warn('[API] No se detectó IP LAN válida. Abre el frontend usando la IP (no localhost).');
+  return host || '';
+};
+
+const ip = resolveHostIP();
 
 // Interfaces
 interface PortConfig {
@@ -56,12 +71,11 @@ export const loadPortConfiguration = (): void => {
  * @param endpoint - El endpoint de la API sin la barra inicial, ej: "users"
  * @returns URL completa con el puerto correcto
  */
-export const getInsuranceApiUrl = (endpoint: string): string => {
-  // Eliminar la barra inicial del endpoint si existe
-  const cleanEndpoint = endpoint.startsWith("/") ? endpoint.substring(1) : endpoint;
-  
-  // Construir la URL completa
-  return `http://${ip}:${portConfig.ensurance}/api/${cleanEndpoint}`;
+export const getInsuranceApiUrl = (endpoint: string = ''): string => {
+  // Normalizar endpoint y permitir vacío
+  const cleanEndpoint = (endpoint || '').replace(/^\//, '');
+  const suffix = cleanEndpoint ? `/api/${cleanEndpoint}` : '/api';
+  return `http://${ip}:${portConfig.ensurance}${suffix}`;
 };
 
 /**
@@ -70,12 +84,10 @@ export const getInsuranceApiUrl = (endpoint: string): string => {
  * @param endpoint - El endpoint de la API sin la barra inicial
  * @returns URL completa de la API de farmacia
  */
-export const getPharmacyApiUrl = (endpoint: string): string => {
-  // Eliminar la barra inicial del endpoint si existe
-  const cleanEndpoint = endpoint.startsWith("/") ? endpoint.substring(1) : endpoint;
-  
-  // Construir la URL completa
-  return `http://${ip}:${portConfig.pharmacy}/api/${cleanEndpoint}`;
+export const getPharmacyApiUrl = (endpoint: string = ''): string => {
+  const cleanEndpoint = (endpoint || '').replace(/^\//, '');
+  const suffix = cleanEndpoint ? `/api/${cleanEndpoint}` : '/api';
+  return `http://${ip}:${portConfig.pharmacy}${suffix}`;
 };
 
 /**
@@ -84,10 +96,8 @@ export const getPharmacyApiUrl = (endpoint: string): string => {
  * @param endpoint - El endpoint de la API sin la barra inicial
  * @returns URL completa de la API de aerolínea
  */
-export const getAirlineApiUrl = (endpoint: string): string => {
-  // Eliminar la barra inicial del endpoint si existe
-  const cleanEndpoint = endpoint.startsWith("/") ? endpoint.substring(1) : endpoint;
-  
-  // Construir la URL completa
-  return `http://${ip}:${portConfig.airline}/api/airline/${cleanEndpoint}`;
-}; 
+export const getAirlineApiUrl = (endpoint: string = ''): string => {
+  const cleanEndpoint = (endpoint || '').replace(/^\//, '');
+  const suffix = cleanEndpoint ? `/api/airline/${cleanEndpoint}` : '/api/airline';
+  return `http://${ip}:${portConfig.airline}${suffix}`;
+};

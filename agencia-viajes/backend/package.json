@@ -6,6 +6,11 @@
   "scripts": {
     "start": "node dist/server.js",
     "dev": "nodemon src/server.ts",
+    "start:ip": "./scripts/start-ip.sh",
+    "simple": "ts-node src/simple-server.ts",
+    "working": "node src/working-server.js",
+    "db:init": "ts-node src/scripts/init-db.ts",
+    "db:seed": "ts-node src/scripts/seed-db.ts",
     "build": "tsc",
     "clean": "rm -rf dist",
     "prebuild": "npm run clean",
@@ -15,6 +20,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "axios": "^1.11.0",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",

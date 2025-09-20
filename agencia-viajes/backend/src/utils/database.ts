@@ -1,19 +1,65 @@
 import mongoose from 'mongoose';
 
+function getLocalIp(): string {
+  try {
+    const os = require('os');
+    const ifaces = os.networkInterfaces();
+    for (const name of Object.keys(ifaces)) {
+      const list = ifaces[name] || [];
+      for (const i of list) {
+        if (i && i.family === 'IPv4' && !i.internal) {
+          return i.address;
+        }
+      }
+    }
+  } catch {}
+  return '127.0.0.1';
+}
+
+async function tryConnect(uri: string, timeoutMs: number) {
+  return mongoose.connect(uri, {
+    maxPoolSize: 10,
+    serverSelectionTimeoutMS: timeoutMs,
+    socketTimeoutMS: 45000,
+    bufferCommands: false
+  });
+}
+
 const connectDB = async (): Promise<void> => {
   try {
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/agencia-viajes';
-    
-    const conn = await mongoose.connect(mongoURI, {
-      // Opciones de conexión para MongoDB
-      maxPoolSize: 10, // Mantener hasta 10 conexiones en el pool
-      serverSelectionTimeoutMS: 5000, // Mantener intentando enviar operaciones por 5 segundos
-      socketTimeoutMS: 45000, // Cerrar sockets después de 45 segundos de inactividad
-      bufferCommands: false, // Deshabilitar el buffering de mongoose
-      bufferMaxEntries: 0 // Deshabilitar el buffering de mongoose
-    });
+    const host = (process.env.MONGO_HOST || '').trim() || getLocalIp();
+    const port = (process.env.MONGO_PORT || '').trim();
+    const db   = (process.env.MONGO_DB || '').trim() || 'agencia-viajes';
+    const explicit = (process.env.MONGODB_URI || '').trim();
 
-    console.log(`✅ MongoDB conectado: ${conn.connection.host}`);
+    const candidates: string[] = [];
+    if (explicit) candidates.push(explicit);
+    if (host && port) candidates.push(`mongodb://${host}:${port}/${db}`);
+    // mismos host/IP con puertos comunes
+    candidates.push(`mongodb://${host}:27017/${db}`);
+    candidates.push(`mongodb://${host}:5001/${db}`);
+    // localhost por si corre local
+    candidates.push(`mongodb://127.0.0.1:27017/${db}`);
+    candidates.push(`mongodb://127.0.0.1:5001/${db}`);
+
+    let connected = false;
+    let lastErr: any = null;
+    for (const uri of Array.from(new Set(candidates))) {
+      try {
+        console.log(`🔎 Intentando conectar a MongoDB: ${uri}`);
+        const conn = await tryConnect(uri, 4000);
+        console.log(`✅ MongoDB conectado: ${conn.connection.host}`);
+        connected = true;
+        break;
+      } catch (e) {
+        lastErr = e;
+        console.warn(`⚠️ Falló conexión a ${uri}: ${(e as Error)?.message}`);
+        try { await mongoose.disconnect(); } catch {}
+      }
+    }
+    if (!connected) {
+      throw lastErr || new Error('No se pudo conectar a ninguna URI de Mongo');
+    }
     
     // Manejar eventos de conexión
     mongoose.connection.on('error', (err) => {

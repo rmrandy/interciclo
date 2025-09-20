@@ -1,7 +1,7 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import { IBooking } from '../types';
 
-export interface IBookingDocument extends IBooking, Document {}
+export interface IBookingDocument extends Omit<IBooking, '_id'>, Document {}
 
 const PassengerSchema = new Schema({
   firstName: {
@@ -46,13 +46,11 @@ const PassengerSchema = new Schema({
 
 const BookingSchema = new Schema<IBookingDocument>({
   userId: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
+    type: String,
     required: [true, 'El ID del usuario es requerido']
   },
   flightId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Flight',
+    type: String,
     required: [true, 'El ID del vuelo es requerido']
   },
   passengers: [PassengerSchema],
@@ -98,20 +96,22 @@ BookingSchema.index({ createdAt: -1 });
 
 // Middleware pre-save para generar referencia de reserva
 BookingSchema.pre('save', function(next) {
-  if (!this.bookingReference) {
+  const doc = this as any;
+  if (!doc.bookingReference) {
     const timestamp = Date.now().toString(36).toUpperCase();
     const random = Math.random().toString(36).substr(2, 4).toUpperCase();
-    this.bookingReference = `BK${timestamp}${random}`;
+    doc.bookingReference = `BK${timestamp}${random}`;
   }
   next();
 });
 
 // Middleware pre-save para generar números de asiento
 BookingSchema.pre('save', function(next) {
-  this.passengers.forEach((passenger, index) => {
+  const doc = this as any;
+  doc.passengers.forEach((passenger: any, index: number) => {
     if (!passenger.seatNumber) {
       const timestamp = Date.now();
-      passenger.seatNumber = `AUTO-${this.flightId}-${passenger.seatCategory}-${timestamp}-${index}`;
+      passenger.seatNumber = `AUTO-${doc.flightId}-${passenger.seatCategory}-${timestamp}-${index}`;
     }
   });
   next();
@@ -119,12 +119,14 @@ BookingSchema.pre('save', function(next) {
 
 // Virtual para número de pasajeros
 BookingSchema.virtual('passengerCount').get(function() {
-  return this.passengers.length;
+  const doc = this as any;
+  return doc.passengers.length;
 });
 
 // Virtual para verificar si la reserva está activa
 BookingSchema.virtual('isActive').get(function() {
-  return this.status === 'confirmed' || this.status === 'pending';
+  const doc = this as any;
+  return doc.status === 'confirmed' || doc.status === 'pending';
 });
 
 export default mongoose.model<IBookingDocument>('Booking', BookingSchema);

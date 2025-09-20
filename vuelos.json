@@ -1,26 +1,36 @@
 [
-    {
-      "flightNumber": "AL101",
-      "originCityId": 1,
-      "destinationCityId": 2,
-      "departureDate": "2025-09-05",
-      "departureTime": "08:00",
-      "arrivalDate": "2025-09-05",
-      "arrivalTime": "10:30",
-      "fares": { "ECONOMY": 200, "BUSINESS": 400 },
-      "availableSeats": 180,
-      "createdBy": 1
-    },
-    {
-      "flightNumber": "AL202",
-      "originCityId": 2,
-      "destinationCityId": 3,
-      "departureDate": "2025-09-06",
-      "departureTime": "12:00",
-      "arrivalDate": "2025-09-06",
-      "arrivalTime": "14:15",
-      "fares": { "ECONOMY": 250, "BUSINESS": 450 },
-      "availableSeats": 150,
-      "createdBy": 1
+  {
+    "flightNumber": "AV476",
+    "originCityId": 1,
+    "destinationCityId": 3,
+    "departureDate": "2025-10-01",
+    "departureTime": "08:00",
+    "arrivalDate": "2025-10-01",
+    "arrivalTime": "10:45",
+    "availableSeats": 180,
+    "createdBy": 1,
+    "aircraftId": 1,
+    "fares": {
+      "ECONOMY": 700.00,
+      "BUSINESS": 1100.00,
+      "FIRST_CLASS": 1500.00
     }
+  },
+  {
+    "flightNumber": "AV456",
+    "originCityId": 1,
+    "destinationCityId": 3,
+    "departureDate": "2025-10-01",
+    "departureTime": "08:00",
+    "arrivalDate": "2025-10-01",
+    "arrivalTime": "10:45",
+    "availableSeats": 180,
+    "createdBy": 1,
+    "aircraftId": 1,
+    "fares": {
+      "ECONOMY": 700.00,
+      "BUSINESS": 1100.00,
+      "FIRST_CLASS": 1500.00
+    }
+  }
   ]

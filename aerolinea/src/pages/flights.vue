@@ -80,6 +80,55 @@
                 <span class="dropdown-arrow">▼</span>
               </div>
             </div>
+
+            <div class="form-divider"></div>
+
+            <!-- Filtros: rango de precios -->
+            <div class="form-group compact">
+              <label>Precio mínimo</label>
+              <div class="input-with-icon">
+                <span class="input-icon">💵</span>
+                <input class="form-input" type="number" min="0" step="1" v-model.number="filtersState.minPrice" />
+              </div>
+            </div>
+            <div class="form-group compact">
+              <label>Precio máximo</label>
+              <div class="input-with-icon">
+                <span class="input-icon">💵</span>
+                <input class="form-input" type="number" min="0" step="1" v-model.number="filtersState.maxPrice" />
+              </div>
+            </div>
+
+            <div class="form-divider"></div>
+
+            <!-- Filtros: rating y asiento -->
+            <div class="form-group compact">
+              <label>Rating mínimo</label>
+              <div class="input-with-icon">
+                <span class="input-icon">⭐</span>
+                <select class="form-select" v-model.number="filtersState.minRating">
+                  <option :value="0">Cualquiera</option>
+                  <option :value="1">1+</option>
+                  <option :value="2">2+</option>
+                  <option :value="3">3+</option>
+                  <option :value="4">4+</option>
+                  <option :value="5">5</option>
+                </select>
+                <span class="dropdown-arrow">▼</span>
+              </div>
+            </div>
+            <div class="form-group compact">
+              <label>Tipo de asiento</label>
+              <div class="input-with-icon">
+                <span class="input-icon">🪑</span>
+                <select class="form-select" v-model="filtersState.seatCategory">
+                  <option value="">Cualquiera</option>
+                  <option value="ECONOMY">ECONOMY</option>
+                  <option value="BUSINESS">BUSINESS</option>
+                </select>
+                <span class="dropdown-arrow">▼</span>
+              </div>
+            </div>
             
             <div class="search-actions">
               <button @click="searchFlights" class="search-btn" :disabled="loading">
@@ -89,7 +138,7 @@
           </div>
           
           <div class="secondary-actions">
-            <button @click="showAllFlights" class="show-all-btn" :disabled="loading">
+            <button @click="resetFiltersAndShowAll" class="show-all-btn show-all-elevated" :disabled="loading">
               {{ loading ? 'Cargando...' : '📋 Ver Todos los Vuelos' }}
             </button>
           </div>
@@ -297,6 +346,14 @@ const searchParams = ref({
   flightType: 'round-trip' // 'one-way', 'round-trip'
 })
 
+// Estado de filtros de UI (no auto-ejecuta búsqueda)
+const filtersState = ref({
+  minPrice: undefined as number | undefined,
+  maxPrice: undefined as number | undefined,
+  minRating: 0 as number,
+  seatCategory: '' as string
+})
+
 // Filtros y ordenamiento
 const activeFilter = ref('all')
 const sortBy = ref('price')
@@ -436,6 +493,7 @@ const filteredFlights = computed(() => {
     result = [...outbound, ...inbound]
   }
 
+  // Filtros rápidos existentes
   if (activeFilter.value === 'direct') {
     result = result.filter(f => !f.hasStops)
   } else if (activeFilter.value === 'stops') {
@@ -444,6 +502,37 @@ const filteredFlights = computed(() => {
     const avgPrice = result.length ? result.reduce((s, f) => s + f.basePrice, 0) / result.length : 0
     result = result.filter(f => f.basePrice <= avgPrice)
   }
+
+  // Filtros nuevos: rango de precios, rating y tipo de asiento (aplicados en cliente por seguridad)
+  const minPrice = filtersState.value.minPrice
+  const maxPrice = filtersState.value.maxPrice
+  const minRating = filtersState.value.minRating || 0
+  const seatCategory = (filtersState.value.seatCategory || '').toUpperCase()
+
+  const priceForFlight = (f: any): number => {
+    if (seatCategory && f?.fares && f.fares[seatCategory] != null) {
+      return Number(f.fares[seatCategory])
+    }
+    return Number(f.basePrice || 0)
+  }
+
+  result = result.filter((f) => {
+    const price = priceForFlight(f)
+    if (minPrice != null && price < minPrice) return false
+    if (maxPrice != null && price > maxPrice) return false
+
+    const rating = Number(
+      f?.averageRating ?? f?.avgRating ?? f?.rating ?? 0
+    )
+    if (minRating && rating && rating < minRating) return false
+
+    if (seatCategory) {
+      // Si se especifica categoría, exigir que exista tarifa para esa categoría
+      const hasFare = f?.fares && f.fares[seatCategory] != null
+      if (!hasFare && seatCategory !== 'ECONOMY') return false
+    }
+    return true
+  })
 
   return result
 })
@@ -535,23 +624,54 @@ const searchFlights = async () => {
     return
   }
   
-  searchPerformed.value = true
-  error.value = ''
-  
-  console.log('🔍 Búsqueda realizada:', searchParams.value)
+  // Ejecutar consulta al backend con parámetros y filtros
+  try {
+    loading.value = true
+    error.value = ''
+    const response = await airlineApi.getFlights({
+      origin: searchParams.value.origin,
+      destination: searchParams.value.destination,
+      departureDate: searchParams.value.departureDate,
+      returnDate: searchParams.value.returnDate,
+      passengers: searchParams.value.passengers,
+      minPrice: filtersState.value.minPrice,
+      maxPrice: filtersState.value.maxPrice,
+      minRating: filtersState.value.minRating || undefined,
+      seatCategory: filtersState.value.seatCategory || undefined
+    })
+    if (response && response.success) {
+      flights.value = response.flights || []
+    }
+    searchPerformed.value = true
+    console.log('🔍 Búsqueda realizada con filtros')
+  } catch (e: any) {
+    error.value = 'No se pudo realizar la búsqueda'
+  } finally {
+    loading.value = false
+  }
 }
 
-const showAllFlights = async () => {
+const resetFiltersAndShowAll = async () => {
   searchParams.value = {
     origin: '',
     destination: '',
     departureDate: '',
     returnDate: '',
-    passengers: 1
+    passengers: 1,
+    flightType: 'round-trip'
   }
-  searchPerformed.value = true
-  error.value = ''
-  console.log('🔍 Mostrando todos los vuelos disponibles')
+  filtersState.value = { minPrice: undefined, maxPrice: undefined, minRating: 0, seatCategory: '' }
+  try {
+    loading.value = true
+    const resp = await airlineApi.getFlights()
+    if (resp && resp.success) {
+      flights.value = resp.flights || []
+    }
+    searchPerformed.value = true
+    error.value = ''
+  } finally {
+    loading.value = false
+  }
 }
 
 const setActiveFilter = (filter: string) => {
@@ -735,11 +855,10 @@ onMounted(() => {
 })
 
 // Disparar búsqueda cuando cambian fechas u origen/destino desde el calendario o selects
+// Ya no auto-ejecutamos búsquedas al cambiar selects/fechas. Solo habilitamos el estado para UI.
 watch(() => [searchParams.value.departureDate, searchParams.value.returnDate, searchParams.value.origin, searchParams.value.destination], () => {
-  if (searchParams.value.departureDate || searchParams.value.returnDate || searchParams.value.origin || searchParams.value.destination) {
-    searchPerformed.value = true
-    error.value = ''
-  }
+  searchPerformed.value = false
+  error.value = ''
 })
 </script>
 
@@ -816,6 +935,16 @@ watch(() => [searchParams.value.departureDate, searchParams.value.returnDate, se
   padding: 1.5rem 1.75rem;
   box-shadow: 0 10px 30px rgba(0,0,0,0.06);
   border: 1px solid #e5e7eb;
+}
+
+.search-form .compact .form-input,
+.search-form .compact .form-select {
+  height: 48px;
+  padding-left: 2.25rem;
+}
+
+.search-form .compact label {
+  font-size: 0.7rem;
 }
 
 .form-row-horizontal {
@@ -979,6 +1108,10 @@ watch(() => [searchParams.value.departureDate, searchParams.value.returnDate, se
   white-space: nowrap;
 }
 
+.show-all-elevated {
+  box-shadow: 0 10px 24px rgba(124, 58, 237, 0.35);
+}
+
 .show-all-btn:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 10px 20px rgba(139, 92, 246, 0.3);
@@ -1063,7 +1196,7 @@ watch(() => [searchParams.value.departureDate, searchParams.value.returnDate, se
 }
 
 .progress-bar {
-  background: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.25);
   border-radius: 1rem;
   padding: 0.5rem;
   margin-top: 1rem;
@@ -1081,6 +1214,12 @@ watch(() => [searchParams.value.departureDate, searchParams.value.returnDate, se
   border-radius: 2px;
   margin-top: 0.5rem;
   width: 33%;
+}
+
+/* animación sutil de carga */
+.loading-state .spinner {
+  border: 4px solid rgba(255,255,255,0.25);
+  border-top: 4px solid #fff;
 }
 
 /* Filters */
@@ -1344,6 +1483,12 @@ watch(() => [searchParams.value.departureDate, searchParams.value.returnDate, se
   text-align: center;
   padding: 3rem;
   color: white;
+}
+
+.no-flights {
+  background: rgba(255,255,255,0.06);
+  border-radius: 1rem;
+  backdrop-filter: blur(2px);
 }
 
 .spinner {

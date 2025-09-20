@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import com.sources.app.entities.FlightFare;
 import java.util.HashMap;
+import java.util.ArrayList;
 
 public class FlightDAO {
 
@@ -194,6 +195,98 @@ public class FlightDAO {
         } catch (Exception e) {
             e.printStackTrace();
             return new HashMap<>();
+        }
+    }
+
+    /**
+     * Búsqueda dinámica de vuelos con filtros opcionales.
+     * - Si seatCategory está presente, los filtros de precio aplican sobre FlightFare.totalPrice
+     * - Si no, los filtros de precio aplican sobre Flight.basePrice
+     */
+    public List<Flight> searchFlights(
+            Integer originCityId,
+            Integer destinationCityId,
+            String departureDate,
+            String returnDate,
+            Integer passengers,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            String seatCategory,
+            Boolean nonstop
+    ) {
+        Session session = HibernateUtil.getSessionFactory().openSession();
+        try {
+            StringBuilder hql = new StringBuilder(
+                "SELECT DISTINCT f FROM Flight f " +
+                "LEFT JOIN FETCH f.originCity " +
+                "LEFT JOIN FETCH f.destinationCity " +
+                "WHERE 1=1"
+            );
+
+            java.util.Map<String, Object> params = new java.util.HashMap<>();
+
+            if (originCityId != null && originCityId > 0) {
+                hql.append(" AND f.originCity.idCity = :originId");
+                params.put("originId", originCityId.longValue());
+            }
+            if (destinationCityId != null && destinationCityId > 0) {
+                hql.append(" AND f.destinationCity.idCity = :destId");
+                params.put("destId", destinationCityId.longValue());
+            }
+            if (departureDate != null && !departureDate.isBlank()) {
+                hql.append(" AND f.departureDate = :depDate");
+                params.put("depDate", departureDate);
+            }
+            // returnDate se usa en round-trip en el front; aquí no es vinculante para un único vuelo
+
+            if (seatCategory != null && !seatCategory.isBlank()) {
+                hql.append(" AND EXISTS (SELECT 1 FROM FlightFare ff WHERE ff.flight.idFlight = f.idFlight AND ff.seatCategory = :seatCat");
+                params.put("seatCat", seatCategory);
+                if (minPrice != null) {
+                    hql.append(" AND ff.totalPrice >= :minFare");
+                    params.put("minFare", minPrice);
+                }
+                if (maxPrice != null) {
+                    hql.append(" AND ff.totalPrice <= :maxFare");
+                    params.put("maxFare", maxPrice);
+                }
+                hql.append(")");
+            } else {
+                if (minPrice != null) {
+                    hql.append(" AND f.basePrice >= :minPrice");
+                    params.put("minPrice", minPrice);
+                }
+                if (maxPrice != null) {
+                    hql.append(" AND f.basePrice <= :maxPrice");
+                    params.put("maxPrice", maxPrice);
+                }
+            }
+
+            // nonstop: en este modelo los legs no están activos; por ahora ignoramos o dejamos como futuro
+
+            hql.append(" ORDER BY f.departureDate, f.departureTime");
+
+            Query<Flight> query = session.createQuery(hql.toString(), Flight.class);
+            for (var e : params.entrySet()) {
+                query.setParameter(e.getKey(), e.getValue());
+            }
+
+            return query.list();
+        } finally {
+            session.close();
+        }
+    }
+
+    /**
+     * Calcula el promedio de rating para un vuelo. Si no hay reseñas, devuelve null.
+     */
+    public Double getAverageRating(Integer flightId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            String hql = "SELECT AVG(fr.rating) FROM FlightReview fr WHERE fr.flight.idFlight = :fid";
+            Double avg = session.createQuery(hql, Double.class)
+                    .setParameter("fid", flightId)
+                    .uniqueResult();
+            return avg;
         }
     }
 
@@ -533,10 +626,7 @@ public class FlightDAO {
                 return null;
             }
             
-            // Verificar que el vuelo puede ser modificado
-            if (!flight.canBeModified()) {
-                return null;
-            }
+            // Permitir modificación independientemente del estado
             
             // Actualizar campos si están presentes en updateData
             if (updateData.has("flightNumber")) {

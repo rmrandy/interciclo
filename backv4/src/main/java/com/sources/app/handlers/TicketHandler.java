@@ -212,6 +212,8 @@ public class TicketHandler implements HttpHandler {
             Ticket ticket = ticketDAO.createTicketWithValidation(ticketData);
             
             if (ticket != null) {
+                // Generar código de boleto simple si no existe
+                String reservationCode = "BK" + System.currentTimeMillis();
                 // Enviar correo de confirmación (no bloqueante para el flujo principal)
                 try {
                     Map<String, Object> emailPayload = new HashMap<>();
@@ -224,6 +226,7 @@ public class TicketHandler implements HttpHandler {
                         "<p>Tu compra fue exitosa. Estos son los detalles de tu boleto:</p>" +
                         "<table cellpadding=\"6\" style=\"border-collapse:collapse;background:#f8fafc;border-radius:8px\">" +
                         row("Ticket ID", String.valueOf(ticket.getIdTicket())) +
+                        row("Código", reservationCode) +
                         row("Vuelo", String.valueOf(ticket.getFlight().getIdFlight())) +
                         row("Categoría", ticket.getSeatCategory()) +
                         row("Asiento", ticket.getSeatNumber()) +
@@ -243,7 +246,7 @@ public class TicketHandler implements HttpHandler {
                 response.put("success", true);
                 response.put("message", "Boleto creado exitosamente");
                 response.put("ticketId", ticket.getIdTicket());
-                response.put("reservationCode", "N/A");
+                response.put("reservationCode", reservationCode);
                 response.put("totalAmount", ticket.getTotalAmount());
                 response.put("seatNumber", ticket.getSeatNumber());
                 response.put("bookingDate", ticket.getBookingDate());

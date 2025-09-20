@@ -22,6 +22,7 @@
           <option value="">Todos los estados</option>
           <option value="DRAFT">Borrador</option>
           <option value="PUBLISHED">Publicado</option>
+          <option value="SCHEDULED">Programado</option>
           <option value="CANCELLED">Cancelado</option>
           <option value="COMPLETED">Completado</option>
         </select>
@@ -127,7 +128,7 @@
             </div>
             <div class="form-group">
               <label>Estado:</label>
-              <select v-model="editForm.status" required>
+              <select v-model="editForm.status" required disabled title="El estado no se puede cambiar desde aquí">
                 <option value="DRAFT">Borrador</option>
                 <option value="PUBLISHED">Publicado</option>
                 <option value="CANCELLED">Cancelado</option>
@@ -139,7 +140,7 @@
           <div class="form-row">
             <div class="form-group">
               <label>Ciudad origen:</label>
-              <select v-model="editForm.originCityId" required>
+              <select v-model="editForm.originCityId" required disabled title="El origen no se puede cambiar">
                 <option v-for="city in cities" :key="city.idCity" :value="city.idCity">
                   {{ city.name }}
                 </option>
@@ -147,7 +148,7 @@
             </div>
             <div class="form-group">
               <label>Ciudad destino:</label>
-              <select v-model="editForm.destinationCityId" required>
+              <select v-model="editForm.destinationCityId" required disabled title="El destino no se puede cambiar">
                 <option v-for="city in cities" :key="city.idCity" :value="city.idCity">
                   {{ city.name }}
                 </option>
@@ -272,6 +273,7 @@ const cities = ref<any[]>([])
 const searchTerm = ref('')
 const statusFilter = ref('')
 const filteredFlights = ref<any[]>([])
+const isLoadingEdit = ref(false)
 
 // Modales
 const showEditModal = ref(false)
@@ -308,6 +310,7 @@ const getFlightStatusClass = (status: string) => {
   switch (status) {
     case 'DRAFT': return 'status-draft'
     case 'PUBLISHED': return 'status-published'
+    case 'SCHEDULED': return 'status-scheduled'
     case 'CANCELLED': return 'status-cancelled'
     case 'COMPLETED': return 'status-completed'
     default: return ''
@@ -318,6 +321,7 @@ const getStatusClass = (status: string) => {
   switch (status) {
     case 'DRAFT': return 'badge-draft'
     case 'PUBLISHED': return 'badge-published'
+    case 'SCHEDULED': return 'badge-scheduled'
     case 'CANCELLED': return 'badge-cancelled'
     case 'COMPLETED': return 'badge-completed'
     default: return ''
@@ -328,6 +332,7 @@ const getStatusLabel = (status: string) => {
   switch (status) {
     case 'DRAFT': return 'Borrador'
     case 'PUBLISHED': return 'Publicado'
+    case 'SCHEDULED': return 'Programado'
     case 'CANCELLED': return 'Cancelado'
     case 'COMPLETED': return 'Completado'
     default: return status
@@ -342,7 +347,15 @@ const loadFlights = async () => {
     const response = await airlineApi.getFlights()
     console.log('📡 Respuesta de getFlights:', response)
     if (response.success) {
-      flights.value = response.flights
+      // Enriquecer objetos de vuelo con flags requeridos por la UI cuando el backend no los provee
+      const enriched = (response.flights || []).map((f: any) => ({
+        ...f,
+        isDraft: f?.isDraft ?? (String(f?.status || '').toUpperCase() === 'DRAFT'),
+        canBeModified: f?.canBeModified ?? (['DRAFT', 'PUBLISHED', 'SCHEDULED'].includes(String(f?.status || '').toUpperCase())),
+        // Por defecto permitimos cancelar salvo que esté COMPLETED (o ya CANCELLED)
+        canBeCancelled: f?.canBeCancelled ?? (!['COMPLETED'].includes(String(f?.status || '').toUpperCase())),
+      }))
+      flights.value = enriched
       console.log('✅ Vuelos cargados:', flights.value.length)
       filterFlights()
     } else {
@@ -386,29 +399,67 @@ const filterFlights = () => {
 }
 
 // Métodos de edición
-const editFlight = (flight: any) => {
-  editingFlight.value = flight
-  editForm.value = {
-    flightNumber: flight.flightNumber,
-    status: flight.status,
-    originCityId: flight.originCityId || 1,
-    destinationCityId: flight.destinationCityId || 1,
-    departureDate: flight.departureDate,
-    departureTime: flight.departureTime,
-    arrivalDate: flight.arrivalDate,
-    arrivalTime: flight.arrivalTime,
-    basePrice: flight.basePrice,
-    availableSeats: flight.availableSeats,
-    gate: flight.gate || '',
-    terminal: flight.terminal || '',
-    updatedBy: 1
+const editFlight = async (flight: any) => {
+  isLoadingEdit.value = true
+  try {
+    editingFlight.value = flight
+
+    // Intentar obtener detalle completo desde el backend
+    let source: any = flight
+    try {
+      const res = await airlineApi.getFlight(flight.idFlight)
+      if (res?.success && res?.flight) {
+        source = res.flight
+      }
+    } catch (e) {
+      console.warn('No se pudo obtener el detalle del vuelo, usando datos de la lista', e)
+    }
+
+    const findCityIdByName = (name: string) => {
+      if (!name) return 1
+      const match = cities.value.find((c: any) => String(c.name).toLowerCase() === String(name).toLowerCase())
+      return match ? match.idCity : 1
+    }
+
+    editForm.value = {
+      flightNumber: source.flightNumber,
+      status: source.status,
+      originCityId: source.originCityId || source.originCity?.idCity || findCityIdByName(source.originCity),
+      destinationCityId: source.destinationCityId || source.destinationCity?.idCity || findCityIdByName(source.destinationCity),
+      departureDate: source.departureDate,
+      departureTime: source.departureTime,
+      arrivalDate: source.arrivalDate,
+      arrivalTime: source.arrivalTime,
+      basePrice: source.basePrice,
+      availableSeats: source.availableSeats,
+      gate: source.gate || '',
+      terminal: source.terminal || '',
+      updatedBy: 1
+    }
+
+    showEditModal.value = true
+  } finally {
+    isLoadingEdit.value = false
   }
-  showEditModal.value = true
 }
 
 const saveFlightChanges = async () => {
   try {
-    const response = await airlineApi.updateFlight(editingFlight.value.idFlight, editForm.value)
+    // Enviar solo campos permitidos (sin cambiar origen/destino)
+    const payload = {
+      flightNumber: editForm.value.flightNumber,
+      departureDate: editForm.value.departureDate,
+      departureTime: editForm.value.departureTime,
+      arrivalDate: editForm.value.arrivalDate,
+      arrivalTime: editForm.value.arrivalTime,
+      basePrice: editForm.value.basePrice,
+      availableSeats: editForm.value.availableSeats,
+      gate: editForm.value.gate,
+      terminal: editForm.value.terminal,
+      updatedBy: editForm.value.updatedBy
+    }
+
+    const response = await airlineApi.updateFlight(editingFlight.value.idFlight, payload)
     if (response.success) {
       // Actualizar la lista
       await loadFlights()

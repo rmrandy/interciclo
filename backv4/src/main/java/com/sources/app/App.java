@@ -165,6 +165,8 @@ public class App {
         // Endpoints para perfil de usuario
         server.createContext("/api/airline/user/profile", new UserProfileHandler(userDAO));
         server.createContext("/api/health", new HealthHandler());
+        // Analytics: capturar y consultar clics
+        server.createContext("/api/analytics", new AnalyticsHandler());
         
         server.setExecutor(null); // Usa el executor por defecto
         server.start();
