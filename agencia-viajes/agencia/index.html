@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Fuerza la URL del backend Django (proxy) para evitar autodetección y CORS -->
-    <meta name="backend-url" content="http://172.16.56.36:5001/api" />
+    <!-- Usar backend relativo para mismo origen/proxy de desarrollo -->
+    <meta name="backend-base" content="/api" />
     <title>Vite + React</title>
   </head>
   <body>

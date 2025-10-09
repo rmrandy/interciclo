@@ -48,10 +48,26 @@
               <!-- Flight info -->
               <div class="flight-info">
                 <div class="flight-header">
-                  <h3>Vuelo {{ item.flight.flightNumber }}</h3>
+                  <h3>
+                    Vuelo {{ item.flight.flightNumber }}
+                    <!-- Badge si es parte de vuelo con escala -->
+                    <span v-if="item.flight.isStopoverSegment" 
+                          style="background: #fbbf24; color: #78350f; padding: 4px 8px; border-radius: 999px; font-size: 0.75rem; margin-left: 8px;">
+                      ✈️ Segmento {{ item.flight.segmentNumber }}/{{ item.flight.totalSegments }}
+                    </span>
+                  </h3>
                   <div class="flight-status" :class="getStatusClass(item.flight.status)">
                     {{ getStatusText(item.flight.status) }}
                   </div>
+                </div>
+                
+                <!-- Indicador de escala -->
+                <div v-if="item.flight.isStopoverSegment && item.flight.segmentNumber === 1" 
+                     style="background: #fef3c7; padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid #f59e0b;">
+                  <strong style="color: #92400e;">🔄 Vuelo con escala en {{ item.flight.viaCityName }}</strong>
+                  <p style="font-size: 0.875rem; color: #78350f; margin: 4px 0 0 0;">
+                    Este viaje incluye 2 segmentos
+                  </p>
                 </div>
                 
                 <div class="flight-route">

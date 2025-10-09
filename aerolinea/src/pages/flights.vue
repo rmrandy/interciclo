@@ -17,9 +17,9 @@
               <label>Origen</label>
               <div class="input-with-icon">
                 <span class="input-icon">✈️</span>
-                <select v-model.number="searchParams.origin" class="form-select">
-                  <option value="">Seleccionar origen</option>
-                  <option v-for="city in cities" :key="city.idCity" :value="city.idCity">
+                <select v-model.number="searchParams.origin" class="form-select" style="color: #1f2937 !important;">
+                  <option value="" style="color: #9ca3af;">Selecciona origen</option>
+                  <option v-for="city in cities" :key="city.idCity" :value="city.idCity" style="color: #1f2937;">
                     {{ city.name }}, {{ city.country }}
                   </option>
                 </select>
@@ -32,9 +32,9 @@
               <label>Destino</label>
               <div class="input-with-icon">
                 <span class="input-icon">✈️</span>
-                <select v-model.number="searchParams.destination" class="form-select">
-                  <option value="">Seleccionar destino</option>
-                  <option v-for="city in cities" :key="city.idCity" :value="city.idCity">
+                <select v-model.number="searchParams.destination" class="form-select" style="color: #1f2937 !important;">
+                  <option value="" style="color: #9ca3af;">Selecciona destino</option>
+                  <option v-for="city in cities" :key="city.idCity" :value="city.idCity" style="color: #1f2937;">
                     {{ city.name }}, {{ city.country }}
                   </option>
                 </select>
@@ -52,6 +52,7 @@
                     class="form-input"
                     type="date"
                     v-model="searchParams.departureDate"
+                    style="color: #1f2937 !important; color-scheme: light;"
                   />
                 </div>
                 <div v-if="searchParams.flightType==='round-trip'" class="input-with-icon" style="flex:1;">
@@ -60,6 +61,7 @@
                     class="form-input"
                     type="date"
                     v-model="searchParams.returnDate"
+                    style="color: #1f2937 !important; color-scheme: light;"
                   />
                 </div>
               </div>
@@ -71,11 +73,11 @@
               <label>Pasajeros</label>
               <div class="input-with-icon">
                 <span class="input-icon">👤</span>
-                <select v-model.number="searchParams.passengers" class="form-select">
-                  <option value="1">1</option>
-                  <option value="2">2</option>
-                  <option value="3">3</option>
-                  <option value="4">4</option>
+                <select v-model.number="searchParams.passengers" class="form-select" style="color: #1f2937 !important;">
+                  <option value="1" style="color: #1f2937;">1 Pasajero</option>
+                  <option value="2" style="color: #1f2937;">2 Pasajeros</option>
+                  <option value="3" style="color: #1f2937;">3 Pasajeros</option>
+                  <option value="4" style="color: #1f2937;">4 Pasajeros</option>
                 </select>
                 <span class="dropdown-arrow">▼</span>
               </div>
@@ -88,14 +90,14 @@
               <label>Precio mínimo</label>
               <div class="input-with-icon">
                 <span class="input-icon">💵</span>
-                <input class="form-input" type="number" min="0" step="1" v-model.number="filtersState.minPrice" />
+                <input class="form-input" type="number" min="0" step="1" v-model.number="filtersState.minPrice" placeholder="0" style="color: #1f2937 !important;" />
               </div>
             </div>
             <div class="form-group compact">
               <label>Precio máximo</label>
               <div class="input-with-icon">
                 <span class="input-icon">💵</span>
-                <input class="form-input" type="number" min="0" step="1" v-model.number="filtersState.maxPrice" />
+                <input class="form-input" type="number" min="0" step="1" v-model.number="filtersState.maxPrice" placeholder="1025" style="color: #1f2937 !important;" />
               </div>
             </div>
 
@@ -106,13 +108,13 @@
               <label>Rating mínimo</label>
               <div class="input-with-icon">
                 <span class="input-icon">⭐</span>
-                <select class="form-select" v-model.number="filtersState.minRating">
-                  <option :value="0">Cualquiera</option>
-                  <option :value="1">1+</option>
-                  <option :value="2">2+</option>
-                  <option :value="3">3+</option>
-                  <option :value="4">4+</option>
-                  <option :value="5">5</option>
+                <select class="form-select" v-model.number="filtersState.minRating" style="color: #1f2937 !important;">
+                  <option :value="0" style="color: #1f2937;">Cualquiera</option>
+                  <option :value="1" style="color: #1f2937;">⭐ 1+</option>
+                  <option :value="2" style="color: #1f2937;">⭐⭐ 2+</option>
+                  <option :value="3" style="color: #1f2937;">⭐⭐⭐ 3+</option>
+                  <option :value="4" style="color: #1f2937;">⭐⭐⭐⭐ 4+</option>
+                  <option :value="5" style="color: #1f2937;">⭐⭐⭐⭐⭐ 5</option>
                 </select>
                 <span class="dropdown-arrow">▼</span>
               </div>
@@ -121,10 +123,10 @@
               <label>Tipo de asiento</label>
               <div class="input-with-icon">
                 <span class="input-icon">🪑</span>
-                <select class="form-select" v-model="filtersState.seatCategory">
-                  <option value="">Cualquiera</option>
-                  <option value="ECONOMY">ECONOMY</option>
-                  <option value="BUSINESS">BUSINESS</option>
+                <select class="form-select" v-model="filtersState.seatCategory" style="color: #1f2937 !important;">
+                  <option value="" style="color: #9ca3af;">Cualquiera</option>
+                  <option value="ECONOMY" style="color: #1f2937;">💺 Economy</option>
+                  <option value="BUSINESS" style="color: #1f2937;">✈️ Business</option>
                 </select>
                 <span class="dropdown-arrow">▼</span>
               </div>
@@ -139,7 +141,7 @@
           
           <div class="secondary-actions">
             <button @click="resetFiltersAndShowAll" class="show-all-btn show-all-elevated" :disabled="loading">
-              {{ loading ? 'Cargando...' : '📋 Ver Todos los Vuelos' }}
+              {{ loading ? 'Cargando...' : 'Borrar filtros' }}
             </button>
           </div>
         </div>
@@ -196,7 +198,7 @@
           <p>Buscando vuelos disponibles...</p>
         </div>
         
-        <div v-else-if="filteredFlights.length === 0" class="no-flights">
+        <div v-else-if="filteredFlights.length === 0 && oneStopFlights.length === 0" class="no-flights">
           <div class="no-flights-icon">✈️</div>
           <h3>No se encontraron vuelos</h3>
           <p>Intenta cambiar las fechas o destinos de búsqueda</p>
@@ -291,6 +293,125 @@
               </div>
             </div>
           </div>
+
+          <!-- ✈️ VUELOS CON ESCALA (1 parada) -->
+          <div v-if="oneStopFlights.length > 0" style="margin-top: 32px;">
+            <h3 style="color: #1f2937; font-size: 1.5rem; margin-bottom: 16px; padding-left: 8px; border-left: 4px solid #f59e0b;">
+              ✈️ Vuelos con 1 Escala
+            </h3>
+            <div 
+              v-for="(route, index) in oneStopFlights" 
+              :key="'onestop-' + index"
+              class="flight-card"
+              style="border: 2px solid #fbbf24; background: linear-gradient(to right, #fffbeb, #ffffff);"
+            >
+              <div class="flight-info">
+                <div style="margin-bottom: 16px; padding: 8px; background: #fef3c7; border-radius: 8px;">
+                  <strong style="color: #92400e;">🔄 Ruta con escala en {{ route.viaCityName }}</strong>
+                </div>
+                
+                <!-- Segmento 1 -->
+                <div style="margin-bottom: 12px; padding: 12px; background: #f9fafb; border-radius: 8px;">
+                  <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">
+                    Segmento 1: {{ route.firstSegment.originCity }} → {{ route.firstSegment.destinationCity }}
+                  </div>
+                  <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #6b7280;">
+                    <span>Vuelo {{ route.firstSegment.flightNumber }}</span>
+                    <span>{{ route.firstSegment.departureDate }} {{ route.firstSegment.departureTime }}</span>
+                    <span>${{ route.firstSegment.basePrice }}</span>
+                  </div>
+                </div>
+                
+                <!-- Segmento 2 -->
+                <div style="padding: 12px; background: #f9fafb; border-radius: 8px;">
+                  <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">
+                    Segmento 2: {{ route.secondSegment.originCity }} → {{ route.secondSegment.destinationCity }}
+                  </div>
+                  <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #6b7280;">
+                    <span>Vuelo {{ route.secondSegment.flightNumber }}</span>
+                    <span>{{ route.secondSegment.departureDate }} {{ route.secondSegment.departureTime }}</span>
+                    <span>${{ route.secondSegment.basePrice }}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="flight-pricing">
+                <div class="price-section">
+                  <div class="price">USD {{ route.totalPrice }}</div>
+                  <div class="price-detail">Total (2 vuelos)</div>
+                </div>
+                <div class="action-buttons">
+                  <button 
+                    @click="bookStopoverFlight(route)" 
+                    class="book-btn"
+                    style="background: #f59e0b;"
+                  >
+                    Comprar con Escala
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 🔄 VUELOS DE VUELTA (Round-Trip) -->
+          <div v-if="returnFlights.length > 0 && searchParams.flightType === 'round-trip'" style="margin-top: 32px;">
+            <h3 style="color: #1f2937; font-size: 1.5rem; margin-bottom: 16px; padding-left: 8px; border-left: 4px solid #10b981;">
+              🔄 Vuelos de Vuelta (Round-Trip)
+            </h3>
+            <div 
+              v-for="returnFlight in returnFlights" 
+              :key="'return-' + returnFlight.idFlight"
+              class="flight-card"
+              style="border: 2px solid #10b981; background: linear-gradient(to right, #d1fae5, #ffffff);"
+            >
+              <div class="flight-info">
+                <div style="margin-bottom: 8px; padding: 6px 12px; background: #d1fae5; border-radius: 999px; display: inline-block;">
+                  <strong style="color: #065f46;">🔙 Vuelo de Vuelta</strong>
+                </div>
+                <div class="flight-times">
+                  <div class="departure">
+                    <div class="time">{{ formatTime(returnFlight.departureTime) || '--:--' }}</div>
+                    <div class="city">{{ returnFlight.originCity }}</div>
+                    <div class="date">{{ formatDate(returnFlight.departureDate) }}</div>
+                  </div>
+                  
+                  <div class="flight-duration">
+                    <div class="duration-line">
+                      <div class="line"></div>
+                      <div class="plane-icon">🔙</div>
+                    </div>
+                    <div class="duration-text">Vuelta</div>
+                    <div class="stops"><span>Directo</span></div>
+                  </div>
+                  
+                  <div class="arrival">
+                    <div class="time">{{ formatTime(returnFlight.arrivalTime) || '--:--' }}</div>
+                    <div class="city">{{ returnFlight.destinationCity }}</div>
+                    <div class="date">{{ formatDate(returnFlight.arrivalDate) }}</div>
+                  </div>
+                </div>
+                
+                <div class="flight-details">
+                  <div class="flight-number">Vuelo {{ returnFlight.flightNumber }}</div>
+                </div>
+              </div>
+              
+              <div class="flight-pricing">
+                <div class="price-section">
+                  <div class="price" style="color: #10b981;">USD {{ formatPrice(returnFlight.basePrice) }}</div>
+                  <div class="price-detail">vuelo de vuelta</div>
+                </div>
+                <div class="action-buttons">
+                  <button @click="viewFlightDetails(returnFlight)" class="details-btn" style="border-color: #10b981; color: #10b981;">
+                    📋 Ver Detalles
+                  </button>
+                  <button @click="bookFlight(returnFlight)" class="book-btn" style="background: #10b981;">
+                    Seleccionar Vuelta
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -332,6 +453,8 @@ const router = useRouter()
 const loading = ref(false)
 const error = ref('')
 const flights = ref<any[]>([])
+const oneStopFlights = ref<any[]>([])  // Vuelos con 1 escala
+const returnFlights = ref<any[]>([])    // Vuelos de vuelta (round-trip)
 const cities = ref<any[]>([])
 const searchPerformed = ref(false)
 const showDebug = ref(false)
@@ -641,6 +764,14 @@ const searchFlights = async () => {
     })
     if (response && response.success) {
       flights.value = response.flights || []
+      oneStopFlights.value = response.oneStopFlights || []
+      returnFlights.value = response.returnFlights || []
+      
+      console.log('📊 Resultados:', {
+        directos: flights.value.length,
+        conEscala: oneStopFlights.value.length,
+        vuelta: returnFlights.value.length
+      })
     }
     searchPerformed.value = true
     console.log('🔍 Búsqueda realizada con filtros')
@@ -666,6 +797,8 @@ const resetFiltersAndShowAll = async () => {
     const resp = await airlineApi.getFlights()
     if (resp && resp.success) {
       flights.value = resp.flights || []
+      oneStopFlights.value = resp.oneStopFlights || []
+      returnFlights.value = resp.returnFlights || []
     }
     searchPerformed.value = true
     error.value = ''
@@ -685,6 +818,20 @@ const bookFlight = (flight: any) => {
     sessionStorage.setItem('selectedItinerary', JSON.stringify(flight))
   } catch {}
   router.push(`/book-flight/${flight.idFlight}`)
+}
+
+/**
+ * Comprar vuelo con escala (2 segmentos)
+ */
+const bookStopoverFlight = (route: any) => {
+  console.log('✈️ Comprando vuelo con escala:', route)
+  try {
+    // Guardar información de la ruta con escala
+    sessionStorage.setItem('stopoverRoute', JSON.stringify(route))
+    sessionStorage.setItem('bookingType', 'STOPOVER')
+  } catch {}
+  // Ir a página de checkout con información de escala
+  router.push(`/flight-details/${route.firstSegment.idFlight}?stopover=true&segment2=${route.secondSegment.idFlight}`)
 }
 
 const viewFlightDetails = (flight: any) => {
@@ -1022,17 +1169,67 @@ watch(() => [searchParams.value.departureDate, searchParams.value.returnDate, se
   width: 100%;
   height: 56px;
   padding: 0 2.25rem 0 2.5rem;
-  border: 2px solid #e5e7eb;
+  border: 2px solid #d1d5db !important;
   border-radius: 0.75rem;
-  font-size: 0.9rem;
+  font-size: 1.1rem !important;
   transition: all 0.2s;
-  background: #ffffff;
-  color: #111827;
-  font-weight: 600;
+  background: #ffffff !important;
+  color: #000000 !important;
+  font-weight: 700 !important;
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.03) inset;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08) inset;
+  -webkit-text-fill-color: #000000 !important;
+}
+
+/* Mejorar visibilidad de placeholders */
+.form-input::placeholder {
+  color: #9ca3af !important;
+  font-weight: 500 !important;
+  -webkit-text-fill-color: #9ca3af !important;
+}
+
+/* Estilos para opciones de select */
+.form-select option {
+  color: #000000 !important;
+  background: #ffffff !important;
+  padding: 0.75rem !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+}
+
+.form-select option:first-child {
+  color: #9ca3af !important;
+  font-weight: 500 !important;
+}
+
+.form-select option:checked {
+  background: #eff6ff !important;
+  color: #000000 !important;
+  font-weight: 700 !important;
+}
+
+/* Asegurar visibilidad en inputs de fecha */
+input[type="date"].form-input {
+  color: #000000 !important;
+  font-weight: 700 !important;
+  -webkit-text-fill-color: #000000 !important;
+}
+
+input[type="date"].form-input::-webkit-datetime-edit-text,
+input[type="date"].form-input::-webkit-datetime-edit-month-field,
+input[type="date"].form-input::-webkit-datetime-edit-day-field,
+input[type="date"].form-input::-webkit-datetime-edit-year-field {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+}
+
+/* Inputs de número */
+input[type="number"].form-input {
+  color: #000000 !important;
+  font-weight: 700 !important;
+  -webkit-text-fill-color: #000000 !important;
 }
 
 .form-select:focus,

@@ -17,6 +17,7 @@ import Policies from "./pages/admin/policies.vue";
 import RegisterClient from "./pages/employee/register-client.vue";
 import ClientManagement from "./pages/admin/client-management.vue";
 import SystemConfiguration from "./pages/admin/system-configuration.vue";
+import SiteSettings from "./pages/admin/site-settings.vue";
 import Analytics from "./pages/admin/analytics.vue";
 import AircraftSeatConfig from "./pages/admin/aircraft-seat-config.vue";
 import UserServices from "./pages/user-services.vue";
@@ -221,6 +222,11 @@ const routes = [
     path: '/admin/configuration',
     component: SystemConfiguration,
     beforeEnter: requireEmployeeOrAdmin // Permitir a empleados y admins
+  },
+  {
+    path: '/admin/site-settings',
+    component: SiteSettings,
+    beforeEnter: requireAdmin
   },
   {
     path: '/admin/informative-pages',

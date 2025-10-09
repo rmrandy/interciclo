@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { integrationsApi } from '../services/api.js';
+import { authApi } from '../services/api.js';
 
 const AuthContext = createContext(null);
 
@@ -32,26 +32,29 @@ export function AuthProvider({ children }) {
 	}, [auth]);
 
     async function login(email, password) {
-        const res = await integrationsApi.loginAirline(email, password);
-        // Derivar user/token según la Aerolínea
-        const userObj = res?.user || res?.data?.user;
+        // Login contra el backend propio de la Agencia
+        console.log('[AuthContext] Llamando authApi.login con:', email);
+        const res = await authApi.login(email, password);
+        console.log('[AuthContext] Respuesta cruda:', res);
+        const userObj = res?.user || res?.data?.user || res?.data; // tolerante a distintos formatos
         const tokenVal = res?.token || res?.data?.token || null;
         if (userObj) {
+            console.log('[AuthContext] Usuario obtenido:', userObj);
             const normalizedUser = { ...userObj, role: String(userObj.role || 'user').toLowerCase() };
-            try { localStorage.setItem('user', JSON.stringify(normalizedUser)); } catch {}
-            setAuth({ token: tokenVal, user: normalizedUser });
+            setAuth({ token: tokenVal, user: normalizedUser }); // se persiste en agencia_auth via useEffect
             return { ok: true };
         }
+        console.warn('[AuthContext] No se obtuvo usuario válido en la respuesta');
         return { ok: false, message: res?.message || 'Credenciales inválidas' };
     }
 
     async function register(payload) {
-        const res = await integrationsApi.registerAirline(payload);
-        const userObj = res?.user || res?.data?.user;
+        // Registro contra el backend propio de la Agencia
+        const res = await authApi.register(payload);
+        const userObj = res?.user || res?.data?.user || res?.data;
         const tokenVal = res?.token || res?.data?.token || null;
         if (userObj) {
             const normalizedUser = { ...userObj, role: String(userObj.role || 'user').toLowerCase() };
-            try { localStorage.setItem('user', JSON.stringify(normalizedUser)); } catch {}
             setAuth({ token: tokenVal, user: normalizedUser });
             return { ok: true };
         }

@@ -161,6 +161,8 @@ public class App {
         server.createContext("/api/configurable-amount/", new ConfigurableAmountHandler(configurableAmountDAO));
         // Registrar el nuevo handler para proxy de servicios de hospital
         server.createContext("/api/hospital-proxy", new HospitalServiceProxyHandler(hospitalDAO));
+        // Site settings (branding Header/Footer)
+        server.createContext("/api/site-settings", new SiteSettingsHandler(new SystemConfigDAO()));
         
         // Endpoints para perfil de usuario
         server.createContext("/api/airline/user/profile", new UserProfileHandler(userDAO));

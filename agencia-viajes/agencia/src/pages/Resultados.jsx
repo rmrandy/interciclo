@@ -9,6 +9,8 @@ function normalize(str) {
 export default function Resultados() {
 	const { state } = useLocation();
 	const [flights, setFlights] = useState([]);
+	const [oneStopFlights, setOneStopFlights] = useState([]);  // Vuelos con 1 escala
+	const [returnFlights, setReturnFlights] = useState([]);     // Vuelos de vuelta
 	const [error, setError] = useState('');
 	const [loading, setLoading] = useState(true);
 
@@ -19,6 +21,16 @@ export default function Resultados() {
 			if (!mounted) return;
 			const list = Array.isArray(res.flights) ? res.flights : [];
 			setFlights(list);
+			
+			// ✈️ Capturar vuelos con escala y round-trip del backend
+			setOneStopFlights(res.oneStopFlights || []);
+			setReturnFlights(res.returnFlights || []);
+			
+			console.log('📊 Resultados:', {
+				directos: list.length,
+				conEscala: (res.oneStopFlights || []).length,
+				vuelta: (res.returnFlights || []).length
+			});
 		}).catch(e => {
 			if (!mounted) return;
 			setError(e.message || 'Error al cargar vuelos');
@@ -74,6 +86,89 @@ export default function Resultados() {
                     </li>
 				))}
 			</ul>
+
+			{/* ✈️ VUELOS CON ESCALA (1 parada) */}
+			{oneStopFlights.length > 0 && (
+				<div style={{ marginTop: 32 }}>
+					<h3 style={{ color: '#1f2937', fontSize: '1.5rem', marginBottom: 16, paddingLeft: 8, borderLeft: '4px solid #f59e0b' }}>
+						✈️ Vuelos con 1 Escala
+					</h3>
+					<ul className="clean grid">
+						{oneStopFlights.map((route, index) => (
+							<li key={'onestop-' + index} className="airline-card" style={{ border: '2px solid #fbbf24', background: 'linear-gradient(to right, #fffbeb, #ffffff)' }}>
+								<div style={{ marginBottom: 16, padding: 8, background: '#fef3c7', borderRadius: 8 }}>
+									<strong style={{ color: '#92400e' }}>🔄 Ruta con escala en {route.viaCityName}</strong>
+								</div>
+								
+								{/* Segmento 1 */}
+								<div style={{ marginBottom: 12, padding: 12, background: '#f9fafb', borderRadius: 8 }}>
+									<div style={{ fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+										Segmento 1: {route.firstSegment.originCity} → {route.firstSegment.destinationCity}
+									</div>
+									<div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#6b7280' }}>
+										<span>Vuelo {route.firstSegment.flightNumber}</span>
+										<span>{route.firstSegment.departureDate} {route.firstSegment.departureTime}</span>
+										<span>${route.firstSegment.basePrice}</span>
+									</div>
+								</div>
+								
+								{/* Segmento 2 */}
+								<div style={{ padding: 12, background: '#f9fafb', borderRadius: 8, marginBottom: 16 }}>
+									<div style={{ fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+										Segmento 2: {route.secondSegment.originCity} → {route.secondSegment.destinationCity}
+									</div>
+									<div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#6b7280' }}>
+										<span>Vuelo {route.secondSegment.flightNumber}</span>
+										<span>{route.secondSegment.departureDate} {route.secondSegment.departureTime}</span>
+										<span>${route.secondSegment.basePrice}</span>
+									</div>
+								</div>
+								
+								<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, borderTop: '2px solid #fef3c7' }}>
+									<div>
+										<strong style={{ fontSize: '1.25rem', color: '#059669' }}>Total: ${route.totalPrice}</strong>
+										<p style={{ fontSize: '0.875rem', color: '#6b7280', margin: '4px 0 0 0' }}>2 vuelos incluidos</p>
+									</div>
+									<Link 
+										className="btn btn-primary" 
+										to={`/compra?stopover=true&segment1=${route.firstSegment.idFlight}&segment2=${route.secondSegment.idFlight}&precio=${route.totalPrice}`}
+										style={{ background: '#f59e0b' }}
+									>
+										Comprar con Escala
+									</Link>
+								</div>
+							</li>
+						))}
+					</ul>
+				</div>
+			)}
+
+			{/* 🔄 VUELOS DE VUELTA (Round-Trip) */}
+			{returnFlights.length > 0 && (
+				<div style={{ marginTop: 32 }}>
+					<h3 style={{ color: '#1f2937', fontSize: '1.5rem', marginBottom: 16, paddingLeft: 8, borderLeft: '4px solid #10b981' }}>
+						🔄 Vuelos de Vuelta (Round-Trip)
+					</h3>
+					<ul className="clean grid">
+						{returnFlights.map((returnFlight) => (
+							<li key={'return-' + returnFlight.idFlight} className="airline-card" style={{ border: '2px solid #10b981', background: 'linear-gradient(to right, #d1fae5, #ffffff)' }}>
+								<div style={{ marginBottom: 8, padding: '6px 12px', background: '#d1fae5', borderRadius: 999, display: 'inline-block' }}>
+									<strong style={{ color: '#065f46' }}>🔙 Vuelo de Vuelta</strong>
+								</div>
+								<div style={{ marginTop: 12 }}>
+									<div style={{ fontWeight: 700, fontSize: '1.05rem', marginBottom: 8 }}>{returnFlight.flightNumber}</div>
+									<div className="small" style={{ marginBottom: 4 }}>{returnFlight.originCity} → {returnFlight.destinationCity}</div>
+									<div className="small" style={{ marginBottom: 12 }}>Salida: {returnFlight.departureDate} {returnFlight.departureTime}</div>
+									<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+										<span className="price-pill" style={{ background: '#10b981', color: '#fff' }}>${returnFlight.basePrice}</span>
+										<Link className="btn" to={`/vuelo/${returnFlight.idFlight}`}>Ver detalle</Link>
+									</div>
+								</div>
+							</li>
+						))}
+					</ul>
+				</div>
+			)}
 		</section>
 	);
 }

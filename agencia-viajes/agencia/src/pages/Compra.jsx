@@ -36,7 +36,7 @@ export default function Compra() {
     // con respaldo usando el usuario autenticado en la Agencia (agencia_auth)
     useEffect(() => {
         try {
-            const rawAirline = localStorage.getItem('user');
+            const rawAirline = localStorage.getItem('airline_user');
             const rawAgency = localStorage.getItem('agencia_auth');
             const airlineUser = rawAirline ? JSON.parse(rawAirline) : null;
             const agencyAuth = rawAgency ? JSON.parse(rawAgency) : null;
@@ -148,31 +148,38 @@ export default function Compra() {
 	function comprar(e) {
 		e.preventDefault();
         setError(''); setSuccess(null);
-        const rawUser = localStorage.getItem('user');
-        const user = rawUser ? JSON.parse(rawUser) : null;
-        const resolvedUserId = user?.idUser || user?.id || user?.userId || null;
-        if (!resolvedUserId) {
-            setError('Debes iniciar sesión en la Aerolínea para comprar.');
+        
+        // 🏢 COMPRA EMPRESARIAL: No requiere login en aerolínea
+        // La agencia usa su usuario empresarial automáticamente mediante API_KEY
+        // Solo necesitamos validar que el formulario esté completo
+        
+        if (!form.firstName || !form.lastName || !form.email) {
+            setError('Por favor completa todos los campos requeridos del pasajero.');
             return;
         }
-        // Construir payload alineado con TicketHandler
+        
+        // Construir payload para compra empresarial
+        // El backend Django agregará el API_KEY automáticamente
         const payload = {
             flightId: Number(itemId),
-            userId: Number(resolvedUserId),
+            // NO enviamos userId - el backend Java usará el usuario empresarial del API_KEY
             seatNumber: form.seatNumber || 'AUTO',
             seatCategory: form.seatCategory,
             fare:  Number(params.get('precio') || 0) || 0,
             quantity: Number.isFinite(Number(quantity)) ? Math.max(1, Math.min(9, Number(quantity))) : 1,
+            // Datos del pasajero (cliente de la agencia)
             passengerFirstName: form.firstName,
             passengerLastName: form.lastName,
             passengerDocumentType: 'ID_CARD',
-            passengerDocumentNumber: form.passport || String(user.idUser),
+            passengerDocumentNumber: form.passport || 'DOC-' + Date.now(),
             passengerEmail: form.email,
             passengerPhone: form.phone || '',
             specialRequests: '',
             paymentMethod: 'CREDIT_CARD',
             totalAmount: (Number(params.get('precio') || 0) || 0) * (Number(quantity) || 1),
         };
+        
+        console.log('🏢 Compra empresarial - Payload:', payload);
         setLoading(true);
         integrationsApi.createTicket(payload)
             .then(res => {
@@ -196,23 +203,9 @@ export default function Compra() {
             {error && <div className="card" style={{ borderColor:'#fecaca', background:'#fef2f2' }}><strong style={{ color:'#b91c1c' }}>Error:</strong> {error}</div>}
             {success && <div className="card" style={{ borderColor:'#bbf7d0', background:'#f0fdf4' }}><strong style={{ color:'#166534' }}>¡Compra exitosa!</strong><div className="small">Ticket ID: {success.ticketId || '-'}</div></div>}
 
-            {!airlineUser && (
-                <div className="card" style={{ border:'1px solid #e5e7eb', background:'#fafafa' }}>
-                    <h3 style={{ marginTop:0 }}>Inicia sesión en la Aerolínea</h3>
-                    <p className="small" style={{ color:'#6b7280' }}>Necesitamos tu cuenta de la Aerolínea para emitir el boleto.</p>
-                    <form onSubmit={doAirlineLogin} className="grid" style={{ gap:12 }}>
-                        <label className="field">
-                            <span className="label">Correo de Aerolínea</span>
-                            <input className="input" type="email" value={airlineLogin.email} onChange={e => setAirlineLogin(v => ({ ...v, email: e.target.value }))} required />
-                        </label>
-                        <label className="field">
-                            <span className="label">Contraseña</span>
-                            <input className="input" type="password" value={airlineLogin.password} onChange={e => setAirlineLogin(v => ({ ...v, password: e.target.value }))} required />
-                        </label>
-                        <button className="btn btn-primary" type="submit" disabled={airlineLoggingIn}>{airlineLoggingIn ? 'Conectando...' : 'Iniciar sesión'}</button>
-                    </form>
-                </div>
-            )}
+            {/* 🏢 COMPRA EMPRESARIAL: No requiere login en aerolínea 
+                La agencia usa su usuario empresarial automáticamente con API_KEY
+            */}
 
             <form onSubmit={comprar} className="grid card">
                 {/* Resumen de disponibilidad por categoría */}
@@ -288,7 +281,7 @@ export default function Compra() {
                         </label>
                     </div>
                 </div>
-                <button className="btn btn-primary" disabled={loading || !airlineUser}>{loading ? 'Procesando...' : (!airlineUser ? 'Inicia sesión para comprar' : 'Confirmar compra')}</button>
+                <button className="btn btn-primary" disabled={loading}>{loading ? 'Procesando compra...' : 'Confirmar compra'}</button>
 			</form>
 		</section>
 	);

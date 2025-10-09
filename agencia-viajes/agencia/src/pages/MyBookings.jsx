@@ -9,26 +9,51 @@ export default function MyBookings() {
 
 	useEffect(() => {
 		let mounted = true;
-		setLoading(true); setError('');
-		try {
-			const raw = localStorage.getItem('user');
-			const user = raw ? JSON.parse(raw) : null;
-			const userId = user?.idUser || user?.id || user?.userId || null;
-			if (!userId) {
-				setError('Debes iniciar sesión para ver tus reservaciones.');
-				setLoading(false);
-				return;
-			}
-			integrationsApi.ticketsList({ userId }).then(res => {
+		loadCorporateTickets();
+		
+		async function loadCorporateTickets() {
+			try {
+				setLoading(true);
+				setError('');
+				
+				// 🏢 COMPRA EMPRESARIAL: Obtener tickets de la agencia (con API_KEY automático)
+				const response = await fetch('http://localhost:5001/api/integrations/airline/tickets/corporate');
+				const data = await response.json();
+				
 				if (!mounted) return;
-				const list = Array.isArray(res?.tickets) ? res.tickets : [];
-				setTickets(list);
-			}).catch(e => { if (mounted) setError(e?.message || 'Error al cargar tus reservaciones'); })
-			.finally(() => mounted && setLoading(false));
-		} catch (e) {
-			setError('Error leyendo usuario');
-			setLoading(false);
+				
+				if (data.success) {
+					// Adaptar formato de tickets empresariales al formato esperado
+					const adaptedTickets = (data.tickets || []).map(t => ({
+						idTicket: t.ticketId,
+						flightNumber: t.flightNumber,
+						originCity: t.origin,
+						destinationCity: t.destination,
+						departureDate: t.departureDate,
+						departureTime: t.departureTime,
+						passengerName: `${t.passengerFirstName} ${t.passengerLastName}`,
+						passengerEmail: t.passengerEmail,
+						seatCategory: t.seatCategory,
+						seatNumber: t.seatNumber,
+						totalAmount: t.totalAmount,
+						status: t.status,
+						bookingDate: t.bookingDate,
+						bookingTime: t.bookingTime,
+						purchasedBy: t.purchasedBy
+					}));
+					setTickets(adaptedTickets);
+					console.log('✅ Tickets empresariales cargados:', data.total);
+				} else {
+					setError(data.error || 'No se pudieron cargar las reservas');
+				}
+			} catch (err) {
+				console.error('❌ Error cargando tickets:', err);
+				if (mounted) setError('Error de conexión al cargar reservas');
+			} finally {
+				if (mounted) setLoading(false);
+			}
 		}
+		
 		return () => { mounted = false; };
 	}, []);
 
@@ -55,12 +80,17 @@ export default function MyBookings() {
 	return (
 		<section className="section">
 			<div className="airline-gradient-sky airline-shadow-large" style={{ color:'#fff', padding:'24px', borderRadius:16, marginBottom:12 }}>
-				<h2 style={{ margin:0 }}>Mis reservaciones</h2>
-				<p className="small" style={{ color:'rgba(255,255,255,0.9)' }}>Consulta tus boletos y descarga el PDF.</p>
+				<h2 style={{ margin:0 }}>🏢 Reservas de la Agencia</h2>
+				<p className="small" style={{ color:'rgba(255,255,255,0.9)' }}>Todas las compras realizadas desde la agencia. Total: {sorted.length}</p>
 			</div>
-			{loading && <p className="small">Cargando...</p>}
+			{loading && <p className="small">Cargando reservas empresariales...</p>}
 			{error && <div className="card" style={{ borderColor:'#fecaca', background:'#fef2f2' }}><strong style={{ color:'#b91c1c' }}>Error:</strong> {error}</div>}
-			{!loading && !error && sorted.length === 0 && <p className="small">Aún no tienes reservaciones.</p>}
+			{!loading && !error && sorted.length === 0 && (
+				<div className="card" style={{ textAlign:'center', padding:'40px' }}>
+					<div style={{ fontSize:'3rem', marginBottom:'12px' }}>✈️</div>
+					<p className="small" style={{ color:'#6b7280' }}>Aún no hay reservas empresariales. Las compras desde la agencia aparecerán aquí.</p>
+				</div>
+			)}
 			<ul className="clean grid">
 				{sorted.map(t => (
 					<li key={t.idTicket} className="airline-card">
@@ -69,8 +99,8 @@ export default function MyBookings() {
 							<div className="small">{t.originCity} → {t.destinationCity}</div>
 						</div>
 						<div className="small">Vuelo: {t.flightNumber} • Fecha: {t.departureDate} {t.departureTime}</div>
-						<div className="small">Pasajero: {t.passengerName} • Categoría: {t.seatCategory} • Asiento: {t.seatNumber || 'AUTO'}</div>
-						<div className="small">Total: ${t.totalAmount} {t.reservationCode ? `• Código: ${t.reservationCode}` : ''}</div>
+						<div className="small">👤 Pasajero: {t.passengerName} ({t.passengerEmail}) • Categoría: {t.seatCategory} • Asiento: {t.seatNumber || 'AUTO'}</div>
+						<div className="small">💰 Total: ${t.totalAmount} {t.purchasedBy && `• 🏢 ${t.purchasedBy}`}</div>
 						<div style={{ display:'flex', gap:8, marginTop:8, justifyContent:'flex-end' }}>
 							<Link className="btn" to={`/reserva/${t.idTicket}`}>Ver detalle</Link>
 							<button className="btn" onClick={() => downloadPdf(t.idTicket)}>Descargar PDF</button>

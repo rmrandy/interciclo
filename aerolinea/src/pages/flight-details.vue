@@ -933,32 +933,80 @@ const addToCart = () => {
     const currentCart = localStorage.getItem('flight_cart') || '[]'
     const cartItems = JSON.parse(currentCart)
     
-    // Check if flight is already in cart
-    const existingItem = cartItems.find((item: any) => item.flight.idFlight === flight.value.idFlight)
-    if (existingItem) {
-      error.value = 'Este vuelo ya está en tu carrito'
-      return
-    }
+    // 🔍 DETECTAR SI ES VUELO CON ESCALA
+    const stopoverRoute = sessionStorage.getItem('stopoverRoute')
+    const isStopover = stopoverRoute !== null
     
-    // Add flight to cart (without seat selection - will be done in cart)
-    const cartItem = {
-      flight: flight.value,
-      selectedCategory: '',
-      selectedSeat: '',
-      availableSeats: {},
-      processing: false
+    if (isStopover) {
+      // ✈️ VUELO CON ESCALA: Agregar 2 vuelos al carrito
+      const route = JSON.parse(stopoverRoute)
+      
+      console.log('✈️ Agregando vuelo con escala al carrito:', route)
+      
+      // Agregar segmento 1
+      const cartItem1 = {
+        flight: {
+          ...route.firstSegment,
+          isStopoverSegment: true,
+          segmentNumber: 1,
+          totalSegments: 2,
+          viaCityName: route.viaCityName
+        },
+        selectedCategory: '',
+        selectedSeat: '',
+        availableSeats: {},
+        processing: false
+      }
+      
+      // Agregar segmento 2
+      const cartItem2 = {
+        flight: {
+          ...route.secondSegment,
+          isStopoverSegment: true,
+          segmentNumber: 2,
+          totalSegments: 2,
+          viaCityName: route.viaCityName
+        },
+        selectedCategory: '',
+        selectedSeat: '',
+        availableSeats: {},
+        processing: false
+      }
+      
+      cartItems.push(cartItem1)
+      cartItems.push(cartItem2)
+      
+      // Limpiar sessionStorage
+      sessionStorage.removeItem('stopoverRoute')
+      
+      alert(`✅ Vuelo con escala agregado al carrito (2 segmentos)\\n\\nSegmento 1: ${route.firstSegment.originCity} → ${route.firstSegment.destinationCity}\\nSegmento 2: ${route.secondSegment.originCity} → ${route.secondSegment.destinationCity}\\n\\nTotal: $${route.totalPrice}`)
+      
+    } else {
+      // 👤 VUELO DIRECTO: Agregar 1 vuelo normal
+      const existingItem = cartItems.find((item: any) => item.flight.idFlight === flight.value.idFlight)
+      if (existingItem) {
+        error.value = 'Este vuelo ya está en tu carrito'
+        return
+      }
+      
+      const cartItem = {
+        flight: flight.value,
+        selectedCategory: '',
+        selectedSeat: '',
+        availableSeats: {},
+        processing: false
+      }
+      
+      cartItems.push(cartItem)
+      
+      alert('✅ Vuelo agregado al carrito exitosamente')
     }
-    
-    cartItems.push(cartItem)
     
     // Save updated cart
     localStorage.setItem('flight_cart', JSON.stringify(cartItems))
     
-    // Show success message
-    alert('✅ Vuelo agregado al carrito exitosamente')
-    
-    // Optionally redirect to cart
-    // router.push('/cart')
+    // Actualizar contador del carrito (emitir evento)
+    window.dispatchEvent(new Event('cart-updated'))
     
   } catch (err) {
     console.error('Error agregando al carrito:', err)

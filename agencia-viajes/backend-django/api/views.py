@@ -286,6 +286,7 @@ def airlines_detail_view(request, airline_id: str):
             db.airlines.update_one({'_id': oid}, {'$set': updates})
             doc = db.airlines.find_one({'_id': oid})
             doc['_id'] = str(doc['_id'])
+            print(f"✅ Aerolínea actualizada en BD: {doc.get('name')} - {doc.get('host')}:{doc.get('port')}")
             return JsonResponse({'success': True, 'data': doc})
         except Exception:
             return JsonResponse({'success': False, 'message': 'Error al actualizar'}, status=500)
@@ -295,37 +296,159 @@ def airlines_detail_view(request, airline_id: str):
     return JsonResponse({'success': False, 'message': 'Método no permitido'}, status=405)
 
 
+@csrf_exempt
+def airlines_active_view(request):
+    """
+    Obtiene la configuración de la aerolínea activa (enabled=True).
+    Útil para que el frontend sepa a qué servidor se está conectando.
+    """
+    if request.method != 'GET':
+        return JsonResponse({'success': False, 'message': 'Método no permitido'}, status=405)
+    
+    try:
+        db = get_db()
+        airline = db.airlines.find_one({'enabled': True})
+        
+        if not airline:
+            return JsonResponse({
+                'success': False, 
+                'message': 'No hay aerolínea activa configurada'
+            }, status=404)
+        
+        airline['_id'] = str(airline['_id'])
+        
+        # También retornar la URL completa construida
+        protocol = airline.get('protocol', 'http')
+        host = airline.get('host', 'localhost')
+        port = airline.get('port', 8080)
+        base = airline.get('basePath', '/api')
+        full_url = f"{protocol}://{host}:{port}{base}"
+        
+        return JsonResponse({
+            'success': True, 
+            'data': airline,
+            'fullUrl': full_url,
+            'message': f'Usando: {airline.get("name")}'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False, 
+            'message': f'Error obteniendo aerolínea activa: {str(e)}'
+        }, status=500)
+
+
 # --------- Proxy hacia backend de aerolínea ---------
 
 def airline_origin_base(request=None):
-    protocol = (os.environ.get('AIRLINE_PROTOCOL') or (getattr(request, 'scheme', None) or 'http')).strip()
-    host = (os.environ.get('AIRLINE_HOST') or '').strip()
-    if not host:
-        try:
-            forwarded = request.META.get('HTTP_X_FORWARDED_HOST') if request else None
-            raw_host = forwarded or (request.get_host() if request else '')
-            host = (raw_host or '').split(':')[0] or 'localhost'
-        except Exception:
-            host = 'localhost'
-    port = (os.environ.get('AIRLINE_PORT') or '8080').strip()
-    base = (os.environ.get('AIRLINE_BASE_PATH') or '/api').strip()
+    """
+    Obtiene la URL base de la aerolínea desde la base de datos.
+    Busca la primera aerolínea activa (enabled=True) en la colección airlines.
+    Si no encuentra ninguna, usa variables de entorno como fallback.
+    """
+    try:
+        # Intentar obtener configuración de la base de datos
+        db = get_db()
+        airline = db.airlines.find_one({'enabled': True})
+        
+        if airline:
+            # Usar configuración de la BD
+            protocol = airline.get('protocol', 'http').strip()
+            host = airline.get('host', 'localhost').strip()
+            port = str(airline.get('port', 8080)).strip()
+            base = airline.get('basePath', '/api').strip()
+            
+            print(f"✅ Usando aerolínea de BD: {airline.get('name')} ({protocol}://{host}:{port}{base})")
+        else:
+            # Fallback: usar variables de entorno
+            print("⚠️  No se encontró aerolínea activa en BD, usando variables de entorno")
+            protocol = (os.environ.get('AIRLINE_PROTOCOL') or (getattr(request, 'scheme', None) or 'http')).strip()
+            host = (os.environ.get('AIRLINE_HOST') or '').strip()
+            if not host:
+                try:
+                    forwarded = request.META.get('HTTP_X_FORWARDED_HOST') if request else None
+                    raw_host = forwarded or (request.get_host() if request else '')
+                    host = (raw_host or '').split(':')[0] or 'localhost'
+                except Exception:
+                    host = 'localhost'
+            port = (os.environ.get('AIRLINE_PORT') or '8080').strip()
+            base = (os.environ.get('AIRLINE_BASE_PATH') or '/api').strip()
+    except Exception as e:
+        # Si falla la BD, usar variables de entorno
+        print(f"❌ Error accediendo a BD para aerolínea: {e}, usando variables de entorno")
+        protocol = (os.environ.get('AIRLINE_PROTOCOL') or 'http').strip()
+        host = (os.environ.get('AIRLINE_HOST') or 'localhost').strip()
+        port = (os.environ.get('AIRLINE_PORT') or '8080').strip()
+        base = (os.environ.get('AIRLINE_BASE_PATH') or '/api').strip()
+    
     if not base.startswith('/'):
         base = '/' + base
     return f"{protocol}://{host}:{port}{base}"
 
 
 def airline_timeout_seconds():
+    """
+    Obtiene el timeout de la aerolínea desde la base de datos.
+    Si no encuentra configuración, usa variable de entorno como fallback.
+    """
     try:
-        ms = int(os.environ.get('AIRLINE_TIMEOUT_MS', '20000'))  # por defecto 12s
+        # Intentar obtener timeout de la BD
+        db = get_db()
+        airline = db.airlines.find_one({'enabled': True})
+        
+        if airline and 'timeoutMs' in airline:
+            ms = int(airline.get('timeoutMs', 40000))  # Default 40 segundos
+            return max(3, ms // 1000)
+    except Exception:
+        pass
+    
+    # Fallback: variables de entorno o 40 segundos por defecto
+    try:
+        ms = int(os.environ.get('AIRLINE_TIMEOUT_MS', '40000'))  # 40 segundos
         return max(3, ms // 1000)
     except Exception:
-        return 12
+        return 40  # 40 segundos por defecto
 
+
+def get_corporate_api_key():
+    """
+    Obtiene el API_KEY empresarial desde la configuración en MongoDB.
+    """
+    try:
+        db = get_db()
+        config = db.corporate_config.find_one({'_id': 'airline_corporate_user', 'enabled': True})
+        print(f"🔍 DEBUG: Buscando config empresarial en MongoDB...")
+        if config:
+            print(f"✅ DEBUG: Config encontrada: {config.get('_id')}")
+            api_key = config.get('apiKey')
+            if api_key:
+                print(f"✅ DEBUG: API_KEY encontrado: {api_key[:10]}...")
+                return api_key
+            else:
+                print(f"⚠️  DEBUG: Config existe pero no tiene apiKey")
+        else:
+            print(f"⚠️  DEBUG: No se encontró config empresarial en MongoDB")
+    except Exception as e:
+        print(f"❌ DEBUG: Error obteniendo API_KEY empresarial: {e}")
+    return None
+
+def get_corporate_headers():
+    """
+    Retorna headers con API_KEY si está configurado.
+    """
+    headers = {}
+    api_key = get_corporate_api_key()
+    if api_key:
+        headers['X-API-Key'] = api_key
+        print(f"🔑 USANDO API_KEY EMPRESARIAL: {api_key[:15]}... en headers")
+    else:
+        print(f"⚠️  NO SE ENCONTRÓ API_KEY - requests sin autenticación empresarial")
+    return headers
 
 def safe_get(url, timeout=None, params=None):
     try:
         read_timeout = timeout if isinstance(timeout, (int, float)) else airline_timeout_seconds()
-        r = requests.get(url, params=params or {}, timeout=(3.0, read_timeout))
+        headers = get_corporate_headers()  # Agregar API_KEY si existe
+        r = requests.get(url, params=params or {}, headers=headers, timeout=(3.0, read_timeout))
         r.raise_for_status()
         ct = r.headers.get('content-type', '')
         if 'application/json' in ct:
@@ -338,7 +461,8 @@ def safe_get(url, timeout=None, params=None):
 def safe_post(url, json_body=None, timeout=None):
     try:
         read_timeout = timeout if isinstance(timeout, (int, float)) else airline_timeout_seconds()
-        r = requests.post(url, json=json_body or {}, timeout=(3.0, read_timeout))
+        headers = get_corporate_headers()  # Agregar API_KEY si existe
+        r = requests.post(url, json=json_body or {}, headers=headers, timeout=(3.0, read_timeout))
         r.raise_for_status()
         ct = r.headers.get('content-type', '')
         if 'application/json' in ct:
@@ -350,7 +474,8 @@ def safe_post(url, json_body=None, timeout=None):
 def stream_get(url, timeout=None):
     try:
         read_timeout = timeout if isinstance(timeout, (int, float)) else airline_timeout_seconds()
-        r = requests.get(url, timeout=(3.0, read_timeout))
+        headers = get_corporate_headers()  # Agregar API_KEY si existe
+        r = requests.get(url, headers=headers, timeout=(3.0, read_timeout))
         r.raise_for_status()
         return r
     except Exception as e:
@@ -419,6 +544,48 @@ def proxy_airline_create_ticket(request):
     if isinstance(data, dict):
         return JsonResponse(data)
     return JsonResponse({ 'success': True, 'data': data })
+
+
+@csrf_exempt
+def proxy_airline_create_roundtrip(request):
+    """
+    Crea 2 tickets para vuelo redondo (ida y vuelta).
+    """
+    if request.method != 'POST':
+        return JsonResponse({ 'success': False, 'message': 'Método no permitido' }, status=405)
+    base = airline_origin_base(request)
+    try:
+        payload = parse_request_data(request)
+    except Exception:
+        payload = {}
+    
+    print(f"🔄 Creando round-trip con payload: {payload}")
+    data = safe_post(f"{base}/airline/tickets/round-trip", json_body=payload)
+    
+    if 'error' in data:
+        return JsonResponse({ 'success': False, 'message': data['error'] }, status=502)
+    return JsonResponse(data)
+
+
+@csrf_exempt
+def proxy_airline_create_stopover(request):
+    """
+    Crea 2 tickets para vuelo con escala (2 segmentos).
+    """
+    if request.method != 'POST':
+        return JsonResponse({ 'success': False, 'message': 'Método no permitido' }, status=405)
+    base = airline_origin_base(request)
+    try:
+        payload = parse_request_data(request)
+    except Exception:
+        payload = {}
+    
+    print(f"✈️ Creando vuelo con escala: {payload}")
+    data = safe_post(f"{base}/airline/tickets/with-stopover", json_body=payload)
+    
+    if 'error' in data:
+        return JsonResponse({ 'success': False, 'message': data['error'] }, status=502)
+    return JsonResponse(data)
 
 
 @csrf_exempt
@@ -497,6 +664,25 @@ def proxy_airline_ticket_by_id(request, ticket_id: str):
     data = safe_get(f"{base}/airline/tickets/{ticket_id}")
     if 'error' in data:
         return JsonResponse({ 'success': False, 'message': data['error'] }, status=502)
+    return JsonResponse(data)
+
+
+@csrf_exempt
+def proxy_airline_corporate_tickets(request):
+    """
+    Obtiene todos los tickets comprados por la agencia (usuario empresarial).
+    Requiere que esté configurado el API_KEY en MongoDB.
+    """
+    if request.method != 'GET':
+        return JsonResponse({ 'success': False, 'message': 'Método no permitido' }, status=405)
+    
+    base = airline_origin_base(request)
+    # Endpoint especial para tickets empresariales
+    data = safe_get(f"{base}/airline/tickets/corporate")
+    
+    if 'error' in data:
+        return JsonResponse({ 'success': False, 'message': data['error'] }, status=502)
+    
     return JsonResponse(data)
 
 

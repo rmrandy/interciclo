@@ -20,12 +20,15 @@ export FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 export DJANGO_DEBUG=1
 export DJANGO_SECRET_KEY="dev-secret-key"
 
-# Forzar destino del backend de Aerolínea (proxy) según petición del usuario
-# Estos valores son leídos por airline_origin_base() en api/views.py
+# Forzar destino del backend de Aerolínea (proxy) - SOLO COMO FALLBACK
+# NOTA: Si hay aerolíneas configuradas en la BD (colección airlines con enabled=True),
+# esas configuraciones tienen prioridad sobre estas variables de entorno.
+# Estos valores solo se usan si NO hay aerolíneas activas en la BD.
 export AIRLINE_PROTOCOL="http"
-export AIRLINE_HOST="172.16.56.36"
+export AIRLINE_HOST="${IP}"  # Usa la IP detectada automáticamente
 export AIRLINE_PORT="8080"
 export AIRLINE_BASE_PATH="/api"
+export AIRLINE_TIMEOUT_MS="40000"  # 40 segundos de timeout
 
 echo "🌐 Django servirá API en http://${IP}:5001"
 

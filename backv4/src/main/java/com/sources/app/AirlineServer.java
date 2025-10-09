@@ -76,13 +76,36 @@ import java.util.concurrent.Executors;
 import java.util.ArrayList;
 
 /**
- * Servidor HTTP simple para el sistema de aerolíneas.
- * Maneja endpoints dinámicos con configuración de puerto e IP.
+ * Servidor HTTP simple para el sistema de aerolíneas integrado con Ensurance Pharmacy.
+ * Este servidor maneja múltiples endpoints para gestionar operaciones de aerolíneas,
+ * farmacias, hospitales, seguros médicos y servicios relacionados.
+ * 
+ * <p>El servidor utiliza un modelo de thread pool para manejar múltiples conexiones
+ * concurrentes y proporciona endpoints RESTful para todas las operaciones del sistema.</p>
+ * 
+ * <p>Características principales:</p>
+ * <ul>
+ *   <li>Gestión de vuelos, aeronaves, rutas y reservas</li>
+ *   <li>Sistema de usuarios con autenticación y roles</li>
+ *   <li>Gestión de farmacias, hospitales y medicinas</li>
+ *   <li>Sistema de seguros médicos y pólizas</li>
+ *   <li>Procesamiento de recetas y transacciones</li>
+ *   <li>Soporte para CORS y manejo de errores robusto</li>
+ * </ul>
+ * 
+ * @author Equipo de Desarrollo Ensurance Pharmacy
+ * @version 1.0
+ * @since 2024
  */
 public class AirlineServer {
     
+    /** Puerto por defecto para el servidor HTTP */
     private static final int DEFAULT_PORT = 8080;
+    
+    /** Host por defecto que acepta conexiones de cualquier interfaz */
     private static final String DEFAULT_HOST = "0.0.0.0";
+    
+    /** Tamaño del pool de threads para manejar conexiones concurrentes */
     private static final int THREAD_POOL_SIZE = 10;
     
     private int port;
@@ -156,10 +179,25 @@ public class AirlineServer {
     
     private Gson gson;
     
+    /**
+     * Constructor por defecto que inicializa el servidor con host y puerto predeterminados.
+     * Utiliza DEFAULT_HOST (0.0.0.0) y DEFAULT_PORT (8080).
+     */
     public AirlineServer() {
         this(DEFAULT_HOST, DEFAULT_PORT);
     }
     
+    /**
+     * Constructor que inicializa el servidor con host y puerto específicos.
+     * Inicializa todos los DAOs, handlers y el pool de threads necesarios
+     * para el funcionamiento del servidor.
+     * 
+     * @param host La dirección IP o hostname donde el servidor escuchará conexiones.
+     *             Usar "0.0.0.0" para aceptar conexiones desde cualquier interfaz,
+     *             o "127.0.0.1" para solo conexiones locales.
+     * @param port El puerto en el que el servidor escuchará. Debe ser un puerto
+     *             disponible y válido (1-65535).
+     */
     public AirlineServer(String host, int port) {
         this.host = host;
         this.port = port;
@@ -231,6 +269,20 @@ public class AirlineServer {
         // initializeDefaultRoles();
     }
     
+    /**
+     * Inicia el servidor HTTP y comienza a escuchar conexiones entrantes.
+     * Este método crea un ServerSocket y entra en un bucle infinito esperando
+     * conexiones de clientes. Cada conexión se maneja en un thread separado
+     * del pool de threads.
+     * 
+     * <p>El método imprime información detallada sobre todos los endpoints
+     * disponibles en la consola al iniciar.</p>
+     * 
+     * <p>Este método es bloqueante y solo retorna cuando se llama a {@link #stop()}
+     * o cuando ocurre un error irrecuperable.</p>
+     * 
+     * @throws IOException Si no se puede crear el ServerSocket en el puerto especificado
+     */
     public void start() {
         try {
             serverSocket = new ServerSocket(port);
@@ -305,6 +357,16 @@ public class AirlineServer {
         }
     }
     
+    /**
+     * Detiene el servidor HTTP de manera ordenada.
+     * Cierra el ServerSocket si está abierto y hace shutdown del pool de threads.
+     * 
+     * <p>Este método es seguro de llamar múltiples veces; llamadas adicionales
+     * no causarán errores.</p>
+     * 
+     * <p>Los threads activos terminarán de procesar sus requests actuales
+     * antes de cerrarse.</p>
+     */
     public void stop() {
         running = false;
         if (serverSocket != null && !serverSocket.isClosed()) {
@@ -318,6 +380,22 @@ public class AirlineServer {
         System.out.println("🛑 Servidor detenido");
     }
     
+    /**
+     * Maneja la conexión de un cliente individual.
+     * Este método es ejecutado en un thread separado del pool para cada cliente.
+     * 
+     * <p>Procesa la solicitud HTTP completa incluyendo:</p>
+     * <ul>
+     *   <li>Lectura de la línea de request (método y path)</li>
+     *   <li>Lectura de headers HTTP</li>
+     *   <li>Lectura del body si existe (basado en Content-Length)</li>
+     *   <li>Procesamiento del request a través de {@link #processRequest}</li>
+     *   <li>Envío de la respuesta HTTP</li>
+     * </ul>
+     * 
+     * @param clientSocket El socket de conexión con el cliente. Se cierra automáticamente
+     *                     al finalizar el procesamiento.
+     */
     private void handleClient(Socket clientSocket) {
         try (BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
              PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true)) {
@@ -375,6 +453,29 @@ public class AirlineServer {
         }
     }
     
+    /**
+     * Procesa una solicitud HTTP y retorna la respuesta apropiada.
+     * Este método actúa como router principal, dirigiendo las solicitudes
+     * a los handlers correspondientes basado en el path y método HTTP.
+     * 
+     * <p>Endpoints soportados incluyen:</p>
+     * <ul>
+     *   <li>/api/health - Estado del servidor</li>
+     *   <li>/api/airline/* - Operaciones de aerolínea</li>
+     *   <li>/api/users - Gestión de usuarios</li>
+     *   <li>/api/policy - Gestión de pólizas</li>
+     *   <li>/api/pharmacy - Gestión de farmacias</li>
+     *   <li>/api/hospital - Gestión de hospitales</li>
+     *   <li>/api/prescription - Gestión de recetas</li>
+     *   <li>Y muchos más...</li>
+     * </ul>
+     * 
+     * @param method El método HTTP (GET, POST, PUT, DELETE, etc.)
+     * @param path El path de la URL solicitada
+     * @param headers Mapa de headers HTTP de la solicitud
+     * @param body El cuerpo de la solicitud (puede estar vacío)
+     * @return Una cadena JSON con la respuesta al cliente
+     */
     private String processRequest(String method, String path, Map<String, String> headers, String body) {
         try {
             // Health check
@@ -851,6 +952,15 @@ public class AirlineServer {
         }
     }
     
+    /**
+     * Maneja las solicitudes de inicio de sesión de usuarios de aerolínea.
+     * Valida las credenciales del usuario y retorna información del usuario
+     * junto con un token de autenticación si el login es exitoso.
+     * 
+     * @param body JSON con las credenciales del usuario (email y password)
+     * @return JSON con el resultado del login, incluyendo datos del usuario y token si es exitoso,
+     *         o un mensaje de error si falla
+     */
     private String handleLogin(String body) {
         try {
             JsonObject jsonRequest = JsonParser.parseString(body).getAsJsonObject();
@@ -885,6 +995,14 @@ public class AirlineServer {
         }
     }
     
+    /**
+     * Maneja la asignación de roles a usuarios.
+     * Solo usuarios con rol de administrador pueden asignar roles.
+     * 
+     * @param body JSON con los datos de asignación de rol (userId y roleId)
+     * @param headers Headers HTTP de la solicitud, incluyendo token de autorización
+     * @return JSON con el resultado de la operación
+     */
     private String handleAssignRole(String body, Map<String, String> headers) {
         try {
             // Verificar autorización (simplificado)
@@ -909,6 +1027,13 @@ public class AirlineServer {
         }
     }
     
+    /**
+     * Obtiene la lista de todos los usuarios registrados.
+     * Requiere autorización de administrador.
+     * 
+     * @param headers Headers HTTP de la solicitud, debe incluir token de autorización
+     * @return JSON con la lista de usuarios o un mensaje de error
+     */
     private String handleGetUsers(Map<String, String> headers) {
         try {
             // Verificar autorización (simplificado)
@@ -949,6 +1074,12 @@ public class AirlineServer {
     
     // ==================== MÉTODOS AUXILIARES PARA ENSURANCE PHARMACY ====================
     
+    /**
+     * Maneja el inicio de sesión para el sistema de Ensurance Pharmacy.
+     * 
+     * @param body JSON con email y password del usuario
+     * @return JSON con resultado del login y datos del usuario si es exitoso
+     */
     private String handleLoginRequest(String body) {
         try {
             JsonObject jsonRequest = JsonParser.parseString(body).getAsJsonObject();
@@ -1440,6 +1571,13 @@ public class AirlineServer {
         }
     }
     
+    /**
+     * Obtiene el perfil completo de un usuario específico.
+     * El userId debe ser proporcionado en los headers de la solicitud.
+     * 
+     * @param headers Headers HTTP que deben incluir el User-Id
+     * @return JSON con los datos completos del perfil del usuario o mensaje de error
+     */
     private String handleGetUserProfile(Map<String, String> headers) {
         try {
             // Obtener userId del query string (se debe enviar como parámetro)
@@ -1479,6 +1617,19 @@ public class AirlineServer {
         }
     }
     
+    /**
+     * Punto de entrada principal del servidor.
+     * Permite especificar puerto y host como argumentos de línea de comandos.
+     * 
+     * <p>Uso:</p>
+     * <ul>
+     *   <li>Sin argumentos: Usa puerto y host por defecto (8080 y 0.0.0.0)</li>
+     *   <li>Con puerto: {@code java AirlineServer 9090}</li>
+     *   <li>Con puerto y host: {@code java AirlineServer 9090 localhost}</li>
+     * </ul>
+     * 
+     * @param args Argumentos opcionales: [puerto] [host]
+     */
     public static void main(String[] args) {
         int port = DEFAULT_PORT;
         String host = DEFAULT_HOST;
@@ -1505,7 +1656,12 @@ public class AirlineServer {
     }
     
     /**
-     * Maneja la cancelación de un vuelo
+     * Maneja la cancelación de un vuelo.
+     * Registra el motivo de cancelación y el usuario que realizó la operación.
+     * 
+     * @param requestBody JSON con cancellationReason (motivo) y cancelledBy (ID del usuario)
+     * @param flightId ID del vuelo a cancelar
+     * @return JSON indicando éxito o error de la operación
      */
     private String handleCancelFlight(String requestBody, String flightId) {
         try {

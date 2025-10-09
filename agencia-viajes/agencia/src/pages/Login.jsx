@@ -14,11 +14,14 @@ export default function Login() {
 		e.preventDefault();
 		setError('');
 		setLoading(true);
+		console.log('[Login] Intentando login con:', email);
 		try {
 			const res = await login(email, password);
+			console.log('[Login] Respuesta de login:', res);
 			if (res.ok) navigate('/');
 			else setError(res.message || 'Error de inicio de sesión');
 		} catch (err) {
+			console.error('[Login] Error capturado:', err);
 			setError(err.message || 'Error de inicio de sesión');
 		} finally {
 			setLoading(false);

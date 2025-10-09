@@ -5,6 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "python3 getip.py && vite --host",
+    "dev:5050": "PORT=5050 python3 getip.py && vite --host",
+    "dev:3000": "PORT=3000 python3 getip.py && vite --host",
+    "dev:8081": "PORT=8081 python3 getip.py && vite --host",
+    "dev:custom": "python3 getip.py && vite --host --port",
     "start:ip": "./scripts/start-ip.sh",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview"

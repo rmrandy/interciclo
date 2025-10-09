@@ -232,7 +232,7 @@ function StarInput({ value = 5, onChange }) {
 
 function getCurrentUserName() {
     try {
-        const rawAirline = localStorage.getItem('user');
+        const rawAirline = localStorage.getItem('airline_user');
         const user = rawAirline ? JSON.parse(rawAirline) : null;
         if (!user) return 'Usuario';
         return user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : (user.firstName || user.name || user.email || 'Usuario');

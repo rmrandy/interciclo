@@ -36,6 +36,10 @@ function getEnvBackend() {
 let resolvedBaseUrlPromise = null;
 
 async function detectBackendBaseUrl() {
+    // - Modo proxy (mismo origen): usar ruta relativa /api
+    if (import.meta?.env?.VITE_USE_DEV_PROXY === '1') {
+        return '/api';
+    }
     // 0) Forzar backend si se proporciona por env
     const env = getEnvBackend();
     if (env) return env;
@@ -44,7 +48,7 @@ async function detectBackendBaseUrl() {
     const meta = readMetaBackend();
     if (meta) return meta.replace(/\/$/, '') + (meta.endsWith('/api') ? '' : '/api');
 
-    // 2) Autodetección por puertos con /health y /api/health
+    // 2) Autodetección basada en salud (sin tocar endpoints de integraciones)
     const host = (typeof window !== 'undefined' && window.location && window.location.hostname) ? window.location.hostname : 'localhost';
     const protocol = (typeof window !== 'undefined' && window.location && window.location.protocol === 'https:') ? 'https' : 'http';
     const envNodePort = (import.meta?.env?.VITE_NODE_PORT && String(import.meta.env?.VITE_NODE_PORT).trim()) || '';
@@ -53,25 +57,15 @@ async function detectBackendBaseUrl() {
     DEFAULT_PORTS().forEach(p => candidates.push(p));
     const unique = Array.from(new Set(candidates));
 
-    // 2.a Preferir el backend Django (proxy) detectando integraciones
     for (const port of unique) {
         const baseNoApi = `${protocol}://${host}:${port}`;
-        const okProxy = await probePath(`${baseNoApi}/api/integrations/airline/cities`, 1200);
-        if (okProxy) return `${baseNoApi}/api`;
+        const okApiHealth = await probeHealth(`${baseNoApi}/api/health`, 1000);
+        if (okApiHealth) return `${baseNoApi}/api`;
+        const okHealth = await probeHealth(`${baseNoApi}/health`, 800);
+        if (okHealth) return `${baseNoApi}/api`;
     }
 
-    // 2.b Si no se detectó proxy, aceptar cualquier /api/health disponible
-    for (const port of unique) {
-        const baseNoApi = `${protocol}://${host}:${port}`;
-        const okHealth = await probeHealth(`${baseNoApi}/health`, 1200);
-        const okApiHealth = okHealth ? true : await probeHealth(`${baseNoApi}/api/health`, 1200);
-        if (okHealth || okApiHealth) {
-            const hasApi = okApiHealth || await probePath(`${baseNoApi}/api`, 800);
-            return `${baseNoApi}${hasApi ? '/api' : ''}`;
-        }
-    }
-
-    // 3) Fallback seguro
+    // 3) Fallback seguro (mismo host:5001)
     return `${protocol}://${host}:5001/api`;
 }
 
@@ -127,6 +121,7 @@ async function request(path, { method = 'GET', body, token } = {}) {
 	const headers = { 'Content-Type': 'application/json' };
 	if (token) headers['Authorization'] = `Bearer ${token}`;
 	const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
+	console.log(`[API] ${method} ${url}`, body ? { body } : '');
 	const res = await fetch(url, {
 		method,
 		headers,
@@ -139,6 +134,7 @@ async function request(path, { method = 'GET', body, token } = {}) {
 	} else {
 		data = await res.text();
 	}
+	console.log(`[API] Respuesta ${res.status}:`, data);
 	if (!res.ok) {
 		const message = (data && data.message) || 'Error de red';
 		throw new Error(message);
@@ -174,9 +170,9 @@ export function apiDelete(path, token) {
 }
 
 export const authApi = {
-	login: (email, password) => apiPost('/auth/login', { email, password }),
-	register: (payload) => apiPost('/auth/register', payload),
-	profile: (token) => apiGet('/auth/profile', token),
+    login: (email, password) => apiPost('/auth/login', { email, password }),
+    register: (payload) => apiPost('/auth/register', payload),
+    profile: (token) => apiGet('/auth/profile', token),
 };
 
 export const airlinesApi = {
@@ -211,9 +207,10 @@ export const integrationsApi = {
 	// Endpoints usados por Compra.jsx
 	// Si el backend aún no los expone, estas funciones retornarán error manejado en la UI
 	seats: (flightId) => apiGet(`/integrations/airline/seats${toQuery({ flightId })}`),
-	createTicket: (payload) => apiPost('/integrations/airline/tickets', payload),
-	loginAirline: (email, password) => apiPost('/integrations/airline/login', { email, password }),
-	registerAirline: (payload) => apiPost('/integrations/airline/register', payload),
+    createTicket: (payload) => apiPost('/integrations/airline/tickets', payload),
+    // login/registro de aerolínea solo se usa desde Compra; el login principal de la agencia usa authApi
+    loginAirline: (email, password) => apiPost('/integrations/airline/login', { email, password }),
+    registerAirline: (payload) => apiPost('/integrations/airline/register', payload),
     ticketsList: (params) => apiGet(`/integrations/airline/tickets-list${toQuery(params)}`),
     ticketPdf: (ticketId) => apiGetBlob(`/integrations/airline/tickets/${encodeURIComponent(ticketId)}/pdf`),
     ticketById: (ticketId) => apiGet(`/integrations/airline/tickets/${encodeURIComponent(ticketId)}`),

@@ -14,6 +14,12 @@ export default function FlightDetail() {
     const [newReview, setNewReview] = useState({ comment: '', rating: 5 });
     const [posting, setPosting] = useState(false);
 
+	// Importante: calcular `flight` ANTES de usarlo en dependencias de efectos
+	const flight = useMemo(() => {
+		const target = decodeURIComponent(id || '');
+		return flights.find(f => String(f?.idFlight) === target || String(f?.flightNumber) === target);
+	}, [flights, id]);
+
 	useEffect(() => {
 		let mounted = true;
 		setLoading(true);
@@ -53,11 +59,6 @@ export default function FlightDetail() {
             })
             .catch(e => setAgencyReviews({ items: [], loading: false, error: e?.message || 'No se pudieron cargar comentarios locales' }));
     }, [flight]);
-
-	const flight = useMemo(() => {
-		const target = decodeURIComponent(id || '');
-		return flights.find(f => String(f?.idFlight) === target || String(f?.flightNumber) === target);
-	}, [flights, id]);
 
 	return (
 		<section className="section" style={{ maxWidth: 840 }}>
@@ -222,7 +223,7 @@ function StarInput({ value = 5, onChange }) {
 
 function getCurrentUserName() {
     try {
-        const rawAirline = localStorage.getItem('user');
+        const rawAirline = localStorage.getItem('airline_user');
         const user = rawAirline ? JSON.parse(rawAirline) : null;
         if (!user) return 'Usuario';
         return user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : (user.firstName || user.name || user.email || 'Usuario');

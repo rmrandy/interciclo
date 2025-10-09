@@ -518,6 +518,42 @@ export class AirlineApiClient {
   resetConfig() {
     this.config.resetConfig()
   }
+
+  /**
+   * Crear tickets para vuelo redondo (round-trip): 2 tickets automáticamente
+   */
+  async createRoundTripTickets(roundTripData: any): Promise<any> {
+    try {
+      const response = await fetch(`${this.config.getBaseUrl()}/api/airline/tickets/round-trip`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(roundTripData)
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      console.error('❌ Error creando round-trip:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Crear tickets para vuelo con escala: 2 tickets automáticamente
+   */
+  async createStopoverTickets(stopoverData: any): Promise<any> {
+    try {
+      const response = await fetch(`${this.config.getBaseUrl()}/api/airline/tickets/with-stopover`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(stopoverData)
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      console.error('❌ Error creando vuelo con escala:', error);
+      throw error;
+    }
+  }
 }
 
 // Instancia global del cliente API

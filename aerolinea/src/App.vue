@@ -3,12 +3,34 @@ import { ref, provide, onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import eventBus from './eventBus';
 import PortSelector from './components/PortSelector.vue';
-import { loadPortConfiguration } from './utils/api';
+import { loadPortConfiguration, getInsuranceApiUrl } from './utils/api';
+import axios from 'axios'
 
 const router = useRouter();
 const isLoggedIn = ref(false);
 const userProfile = ref<any>(null);
 const showPortSelector = ref(false);
+
+// Branding dinámico
+const brandTitle = ref('AeroLinea')
+const brandSubtitle = ref('Tu compañía de seguros aeronáuticos')
+const footerText = ref('© 2025 AeroLinea. Todos los derechos reservados.')
+const brandLogoUrl = ref('')
+
+const loadSiteSettings = async () => {
+  try {
+    const url = getInsuranceApiUrl('/site-settings')
+    const { data } = await axios.get(url)
+    if (data) {
+      brandTitle.value = data['brand.title'] || brandTitle.value
+      brandSubtitle.value = data['brand.subtitle'] || brandSubtitle.value
+      footerText.value = data['footer.text'] || footerText.value
+      brandLogoUrl.value = data['brand.logoUrl'] || ''
+    }
+  } catch (e) {
+    console.warn('No se pudieron cargar los site-settings, usando defaults', e)
+  }
+}
 
 // Verificar si se debe mostrar el selector de puertos
 const checkShowPortSelector = () => {
@@ -24,13 +46,15 @@ const checkAuth = () => {
   console.log("Es admin:", isAdmin.value);
 };
 
-// Computed para verificar roles
+// Computed para verificar roles (case-insensitive)
 const isAdmin = computed(() => {
-  return userProfile.value && userProfile.value.role === "ADMIN";
+  const role = String(userProfile.value?.role || '').toUpperCase()
+  return role === 'ADMIN'
 });
 
 const isEmployee = computed(() => {
-  return userProfile.value && (userProfile.value.role === "EMPLOYEE" || userProfile.value.role === "ADMIN");
+  const role = String(userProfile.value?.role || '').toUpperCase()
+  return role === 'EMPLOYEE' || role === 'ADMIN'
 });
 
 // Inicialización
@@ -38,6 +62,7 @@ onMounted(() => {
   loadPortConfiguration();
   checkAuth();
   checkShowPortSelector();
+  loadSiteSettings();
   
   eventBus.on('login', () => {
     checkAuth();
@@ -153,12 +178,17 @@ function navigateToInformativePages() {
     <div class="container mx-auto px-6 py-4 flex justify-between items-center">
       <!-- Logo -->
       <div class="flex items-center space-x-3">
-        <div class="w-10 h-10 bg-gradient-to-r from-blue-600 to-blue-800 rounded-full flex items-center justify-center">
-          <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
-          </svg>
-        </div>
-        <div class="airline-title text-2xl">AeroLinea</div>
+        <template v-if="brandLogoUrl">
+          <img :src="brandLogoUrl" alt="logo" class="w-10 h-10 rounded-full object-cover" />
+        </template>
+        <template v-else>
+          <div class="w-10 h-10 bg-gradient-to-r from-blue-600 to-blue-800 rounded-full flex items-center justify-center">
+            <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
+            </svg>
+          </div>
+        </template>
+        <div class="airline-title text-2xl">{{ brandTitle }}</div>
       </div>
 
       <!-- Navegación -->
@@ -434,6 +464,15 @@ function navigateToInformativePages() {
                 </svg>
                 Páginas Informativas
               </button>
+              <button
+                @click="router.push('/admin/site-settings')"
+                class="block w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              >
+                <svg class="w-4 h-4 text-blue-700" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M11.983 1.077a1 1 0 00-1.966 0l-.143.859a7.965 7.965 0 00-1.709.99l-.79-.456a1 1 0 00-1.366.366l-.983 1.702a1 1 0 00.366 1.366l.79.456c-.086.559-.086 1.139 0 1.698l-.79.456a1 1 0 00-.366 1.366l.983 1.702a1 1 0 001.366.366l.79-.456c.53.417 1.11.77 1.709.99l.143.859a1 1 0 001.966 0l.143-.859a7.965 7.965 0 001.709-.99l.79.456a1 1 0 001.366-.366l.983-1.702a1 1 0 00-.366-1.366l-.79-.456c.086-.559.086-1.139 0-1.698l.79-.456a1 1 0 00.366-1.366l-.983-1.702a1 1 0 00-1.366-.366l-.79.456a7.965 7.965 0 00-1.709-.99l-.143-.859z"/>
+                </svg>
+                Ajustes del Sitio
+              </button>
               <button 
                 @click="() => router.push('/admin/analytics')" 
                 class="block w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50 flex items-center gap-2"
@@ -498,12 +537,12 @@ function navigateToInformativePages() {
             </svg>
           </div>
           <div>
-            <p class="font-bold text-lg">AeroLinea</p>
-            <p class="text-blue-200 text-sm">Tu compañía de seguros aeronáuticos</p>
+            <p class="font-bold text-lg">{{ brandTitle }}</p>
+            <p class="text-blue-200 text-sm">{{ brandSubtitle }}</p>
           </div>
         </div>
         <div class="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-6">
-          <p class="text-blue-200 text-sm">&copy; 2025 AeroLinea. Todos los derechos reservados.</p>
+          <p class="text-blue-200 text-sm">{{ footerText }}</p>
           <div class="flex space-x-4">
             <a href="#" class="text-blue-200 hover:text-white transition-colors">
               <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -516,7 +555,7 @@ function navigateToInformativePages() {
               </svg>
             </a>
           </div>
-        </div>
+            </div>
       </div>
     </div>
   </footer>

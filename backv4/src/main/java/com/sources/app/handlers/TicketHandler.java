@@ -7,6 +7,8 @@ import com.sources.app.dao.TicketDAO;
 import com.sources.app.dao.FlightDAO;
 import com.sources.app.dao.UserDAO;
 import com.sources.app.entities.Ticket;
+import com.sources.app.entities.User;
+import com.sources.app.util.CorporateAuthUtil;
 // removed unused imports
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -16,6 +18,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +45,7 @@ public class TicketHandler implements HttpHandler {
         // Configuración de CORS para permitir solicitudes desde cualquier origen
         exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
         exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key");
         
         // Manejo de solicitudes OPTIONS (preflight de CORS)
         if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -60,14 +63,23 @@ public class TicketHandler implements HttpHandler {
         String response = "";
         
         try {
-            if (path.startsWith("/api/airline/tickets") && "POST".equals(method)) {
-                // Crear nuevo boleto
+            if (path.startsWith("/api/airline/tickets/round-trip") && "POST".equals(method)) {
+                // 🔄 Crear tickets para vuelo redondo (ida + vuelta)
+                response = handleCreateRoundTripTickets(exchange);
+            } else if (path.startsWith("/api/airline/tickets/with-stopover") && "POST".equals(method)) {
+                // ✈️ Crear tickets para vuelo con escala (2 segmentos)
+                response = handleCreateStopoverTickets(exchange);
+            } else if (path.startsWith("/api/airline/tickets") && "POST".equals(method)) {
+                // Crear nuevo boleto simple
                 response = handleCreateTicket(exchange);
             } else if (path.matches("/api/airline/tickets/\\d+") && "GET".equals(method)) {
                 // Obtener ticket por ID
                 String[] pathParts = path.split("/");
                 String ticketId = pathParts[4];
                 response = handleGetTicketById(ticketId);
+            } else if (path.startsWith("/api/airline/tickets/corporate") && "GET".equals(method)) {
+                // 🏢 Obtener tickets empresariales (comprados por usuario empresarial)
+                response = handleGetCorporateTickets(exchange);
             } else if (path.startsWith("/api/airline/tickets") && "GET".equals(method)) {
                 // Obtener boletos
                 response = handleGetTickets(exchange);
@@ -148,6 +160,9 @@ public class TicketHandler implements HttpHandler {
         System.out.println("DEBUG: 🎫 Creando boleto - Body: " + requestBody);
         
         try {
+            // 🔐 AUTENTICACIÓN EMPRESARIAL: Verificar si viene con API_KEY
+            User corporateUser = CorporateAuthUtil.authenticateWithApiKey(exchange);
+            
             JsonObject jsonRequest = JsonParser.parseString(requestBody).getAsJsonObject();
             
             if (!validateCreateTicketRequest(jsonRequest)) {
@@ -159,7 +174,41 @@ public class TicketHandler implements HttpHandler {
             // Preparar datos para crear el boleto
             Map<String, Object> ticketData = new HashMap<>();
             ticketData.put("flightId", jsonRequest.get("flightId").getAsInt());
-            ticketData.put("userId", jsonRequest.get("userId").getAsInt());
+            
+            // Determinar quién compra y quién viaja
+            Integer userId;
+            Integer purchasedByUserId = null;
+            
+            if (corporateUser != null) {
+                // 🏢 COMPRA EMPRESARIAL (desde agencia)
+                System.out.println("🏢 Compra empresarial detectada: " + corporateUser.getCompanyName());
+                userId = corporateUser.getIdUser().intValue(); // La agencia es el "usuario" del ticket
+                purchasedByUserId = corporateUser.getIdUser().intValue(); // La agencia compró
+                
+                // Si viene un userId específico del pasajero en el JSON, usarlo
+                if (jsonRequest.has("passengerUserId") && !jsonRequest.get("passengerUserId").isJsonNull()) {
+                    userId = jsonRequest.get("passengerUserId").getAsInt();
+                    System.out.println("👤 Pasajero específico ID: " + userId);
+                } else if (jsonRequest.has("userId") && !jsonRequest.get("userId").isJsonNull()) {
+                    // Si viene userId pero es compra empresarial, usar ese userId como pasajero
+                    Integer providedUserId = jsonRequest.get("userId").getAsInt();
+                    if (providedUserId != null && !providedUserId.equals(corporateUser.getIdUser().intValue())) {
+                        userId = providedUserId;
+                        System.out.println("👤 Usuario pasajero del payload: " + userId);
+                    }
+                }
+                System.out.println("🏢 Ticket: Usuario=" + userId + ", Comprado por=" + purchasedByUserId);
+            } else {
+                // 👤 COMPRA INDIVIDUAL (directo en aerolínea, sin API_KEY)
+                if (!jsonRequest.has("userId") || jsonRequest.get("userId").isJsonNull()) {
+                    throw new RuntimeException("userId es requerido para compras individuales");
+                }
+                userId = jsonRequest.get("userId").getAsInt();
+                System.out.println("👤 Compra individual - Usuario ID: " + userId);
+            }
+            
+            ticketData.put("userId", userId);
+            ticketData.put("purchasedByUserId", purchasedByUserId);
             
             // Si viene seatNumber del cliente, usarlo; si no, se deja null (asignación posterior opcional)
             if (jsonRequest.has("seatNumber") && !jsonRequest.get("seatNumber").isJsonNull()) {
@@ -466,72 +515,438 @@ public class TicketHandler implements HttpHandler {
     }
 
     private void handleDownloadTicketPdf(HttpExchange exchange, String ticketId) throws IOException {
+        org.apache.pdfbox.pdmodel.PDDocument doc = null;
         try {
             Long id = Long.parseLong(ticketId);
             Ticket t = ticketDAO.getTicketById(id);
             if (t == null) {
                 String err = gson.toJson(Map.of("success", false, "error", "Boleto no encontrado"));
                 byte[] bytes = err.getBytes(StandardCharsets.UTF_8);
-                exchange.getResponseHeaders().add("Content-Type", "application/json; charset=UTF-8");
+                exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
                 exchange.sendResponseHeaders(404, bytes.length);
                 try (OutputStream os = exchange.getResponseBody()) { os.write(bytes); }
                 return;
             }
 
-            // Generar PDF sencillo con PDFBox
-            org.apache.pdfbox.pdmodel.PDDocument doc = new org.apache.pdfbox.pdmodel.PDDocument();
-            org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage();
+            System.out.println("📄 Generando PDF para ticket #" + t.getIdTicket());
+
+            // Generar PDF mejorado con PDFBox
+            doc = new org.apache.pdfbox.pdmodel.PDDocument();
+            org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage(org.apache.pdfbox.pdmodel.common.PDRectangle.A4);
             doc.addPage(page);
 
             org.apache.pdfbox.pdmodel.PDPageContentStream cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(doc, page);
-            cs.beginText();
-            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 18);
-            cs.newLineAtOffset(72, 720);
-            cs.showText("Ticket de vuelo #" + t.getIdTicket());
-            cs.endText();
+            
+            try {
+                // Título
+                cs.beginText();
+                cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 24);
+                cs.newLineAtOffset(50, 750);
+                cs.showText("TICKET DE VUELO");
+                cs.endText();
 
-            float y = 700;
-            y = writeLine(cs, 12, 72, y, "Vuelo: " + t.getFlight().getFlightNumber());
-            y = writeLine(cs, 12, 72, y, "Ruta: " + t.getFlight().getOriginCity().getName() + " → " + t.getFlight().getDestinationCity().getName());
-            y = writeLine(cs, 12, 72, y, "Salida: " + t.getFlight().getDepartureDate() + " " + t.getFlight().getDepartureTime());
-            y = writeLine(cs, 12, 72, y, "Pasajero: " + t.getPassengerFirstName() + " " + t.getPassengerLastName());
-            y = writeLine(cs, 12, 72, y, "Categoría: " + t.getSeatCategory() + "  Asiento: " + (t.getSeatNumber() != null ? t.getSeatNumber() : "AUTO"));
-            y = writeLine(cs, 12, 72, y, "Total: $" + t.getTotalAmount());
-            cs.close();
+                // Línea separadora
+                cs.setLineWidth(1f);
+                cs.moveTo(50, 740);
+                cs.lineTo(550, 740);
+                cs.stroke();
 
+                float y = 710;
+                
+                // Información del ticket
+                cs.beginText();
+                cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 14);
+                cs.newLineAtOffset(50, y);
+                cs.showText("Ticket #" + t.getIdTicket());
+                cs.endText();
+                y -= 30;
+
+                // Detalles del vuelo
+                y = writeLineSafe(cs, 12, 50, y, "Vuelo: " + safeString(t.getFlight().getFlightNumber()));
+                
+                String route = safeString(t.getFlight().getOriginCity() != null ? t.getFlight().getOriginCity().getName() : "N/A") 
+                             + " -> " 
+                             + safeString(t.getFlight().getDestinationCity() != null ? t.getFlight().getDestinationCity().getName() : "N/A");
+                y = writeLineSafe(cs, 12, 50, y, "Ruta: " + route);
+                
+                String departure = safeString(t.getFlight().getDepartureDate()) + " " + safeString(t.getFlight().getDepartureTime());
+                y = writeLineSafe(cs, 12, 50, y, "Salida: " + departure);
+                
+                y -= 10; // Espacio extra
+
+                // Información del pasajero
+                cs.beginText();
+                cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 14);
+                cs.newLineAtOffset(50, y);
+                cs.showText("Informacion del Pasajero");
+                cs.endText();
+                y -= 25;
+
+                y = writeLineSafe(cs, 12, 50, y, "Nombre: " + safeString(t.getPassengerFirstName()) + " " + safeString(t.getPassengerLastName()));
+                y = writeLineSafe(cs, 12, 50, y, "Email: " + safeString(t.getPassengerEmail()));
+                y = writeLineSafe(cs, 12, 50, y, "Telefono: " + safeString(t.getPassengerPhone()));
+                y = writeLineSafe(cs, 12, 50, y, "Documento: " + safeString(t.getPassengerDocumentNumber()));
+                
+                y -= 10;
+
+                // Información del asiento
+                cs.beginText();
+                cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 14);
+                cs.newLineAtOffset(50, y);
+                cs.showText("Informacion del Asiento");
+                cs.endText();
+                y -= 25;
+
+                y = writeLineSafe(cs, 12, 50, y, "Categoria: " + safeString(t.getSeatCategory()));
+                y = writeLineSafe(cs, 12, 50, y, "Asiento: " + (t.getSeatNumber() != null ? t.getSeatNumber() : "Por asignar"));
+                y = writeLineSafe(cs, 12, 50, y, "Cantidad: " + (t.getQuantity() != null ? t.getQuantity() : 1));
+                
+                y -= 10;
+
+                // Información de pago
+                cs.beginText();
+                cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 14);
+                cs.newLineAtOffset(50, y);
+                cs.showText("Informacion de Pago");
+                cs.endText();
+                y -= 25;
+
+                y = writeLineSafe(cs, 12, 50, y, "Tarifa base: $" + safeString(t.getFare()));
+                y = writeLineSafe(cs, 12, 50, y, "Total: $" + safeString(t.getTotalAmount()));
+                y = writeLineSafe(cs, 12, 50, y, "Estado: " + safeString(t.getStatus()));
+                y = writeLineSafe(cs, 12, 50, y, "Metodo de pago: " + safeString(t.getPaymentMethod()));
+
+                // Nota al pie
+                cs.beginText();
+                cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_OBLIQUE, 10);
+                cs.newLineAtOffset(50, 50);
+                cs.showText("Gracias por volar con nosotros - AeroLinea");
+                cs.endText();
+
+                cs.close();
+
+            } catch (Exception e) {
+                System.err.println("❌ Error al escribir contenido del PDF: " + e.getMessage());
+                e.printStackTrace();
+                if (cs != null) {
+                    try { cs.close(); } catch (Exception ignored) {}
+                }
+                throw e;
+            }
+
+            // Guardar PDF en ByteArray
             java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
             doc.save(baos);
             doc.close();
-            byte[] pdf = baos.toByteArray();
+            doc = null; // Marcar como cerrado
+            
+            byte[] pdfBytes = baos.toByteArray();
+            
+            System.out.println("✅ PDF generado exitosamente: " + pdfBytes.length + " bytes");
 
-            exchange.getResponseHeaders().add("Content-Type", "application/pdf");
-            exchange.getResponseHeaders().add("Content-Disposition", "attachment; filename=Ticket-" + t.getIdTicket() + ".pdf");
-            exchange.sendResponseHeaders(200, pdf.length);
-            try (OutputStream os = exchange.getResponseBody()) { os.write(pdf); }
+            // Enviar headers correctos
+            exchange.getResponseHeaders().set("Content-Type", "application/pdf");
+            exchange.getResponseHeaders().set("Content-Disposition", "attachment; filename=\"Ticket-" + t.getIdTicket() + ".pdf\"");
+            exchange.getResponseHeaders().set("Content-Length", String.valueOf(pdfBytes.length));
+            exchange.getResponseHeaders().set("Cache-Control", "no-cache, no-store, must-revalidate");
+            
+            exchange.sendResponseHeaders(200, pdfBytes.length);
+            
+            try (OutputStream os = exchange.getResponseBody()) { 
+                os.write(pdfBytes);
+                os.flush();
+            }
+            
+            System.out.println("✅ PDF enviado correctamente para ticket #" + t.getIdTicket());
+            
+        } catch (NumberFormatException e) {
+            System.err.println("❌ ID de ticket inválido: " + ticketId);
+            sendErrorResponse(exchange, 400, "ID de ticket inválido");
         } catch (Exception e) {
+            System.err.println("❌ Error generando PDF: " + e.getMessage());
             e.printStackTrace();
-            String err = gson.toJson(Map.of("success", false, "error", "Error generando PDF: " + e.getMessage()));
-            byte[] bytes = err.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().add("Content-Type", "application/json; charset=UTF-8");
-            exchange.sendResponseHeaders(500, bytes.length);
-            try (OutputStream os = exchange.getResponseBody()) { os.write(bytes); }
+            sendErrorResponse(exchange, 500, "Error generando PDF: " + e.getMessage());
+        } finally {
+            if (doc != null) {
+                try {
+                    doc.close();
+                } catch (Exception e) {
+                    System.err.println("⚠️ Error cerrando documento PDF: " + e.getMessage());
+                }
+            }
         }
     }
 
-    private float writeLine(org.apache.pdfbox.pdmodel.PDPageContentStream cs, int fontSize, float x, float y, String text) throws IOException {
-        y -= 18;
-        cs.beginText();
-        cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, fontSize);
-        cs.newLineAtOffset(x, y);
-        cs.showText(text);
-        cs.endText();
+    private String safeString(Object obj) {
+        if (obj == null) return "N/A";
+        String str = obj.toString().trim();
+        return str.isEmpty() ? "N/A" : str;
+    }
+
+    private float writeLineSafe(org.apache.pdfbox.pdmodel.PDPageContentStream cs, int fontSize, float x, float y, String text) throws IOException {
+        y -= 20;
+        if (text != null && !text.trim().isEmpty()) {
+            cs.beginText();
+            cs.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA, fontSize);
+            cs.newLineAtOffset(x, y);
+            // Limpiar texto de caracteres especiales que pueden causar problemas
+            String cleanText = text.replaceAll("[^\\x20-\\x7E]", "?");
+            cs.showText(cleanText);
+            cs.endText();
+        }
         return y;
     }
+
+    private void sendErrorResponse(HttpExchange exchange, int statusCode, String message) throws IOException {
+        String err = gson.toJson(Map.of("success", false, "error", message));
+        byte[] bytes = err.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+        exchange.sendResponseHeaders(statusCode, bytes.length);
+        try (OutputStream os = exchange.getResponseBody()) { os.write(bytes); }
+    }
+
+    /**
+     * Crea 2 tickets para un vuelo redondo (ida y vuelta).
+     * Usa la misma información de pago para ambos tickets.
+     */
+    private String handleCreateRoundTripTickets(HttpExchange exchange) throws IOException {
+        String requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        System.out.println("🔄 Creando tickets round-trip - Body: " + requestBody);
+        
+        try {
+            User corporateUser = CorporateAuthUtil.authenticateWithApiKey(exchange);
+            JsonObject jsonRequest = JsonParser.parseString(requestBody).getAsJsonObject();
+            
+            if (!jsonRequest.has("outboundFlightId") || !jsonRequest.has("returnFlightId")) {
+                return gson.toJson(Map.of("success", false, "error", "Se requieren outboundFlightId y returnFlightId"));
+            }
+            
+            Integer outboundFlightId = jsonRequest.get("outboundFlightId").getAsInt();
+            Integer returnFlightId = jsonRequest.get("returnFlightId").getAsInt();
+            
+            Integer userId;
+            Integer purchasedByUserId = null;
+            
+            if (corporateUser != null) {
+                userId = corporateUser.getIdUser().intValue();
+                purchasedByUserId = userId;
+                System.out.println("🏢 Round-trip empresarial: " + corporateUser.getCompanyName());
+            } else {
+                userId = jsonRequest.has("userId") ? jsonRequest.get("userId").getAsInt() : null;
+                if (userId == null) {
+                    return gson.toJson(Map.of("success", false, "error", "userId requerido"));
+                }
+            }
+            
+            // Datos comunes del pasajero
+            Map<String, Object> commonData = extractPassengerData(jsonRequest);
+            
+            // Crear ticket de IDA
+            Map<String, Object> ticketData1 = new HashMap<>(commonData);
+            ticketData1.put("flightId", outboundFlightId);
+            ticketData1.put("userId", userId);
+            ticketData1.put("purchasedByUserId", purchasedByUserId);
+            ticketData1.put("specialRequests", "Vuelo de IDA - Round Trip");
+            
+            Ticket ticket1 = ticketDAO.createTicketWithValidation(ticketData1);
+            
+            // Crear ticket de VUELTA
+            Map<String, Object> ticketData2 = new HashMap<>(commonData);
+            ticketData2.put("flightId", returnFlightId);
+            ticketData2.put("userId", userId);
+            ticketData2.put("purchasedByUserId", purchasedByUserId);
+            ticketData2.put("specialRequests", "Vuelo de VUELTA - Round Trip");
+            
+            Ticket ticket2 = ticketDAO.createTicketWithValidation(ticketData2);
+            
+            if (ticket1 != null && ticket2 != null) {
+                List<Map<String, Object>> tickets = new ArrayList<>();
+                tickets.add(Map.of("ticketId", ticket1.getIdTicket(), "type", "outbound", "flightNumber", ticket1.getFlight().getFlightNumber()));
+                tickets.add(Map.of("ticketId", ticket2.getIdTicket(), "type", "return", "flightNumber", ticket2.getFlight().getFlightNumber()));
+                
+                System.out.println("✅ Round-trip: Tickets #" + ticket1.getIdTicket() + " y #" + ticket2.getIdTicket());
+                
+                return gson.toJson(Map.of(
+                    "success", true,
+                    "message", "Vuelo redondo confirmado",
+                    "tickets", tickets,
+                    "totalTickets", 2
+                ));
+            } else {
+                return gson.toJson(Map.of("success", false, "error", "Error creando tickets"));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return gson.toJson(Map.of("success", false, "error", "Error round-trip: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Crea 2 tickets para un vuelo con escala (2 segmentos).
+     */
+    private String handleCreateStopoverTickets(HttpExchange exchange) throws IOException {
+        String requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        System.out.println("✈️ Creando tickets con escala - Body: " + requestBody);
+        
+        try {
+            User corporateUser = CorporateAuthUtil.authenticateWithApiKey(exchange);
+            JsonObject jsonRequest = JsonParser.parseString(requestBody).getAsJsonObject();
+            
+            if (!jsonRequest.has("firstSegmentFlightId") || !jsonRequest.has("secondSegmentFlightId")) {
+                return gson.toJson(Map.of("success", false, "error", "Se requieren firstSegmentFlightId y secondSegmentFlightId"));
+            }
+            
+            Integer flight1Id = jsonRequest.get("firstSegmentFlightId").getAsInt();
+            Integer flight2Id = jsonRequest.get("secondSegmentFlightId").getAsInt();
+            
+            Integer userId;
+            Integer purchasedByUserId = null;
+            
+            if (corporateUser != null) {
+                userId = corporateUser.getIdUser().intValue();
+                purchasedByUserId = userId;
+            } else {
+                userId = jsonRequest.has("userId") ? jsonRequest.get("userId").getAsInt() : null;
+                if (userId == null) {
+                    return gson.toJson(Map.of("success", false, "error", "userId requerido"));
+                }
+            }
+            
+            Map<String, Object> commonData = extractPassengerData(jsonRequest);
+            
+            // Ticket segmento 1: Origen → Escala
+            Map<String, Object> ticketData1 = new HashMap<>(commonData);
+            ticketData1.put("flightId", flight1Id);
+            ticketData1.put("userId", userId);
+            ticketData1.put("purchasedByUserId", purchasedByUserId);
+            ticketData1.put("specialRequests", "Segmento 1 - Con Escala");
+            
+            Ticket ticket1 = ticketDAO.createTicketWithValidation(ticketData1);
+            
+            // Ticket segmento 2: Escala → Destino
+            Map<String, Object> ticketData2 = new HashMap<>(commonData);
+            ticketData2.put("flightId", flight2Id);
+            ticketData2.put("userId", userId);
+            ticketData2.put("purchasedByUserId", purchasedByUserId);
+            ticketData2.put("specialRequests", "Segmento 2 - Con Escala");
+            
+            Ticket ticket2 = ticketDAO.createTicketWithValidation(ticketData2);
+            
+            if (ticket1 != null && ticket2 != null) {
+                List<Map<String, Object>> tickets = new ArrayList<>();
+                tickets.add(Map.of("ticketId", ticket1.getIdTicket(), "segment", 1, "flightNumber", ticket1.getFlight().getFlightNumber()));
+                tickets.add(Map.of("ticketId", ticket2.getIdTicket(), "segment", 2, "flightNumber", ticket2.getFlight().getFlightNumber()));
+                
+                System.out.println("✅ Vuelo con escala: Tickets #" + ticket1.getIdTicket() + " y #" + ticket2.getIdTicket());
+                
+                return gson.toJson(Map.of(
+                    "success", true,
+                    "message", "Vuelo con escala confirmado",
+                    "tickets", tickets,
+                    "totalTickets", 2
+                ));
+            } else {
+                return gson.toJson(Map.of("success", false, "error", "Error creando tickets"));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return gson.toJson(Map.of("success", false, "error", "Error con escala: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Extrae datos comunes del pasajero del JSON request.
+     */
+    private Map<String, Object> extractPassengerData(JsonObject jsonRequest) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("seatCategory", jsonRequest.get("seatCategory").getAsString());
+        data.put("fare", getBigDecimalFromJson(jsonRequest, "fare", BigDecimal.ZERO));
+        data.put("passengerFirstName", jsonRequest.get("passengerFirstName").getAsString());
+        data.put("passengerLastName", jsonRequest.get("passengerLastName").getAsString());
+        data.put("passengerEmail", jsonRequest.get("passengerEmail").getAsString());
+        data.put("passengerPhone", jsonRequest.get("passengerPhone").getAsString());
+        data.put("passengerDocumentType", jsonRequest.get("passengerDocumentType").getAsString());
+        data.put("passengerDocumentNumber", jsonRequest.get("passengerDocumentNumber").getAsString());
+        data.put("paymentMethod", jsonRequest.get("paymentMethod").getAsString());
+        data.put("totalAmount", getBigDecimalFromJson(jsonRequest, "fare", BigDecimal.ZERO));
+        data.put("taxes", BigDecimal.ZERO);
+        data.put("fees", BigDecimal.ZERO);
+        data.put("discountAmount", BigDecimal.ZERO);
+        data.put("discountCode", "");
+        data.put("quantity", jsonRequest.has("quantity") ? jsonRequest.get("quantity").getAsInt() : 1);
+        return data;
+    }
+
+    /**
+     * Obtiene los tickets comprados por el usuario empresarial autenticado.
+     * Este endpoint es para que la agencia vea todas sus compras.
+     */
+    private String handleGetCorporateTickets(HttpExchange exchange) {
+        try {
+            // 🔐 Autenticar con API_KEY
+            User corporateUser = CorporateAuthUtil.authenticateWithApiKey(exchange);
+            
+            if (corporateUser == null) {
+                return gson.toJson(Map.of(
+                    "success", false, 
+                    "error", "Autenticación empresarial requerida. Usa header X-API-Key"
+                ));
+            }
+            
+            System.out.println("🏢 Obteniendo tickets empresariales para: " + corporateUser.getCompanyName());
+            
+            // Obtener tickets comprados por este usuario empresarial
+            List<Ticket> tickets = ticketDAO.getTicketsByPurchasedByUserId(corporateUser.getIdUser().intValue());
+            
+            // Convertir a formato JSON
+            List<Map<String, Object>> ticketsList = new ArrayList<>();
+            for (Ticket t : tickets) {
+                Map<String, Object> ticketMap = new HashMap<>();
+                ticketMap.put("ticketId", t.getIdTicket());
+                ticketMap.put("flightId", t.getFlight().getIdFlight());
+                ticketMap.put("flightNumber", t.getFlight().getFlightNumber());
+                ticketMap.put("origin", t.getFlight().getOriginCity() != null ? t.getFlight().getOriginCity().getName() : "N/A");
+                ticketMap.put("destination", t.getFlight().getDestinationCity() != null ? t.getFlight().getDestinationCity().getName() : "N/A");
+                ticketMap.put("departureDate", t.getFlight().getDepartureDate());
+                ticketMap.put("departureTime", t.getFlight().getDepartureTime());
+                ticketMap.put("passengerFirstName", t.getPassengerFirstName());
+                ticketMap.put("passengerLastName", t.getPassengerLastName());
+                ticketMap.put("passengerEmail", t.getPassengerEmail());
+                ticketMap.put("passengerPhone", t.getPassengerPhone());
+                ticketMap.put("seatCategory", t.getSeatCategory());
+                ticketMap.put("seatNumber", t.getSeatNumber());
+                ticketMap.put("quantity", t.getQuantity());
+                ticketMap.put("totalAmount", t.getTotalAmount());
+                ticketMap.put("status", t.getStatus());
+                ticketMap.put("paymentStatus", t.getPaymentStatus());
+                ticketMap.put("bookingDate", t.getBookingDate());
+                ticketMap.put("bookingTime", t.getBookingTime());
+                ticketMap.put("purchasedBy", corporateUser.getCompanyName());
+                ticketsList.add(ticketMap);
+            }
+            
+            return gson.toJson(Map.of(
+                "success", true,
+                "tickets", ticketsList,
+                "total", tickets.size(),
+                "companyName", corporateUser.getCompanyName()
+            ));
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return gson.toJson(Map.of(
+                "success", false, 
+                "error", "Error obteniendo tickets empresariales: " + e.getMessage()
+            ));
+        }
+    }
+
     
     private boolean validateCreateTicketRequest(JsonObject jsonRequest) {
         // Campos requeridos para crear un boleto
+        // userId NO es requerido si viene con API_KEY (compra empresarial)
         String[] requiredFields = {
-            "flightId", "userId", "seatCategory", "fare", 
+            "flightId", "seatCategory", "fare", 
             "passengerFirstName", "passengerLastName", "passengerDocumentType",
             "passengerDocumentNumber", "passengerEmail", "passengerPhone", "paymentMethod"
         };
