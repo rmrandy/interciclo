@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { integrationsApi } from '../services/api.js';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
+import { jsPDF } from 'jspdf';
 
 export default function MyBookings() {
+	const { user } = useAuth();
 	const [tickets, setTickets] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
@@ -40,9 +43,16 @@ export default function MyBookings() {
 						bookingDate: t.bookingDate,
 						bookingTime: t.bookingTime,
 						purchasedBy: t.purchasedBy
-					}));
-					setTickets(adaptedTickets);
-					console.log('✅ Tickets empresariales cargados:', data.total);
+					}));	
+					
+					// Filtrar solo las reservas del usuario loggeado
+					const userTickets = adaptedTickets.filter(t => 
+						t.passengerEmail && user?.email && 
+						t.passengerEmail.toLowerCase() === user.email.toLowerCase()
+					);
+					
+					setTickets(userTickets);
+					console.log(`✅ Mis reservas cargadas: ${userTickets.length} de ${data.total} totales`);
 				} else {
 					setError(data.error || 'No se pudieron cargar las reservas');
 				}
@@ -55,21 +65,95 @@ export default function MyBookings() {
 		}
 		
 		return () => { mounted = false; };
-	}, []);
+	}, [user?.email]);
 
-	async function downloadPdf(id) {
+	function downloadPdf(ticketId) {
 		try {
-			const res = await integrationsApi.ticketPdf(id);
-			if (!res.ok || !(res.contentType || '').includes('pdf')) {
-				alert('El PDF no está disponible por el momento.');
+			console.log('📄 Generando PDF del ticket:', ticketId);
+			
+			// Encontrar el ticket en la lista
+			const ticket = sorted.find(t => t.idTicket === ticketId);
+			if (!ticket) {
+				alert('No se encontró la información del ticket');
 				return;
 			}
-			const url = URL.createObjectURL(res.blob);
-			const a = document.createElement('a');
-			a.href = url; a.download = `Ticket-${id}.pdf`; a.click();
-			URL.revokeObjectURL(url);
+			
+			// Crear un nuevo documento PDF
+			const doc = new jsPDF();
+			
+			// Título
+			doc.setFontSize(24);
+			doc.setFont('helvetica', 'bold');
+			doc.text('TICKET DE VUELO', 20, 30);
+			
+			// Línea separadora
+			doc.setLineWidth(0.5);
+			doc.line(20, 35, 190, 35);
+			
+			// Información del ticket
+			let y = 50;
+			doc.setFontSize(14);
+			doc.setFont('helvetica', 'bold');
+			doc.text(`Ticket #${ticket.idTicket}`, 20, y);
+			
+			y += 15;
+			doc.setFontSize(12);
+			doc.setFont('helvetica', 'normal');
+			
+			// Detalles del vuelo
+			doc.text(`Vuelo: ${ticket.flightNumber || 'N/A'}`, 20, y);
+			y += 7;
+			doc.text(`Ruta: ${ticket.originCity || 'N/A'} → ${ticket.destinationCity || 'N/A'}`, 20, y);
+			y += 7;
+			doc.text(`Fecha: ${ticket.departureDate || 'N/A'}`, 20, y);
+			y += 7;
+			doc.text(`Hora: ${ticket.departureTime || 'N/A'}`, 20, y);
+			
+			y += 15;
+			
+			// Información del pasajero
+			doc.setFont('helvetica', 'bold');
+			doc.text('Informacion del Pasajero', 20, y);
+			y += 10;
+			doc.setFont('helvetica', 'normal');
+			doc.text(`Nombre: ${ticket.passengerName || 'N/A'}`, 20, y);
+			y += 7;
+			doc.text(`Email: ${ticket.passengerEmail || 'N/A'}`, 20, y);
+			
+			y += 15;
+			
+			// Información del asiento
+			doc.setFont('helvetica', 'bold');
+			doc.text('Informacion del Asiento', 20, y);
+			y += 10;
+			doc.setFont('helvetica', 'normal');
+			doc.text(`Categoria: ${ticket.seatCategory || 'N/A'}`, 20, y);
+			y += 7;
+			doc.text(`Asiento: ${ticket.seatNumber || 'Por asignar'}`, 20, y);
+			
+			y += 15;
+			
+			// Información de pago
+			doc.setFont('helvetica', 'bold');
+			doc.text('Informacion de Pago', 20, y);
+			y += 10;
+			doc.setFont('helvetica', 'normal');
+			doc.text(`Total: $${ticket.totalAmount || 0}`, 20, y);
+			y += 7;
+			doc.text(`Estado: ${ticket.status || 'N/A'}`, 20, y);
+			
+			// Nota al pie
+			doc.setFontSize(10);
+			doc.setFont('helvetica', 'italic');
+			doc.text('Gracias por volar con nosotros - AeroLinea', 20, 280);
+			
+			// Guardar el PDF
+			doc.save(`Ticket-${ticketId}.pdf`);
+			console.log('✅ PDF generado y descargado exitosamente');
+			
 		} catch (e) {
-			alert('No se pudo descargar el PDF');
+			console.error('❌ Error generando PDF:', e);
+			alert('No se pudo generar el PDF: ' + e.message);
 		}
 	}
 
@@ -80,15 +164,15 @@ export default function MyBookings() {
 	return (
 		<section className="section">
 			<div className="airline-gradient-sky airline-shadow-large" style={{ color:'#fff', padding:'24px', borderRadius:16, marginBottom:12 }}>
-				<h2 style={{ margin:0 }}>🏢 Reservas de la Agencia</h2>
-				<p className="small" style={{ color:'rgba(255,255,255,0.9)' }}>Todas las compras realizadas desde la agencia. Total: {sorted.length}</p>
+				<h2 style={{ margin:0 }}>✈️ Mis reservas</h2>
+				<p className="small" style={{ color:'rgba(255,255,255,0.9)' }}>Todas tus reservaciones de vuelos. Total: {sorted.length}</p>
 			</div>
-			{loading && <p className="small">Cargando reservas empresariales...</p>}
+			{loading && <p className="small">Cargando tus reservas...</p>}
 			{error && <div className="card" style={{ borderColor:'#fecaca', background:'#fef2f2' }}><strong style={{ color:'#b91c1c' }}>Error:</strong> {error}</div>}
 			{!loading && !error && sorted.length === 0 && (
 				<div className="card" style={{ textAlign:'center', padding:'40px' }}>
 					<div style={{ fontSize:'3rem', marginBottom:'12px' }}>✈️</div>
-					<p className="small" style={{ color:'#6b7280' }}>Aún no hay reservas empresariales. Las compras desde la agencia aparecerán aquí.</p>
+					<p className="small" style={{ color:'#6b7280' }}>Aún no tienes reservas. Tus compras de vuelos aparecerán aquí.</p>
 				</div>
 			)}
 			<ul className="clean grid">
