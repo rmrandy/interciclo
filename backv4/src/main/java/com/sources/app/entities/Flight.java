@@ -10,7 +10,8 @@ import java.time.LocalDate;
 public class Flight {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "flight_seq")
+    @SequenceGenerator(name = "flight_seq", sequenceName = "FLIGHTS_SEQ", allocationSize = 1)
     @Column(name = "ID_FLIGHT")
     private Integer idFlight;
 

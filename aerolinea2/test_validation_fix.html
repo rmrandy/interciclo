@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Prueba de Validación - Gestión de Vuelos</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .test-section {
+            background: white;
+            margin-bottom: 20px;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .test-section h3 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+        
+        .required-field {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        
+        .error-input {
+            border-color: #e74c3c !important;
+            background: #fef2f2 !important;
+        }
+        
+        .field-error {
+            color: #e74c3c;
+            font-size: 12px;
+            margin-top: 5px;
+            padding: 5px;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 4px;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            margin-right: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary { 
+            background: linear-gradient(135deg, #3498db, #2980b9); 
+            color: white; 
+        }
+        
+        .btn-primary:hover { 
+            background: linear-gradient(135deg, #2980b9, #1f5f8b); 
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        
+        .response {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .response.success { 
+            border-color: #28a745; 
+            background: #d4edda; 
+        }
+        
+        .response.error { 
+            border-color: #dc3545; 
+            background: #f8d7da; 
+        }
+        
+        .validation-summary {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .validation-summary h4 {
+            color: #856404;
+            margin-top: 0;
+        }
+        
+        .validation-summary ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        .validation-summary li {
+            color: #856404;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-section">
+        <h3>🧪 Prueba de Validación de Formulario</h3>
+        <p>Este formulario simula la validación que se implementó en el modal de edición de vuelos.</p>
+        
+        <form id="testForm">
+            <div class="form-group">
+                <label>
+                    <span class="required-field">*</span>
+                    Número de Vuelo
+                </label>
+                <input type="text" id="flightNumber" placeholder="Ej: AV008" required>
+                <div id="flightNumberError" class="field-error" style="display: none;">
+                    El número de vuelo es obligatorio
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <span class="required-field">*</span>
+                    Ciudad de Origen
+                </label>
+                <select id="originCity" required>
+                    <option value="">Seleccionar ciudad origen</option>
+                    <option value="1">Ciudad de Guatemala, Guatemala</option>
+                    <option value="2">Miami, Estados Unidos</option>
+                    <option value="3">Orlando, Estados Unidos</option>
+                </select>
+                <div id="originCityError" class="field-error" style="display: none;">
+                    La ciudad de origen es obligatoria
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <span class="required-field">*</span>
+                    Ciudad de Destino
+                </label>
+                <select id="destinationCity" required>
+                    <option value="">Seleccionar ciudad destino</option>
+                    <option value="1">Ciudad de Guatemala, Guatemala</option>
+                    <option value="2">Miami, Estados Unidos</option>
+                    <option value="3">Orlando, Estados Unidos</option>
+                </select>
+                <div id="destinationCityError" class="field-error" style="display: none;">
+                    La ciudad de destino es obligatoria
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <span class="required-field">*</span>
+                    Fecha de Salida
+                </label>
+                <input type="date" id="departureDate" required>
+                <div id="departureDateError" class="field-error" style="display: none;">
+                    La fecha de salida es obligatoria
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <span class="required-field">*</span>
+                    Hora de Salida
+                </label>
+                <input type="time" id="departureTime" required>
+                <div id="departureTimeError" class="field-error" style="display: none;">
+                    La hora de salida es obligatoria
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <span class="required-field">*</span>
+                    Precio Base
+                </label>
+                <input type="number" id="basePrice" step="0.01" min="0" placeholder="150.00" required>
+                <div id="basePriceError" class="field-error" style="display: none;">
+                    El precio base debe ser mayor a 0
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <span class="required-field">*</span>
+                    Asientos Disponibles
+                </label>
+                <input type="number" id="availableSeats" min="1" placeholder="100" required>
+                <div id="availableSeatsError" class="field-error" style="display: none;">
+                    Los asientos disponibles deben ser mayor a 0
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Validar Formulario</button>
+        </form>
+        
+        <div id="validationSummary" class="validation-summary" style="display: none;">
+            <h4>⚠️ Errores de Validación:</h4>
+            <ul id="errorList"></ul>
+        </div>
+        
+        <div id="response" class="response"></div>
+    </div>
+
+    <script>
+        // Simular la validación implementada en el componente Vue
+        function validateForm() {
+            const validationErrors = []
+            
+            // Obtener valores del formulario
+            const flightNumber = document.getElementById('flightNumber').value.trim()
+            const originCityId = document.getElementById('originCity').value
+            const destinationCityId = document.getElementById('destinationCity').value
+            const departureDate = document.getElementById('departureDate').value
+            const departureTime = document.getElementById('departureTime').value
+            const basePrice = parseFloat(document.getElementById('basePrice').value)
+            const availableSeats = parseInt(document.getElementById('availableSeats').value)
+            
+            // Limpiar errores previos
+            clearAllErrors()
+            
+            // Validar campos obligatorios
+            if (!flightNumber) {
+                validationErrors.push('El número de vuelo es obligatorio')
+                showFieldError('flightNumberError')
+                addErrorClass('flightNumber')
+            }
+            
+            if (!originCityId) {
+                validationErrors.push('La ciudad de origen es obligatoria')
+                showFieldError('originCityError')
+                addErrorClass('originCity')
+            }
+            
+            if (!destinationCityId) {
+                validationErrors.push('La ciudad de destino es obligatoria')
+                showFieldError('destinationCityError')
+                addErrorClass('destinationCity')
+            }
+            
+            if (!departureDate) {
+                validationErrors.push('La fecha de salida es obligatoria')
+                showFieldError('departureDateError')
+                addErrorClass('departureDate')
+            }
+            
+            if (!departureTime) {
+                validationErrors.push('La hora de salida es obligatoria')
+                showFieldError('departureTimeError')
+                addErrorClass('departureTime')
+            }
+            
+            if (!basePrice || basePrice <= 0) {
+                validationErrors.push('El precio base debe ser mayor a 0')
+                showFieldError('basePriceError')
+                addErrorClass('basePrice')
+            }
+            
+            if (!availableSeats || availableSeats <= 0) {
+                validationErrors.push('Los asientos disponibles deben ser mayor a 0')
+                showFieldError('availableSeatsError')
+                addErrorClass('availableSeats')
+            }
+            
+            // Mostrar resumen de validación
+            if (validationErrors.length > 0) {
+                showValidationSummary(validationErrors)
+                return false
+            }
+            
+            // Si no hay errores, simular envío exitoso
+            showSuccessResponse()
+            return true
+        }
+        
+        function clearAllErrors() {
+            const errorElements = document.querySelectorAll('.field-error')
+            errorElements.forEach(element => {
+                element.style.display = 'none'
+            })
+            
+            const inputs = document.querySelectorAll('input, select')
+            inputs.forEach(input => {
+                input.classList.remove('error-input')
+            })
+        }
+        
+        function showFieldError(errorId) {
+            const errorElement = document.getElementById(errorId)
+            if (errorElement) {
+                errorElement.style.display = 'block'
+            }
+        }
+        
+        function addErrorClass(fieldId) {
+            const field = document.getElementById(fieldId)
+            if (field) {
+                field.classList.add('error-input')
+            }
+        }
+        
+        function showValidationSummary(errors) {
+            const summary = document.getElementById('validationSummary')
+            const errorList = document.getElementById('errorList')
+            
+            errorList.innerHTML = ''
+            errors.forEach(error => {
+                const li = document.createElement('li')
+                li.textContent = error
+                errorList.appendChild(li)
+            })
+            
+            summary.style.display = 'block'
+            
+            // Ocultar resumen exitoso
+            document.getElementById('response').innerHTML = ''
+        }
+        
+        function showSuccessResponse() {
+            const response = document.getElementById('response')
+            response.innerHTML = '✅ Formulario válido - Todos los campos están correctos'
+            response.className = 'response success'
+            
+            // Ocultar resumen de errores
+            document.getElementById('validationSummary').style.display = 'none'
+        }
+        
+        // Event listeners
+        document.getElementById('testForm').addEventListener('submit', function(e) {
+            e.preventDefault()
+            validateForm()
+        })
+        
+        // Validación en tiempo real
+        document.getElementById('flightNumber').addEventListener('input', function() {
+            if (this.value.trim()) {
+                this.classList.remove('error-input')
+                document.getElementById('flightNumberError').style.display = 'none'
+            }
+        })
+        
+        document.getElementById('originCity').addEventListener('change', function() {
+            if (this.value) {
+                this.classList.remove('error-input')
+                document.getElementById('originCityError').style.display = 'none'
+            }
+        })
+        
+        document.getElementById('destinationCity').addEventListener('change', function() {
+            if (this.value) {
+                this.classList.remove('error-input')
+                document.getElementById('destinationCityError').style.display = 'none'
+            }
+        })
+        
+        // Inicializar con fecha de hoy
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date().toISOString().split('T')[0]
+            document.getElementById('departureDate').value = today
+        })
+    </script>
+</body>
+</html>
+
+

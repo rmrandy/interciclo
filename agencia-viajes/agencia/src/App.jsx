@@ -17,6 +17,7 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 import MyProfile from './pages/MyProfile.jsx';
 import MyBookings from './pages/MyBookings.jsx';
 import BookingDetail from './pages/BookingDetail.jsx';
+import CorporateUsers from './pages/CorporateUsers.jsx';
 
 function App() {
 	return (
@@ -31,6 +32,7 @@ function App() {
 						<Route path="resultados" element={<Resultados />} />
 						<Route path="vuelo/:id" element={<FlightDetail />} />
 						<Route path="compra" element={<ProtectedRoute><Compra /></ProtectedRoute>} />
+						<Route path="admin/corporate-users" element={<ProtectedRoute roles={["admin"]}><CorporateUsers /></ProtectedRoute>} />
 						<Route path="admin" element={<ProtectedRoute roles={["admin"]}><Admin /></ProtectedRoute>} />
 						<Route path="mi-perfil" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
 						<Route path="mis-reservas" element={<ProtectedRoute><MyBookings /></ProtectedRoute>} />

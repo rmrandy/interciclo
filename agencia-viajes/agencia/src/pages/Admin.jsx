@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { airlinesApi, usersApi, getBackendBaseUrl, infoPagesApi } from '../services/api.js';
 
 const emptyAirline = {
@@ -109,7 +110,12 @@ export default function Admin() {
 
 	return (
 		<section className="section" style={{ maxWidth: 980 }}>
-			<h2>Administración</h2>
+			<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+				<h2>Administración</h2>
+				<Link to="/admin/corporate-users" className="btn btn-primary">
+					👔 Gestionar Usuarios Empresariales
+				</Link>
+			</div>
 			<div className="tabs" style={{ marginBottom: 12 }}>
 				<button className={`tab${tab==='airlines' ? ' active' : ''}`} onClick={()=>setTab('airlines')}>Aerolíneas</button>
 				<button className={`tab${tab==='users' ? ' active' : ''}`} onClick={()=>setTab('users')}>Usuarios</button>

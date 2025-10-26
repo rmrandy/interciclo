@@ -4,6 +4,7 @@ import Login from "./pages/login.vue";
 import Home from "./pages/home.vue";
 import Register from "./pages/register.vue";
 import AdminUsers from "./pages/admin/users.vue";
+import CorporateUsers from "./pages/admin/corporate-users.vue";
 import InsuranceServices from "./pages/admin/insurance-services.vue";
 import HospitalServices from "./pages/admin/hospital-services.vue";
 import HospitalServicesImport from "./pages/admin/hospital-services-import.vue";
@@ -152,6 +153,11 @@ const routes = [
   {
     path: "/admin/users",
     component: AdminUsers,
+    beforeEnter: requireAdmin
+  },
+  {
+    path: "/admin/corporate-users",
+    component: CorporateUsers,
     beforeEnter: requireAdmin
   },
   {

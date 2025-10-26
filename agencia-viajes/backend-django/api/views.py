@@ -936,3 +936,241 @@ def users_detail_view(request, user_id: str):
     return JsonResponse({'success': False, 'message': 'Método no permitido'}, status=405)
 
 
+# ============================================================
+# CORPORATE USERS (Usuarios Empresariales con API Keys)
+# ============================================================
+
+def generate_api_key():
+    """Genera un API Key único de 32 caracteres"""
+    import secrets
+    return secrets.token_urlsafe(32)[:32]
+
+
+@csrf_exempt
+def corporate_users_list_view(request):
+    """GET: Lista todos los usuarios corporativos | POST: Crea uno nuevo"""
+    db = get_db()
+    
+    if request.method == 'GET':
+        users = list(db.corporate_config.find())
+        result = []
+        for u in users:
+            result.append({
+                'idUser': str(u.get('_id')),
+                'companyName': u.get('companyName', ''),
+                'name': u.get('name', ''),
+                'email': u.get('email', ''),
+                'phone': u.get('phone', ''),
+                'cui': u.get('cui', ''),
+                'birthDate': u.get('birthDate'),
+                'address': u.get('address', ''),
+                'apiKey': u.get('apiKey', ''),
+                'enabled': 1 if u.get('enabled', True) else 0,
+                'createdAt': u.get('createdAt'),
+                'updatedAt': u.get('updatedAt'),
+            })
+        return JsonResponse(result, safe=False)
+    
+    if request.method == 'POST':
+        data = parse_request_data(request)
+        
+        # Validaciones
+        required = ['companyName', 'name', 'email', 'phone', 'cui', 'address', 'password']
+        for field in required:
+            if not data.get(field):
+                return JsonResponse({'error': f'Campo requerido: {field}'}, status=400)
+        
+        email = data.get('email', '').strip().lower()
+        if not email_pattern.match(email):
+            return JsonResponse({'error': 'Email inválido'}, status=400)
+        
+        # Verificar que no exista otro usuario con el mismo email
+        if db.corporate_config.find_one({'email': email}):
+            return JsonResponse({'error': 'Ya existe un usuario con este email'}, status=400)
+        
+        # Generar API Key único
+        api_key = generate_api_key()
+        while db.corporate_config.find_one({'apiKey': api_key}):
+            api_key = generate_api_key()
+        
+        # Hashear contraseña
+        pwd = data.get('password', '')
+        if len(pwd) < 6:
+            return JsonResponse({'error': 'La contraseña debe tener al menos 6 caracteres'}, status=400)
+        
+        salt = bcrypt.gensalt(rounds=12)
+        hashed_password = bcrypt.hashpw(pwd.encode('utf-8'), salt).decode('utf-8')
+        
+        # Crear documento
+        now = datetime.utcnow()
+        doc = {
+            'companyName': data.get('companyName', '').strip(),
+            'name': data.get('name', '').strip(),
+            'email': email,
+            'phone': data.get('phone', '').strip(),
+            'cui': data.get('cui', '').strip(),
+            'birthDate': data.get('birthDate') or None,
+            'address': data.get('address', '').strip(),
+            'password': hashed_password,
+            'apiKey': api_key,
+            'enabled': True,
+            'createdAt': now,
+            'updatedAt': now,
+        }
+        
+        result = db.corporate_config.insert_one(doc)
+        
+        return JsonResponse({
+            'success': True,
+            'idUser': str(result.inserted_id),
+            'apiKey': api_key,
+            'message': 'Usuario corporativo creado exitosamente'
+        }, status=201)
+    
+    return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+
+@csrf_exempt
+def corporate_users_detail_view(request, user_id: str):
+    """GET: Obtiene un usuario | PUT: Actualiza un usuario"""
+    from bson import ObjectId
+    db = get_db()
+    
+    try:
+        oid = ObjectId(user_id)
+    except Exception:
+        return JsonResponse({'error': 'ID inválido'}, status=400)
+    
+    user = db.corporate_config.find_one({'_id': oid})
+    if not user:
+        return JsonResponse({'error': 'Usuario no encontrado'}, status=404)
+    
+    if request.method == 'GET':
+        return JsonResponse({
+            'idUser': str(user.get('_id')),
+            'companyName': user.get('companyName', ''),
+            'name': user.get('name', ''),
+            'email': user.get('email', ''),
+            'phone': user.get('phone', ''),
+            'cui': user.get('cui', ''),
+            'birthDate': user.get('birthDate'),
+            'address': user.get('address', ''),
+            'apiKey': user.get('apiKey', ''),
+            'enabled': 1 if user.get('enabled', True) else 0,
+            'createdAt': user.get('createdAt'),
+            'updatedAt': user.get('updatedAt'),
+        })
+    
+    if request.method == 'PUT':
+        data = parse_request_data(request)
+        updates = {}
+        
+        # Campos actualizables
+        for field in ['companyName', 'name', 'email', 'phone', 'cui', 'birthDate', 'address']:
+            if field in data and data[field] is not None:
+                if field == 'email':
+                    email = data[field].strip().lower()
+                    if not email_pattern.match(email):
+                        return JsonResponse({'error': 'Email inválido'}, status=400)
+                    # Verificar que no exista otro usuario con el mismo email
+                    existing = db.corporate_config.find_one({'email': email, '_id': {'$ne': oid}})
+                    if existing:
+                        return JsonResponse({'error': 'Ya existe un usuario con este email'}, status=400)
+                    updates[field] = email
+                else:
+                    updates[field] = data[field]
+        
+        # Actualizar enabled
+        if 'enabled' in data:
+            updates['enabled'] = bool(data['enabled'])
+        
+        # Actualizar contraseña si se proporciona
+        if 'password' in data and data['password']:
+            pwd = data['password']
+            if len(pwd) < 6:
+                return JsonResponse({'error': 'La contraseña debe tener al menos 6 caracteres'}, status=400)
+            salt = bcrypt.gensalt(rounds=12)
+            updates['password'] = bcrypt.hashpw(pwd.encode('utf-8'), salt).decode('utf-8')
+        
+        if not updates:
+            return JsonResponse({'error': 'No hay datos para actualizar'}, status=400)
+        
+        updates['updatedAt'] = datetime.utcnow()
+        
+        db.corporate_config.update_one({'_id': oid}, {'$set': updates})
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Usuario actualizado exitosamente'
+        })
+    
+    return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+
+@csrf_exempt
+def corporate_users_regenerate_key_view(request, user_id: str):
+    """PUT: Regenera el API Key de un usuario corporativo"""
+    from bson import ObjectId
+    db = get_db()
+    
+    if request.method != 'PUT':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    
+    try:
+        oid = ObjectId(user_id)
+    except Exception:
+        return JsonResponse({'error': 'ID inválido'}, status=400)
+    
+    user = db.corporate_config.find_one({'_id': oid})
+    if not user:
+        return JsonResponse({'error': 'Usuario no encontrado'}, status=404)
+    
+    # Generar nuevo API Key único
+    api_key = generate_api_key()
+    while db.corporate_config.find_one({'apiKey': api_key}):
+        api_key = generate_api_key()
+    
+    db.corporate_config.update_one(
+        {'_id': oid},
+        {'$set': {'apiKey': api_key, 'updatedAt': datetime.utcnow()}}
+    )
+    
+    return JsonResponse({
+        'success': True,
+        'apiKey': api_key,
+        'message': 'API Key regenerado exitosamente'
+    })
+
+
+@csrf_exempt
+def corporate_users_toggle_status_view(request, user_id: str):
+    """PUT: Activa/desactiva un usuario corporativo"""
+    from bson import ObjectId
+    db = get_db()
+    
+    if request.method != 'PUT':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    
+    try:
+        oid = ObjectId(user_id)
+    except Exception:
+        return JsonResponse({'error': 'ID inválido'}, status=400)
+    
+    user = db.corporate_config.find_one({'_id': oid})
+    if not user:
+        return JsonResponse({'error': 'Usuario no encontrado'}, status=404)
+    
+    new_status = not user.get('enabled', True)
+    
+    db.corporate_config.update_one(
+        {'_id': oid},
+        {'$set': {'enabled': new_status, 'updatedAt': datetime.utcnow()}}
+    )
+    
+    return JsonResponse({
+        'success': True,
+        'enabled': new_status,
+        'message': f'Usuario {"activado" if new_status else "desactivado"} exitosamente'
+    })
+
+

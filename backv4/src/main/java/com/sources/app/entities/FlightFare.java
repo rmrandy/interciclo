@@ -9,7 +9,8 @@ import java.time.LocalDateTime;
 public class FlightFare {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "flight_fare_seq")
+    @SequenceGenerator(name = "flight_fare_seq", sequenceName = "FLIGHT_FARES_SEQ", allocationSize = 1)
     @Column(name = "ID_FARE")
     private Long idFare;
 

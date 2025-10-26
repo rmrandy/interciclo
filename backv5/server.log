@@ -1,0 +1,97 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.google.inject.internal.aop.HiddenClassDefiner (file:/opt/homebrew/Cellar/maven/3.9.10/libexec/lib/guice-5.1.0-classes.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.inject.internal.aop.HiddenClassDefiner
+WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -----------------------< com.sources.app:backv4 >-----------------------
+[INFO] Building backv4 1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- exec:3.6.1:java (default-cli) @ backv4 ---
+Oct 17, 2025 11:49:36 PM com.sources.app.handlers.NotificationHandler loadMailProperties
+INFO: Propiedades de correo cargadas correctamente desde mail.properties
+Oct 17, 2025 11:49:36 PM com.sources.app.handlers.NotificationHandler <init>
+INFO: NotificationHandler inicializado.
+🚀 Servidor AeroLinea iniciado en 0.0.0.0:8080
+📡 Endpoints disponibles:
+📄 USUARIOS:
+   POST /api/airline/register - Registro de usuarios
+   POST /api/airline/login - Login de usuarios
+   GET  /api/airline/roles - Obtener roles
+   POST /api/airline/assign-role - Asignar rol (admin)
+   GET  /api/airline/users - Obtener usuarios (admin)
+   POST /api/airline/initialize-roles - Inicializar roles
+📊 CONSULTAS PÚBLICAS:
+   GET  /api/airline/aircrafts - Listar aeronaves
+   GET  /api/airline/routes - Listar rutas
+   GET  /api/airline/flights - Listar vuelos públicos
+   GET  /api/airline/flights/search - Buscar vuelos
+   POST /api/airline/bookings - Crear reserva
+✈️ GESTIÓN ADMINISTRATIVA:
+   POST /api/admin/flights - Crear vuelo completo
+   GET  /api/admin/flights - Listar vuelos (admin)
+   GET  /api/admin/flights/{id} - Detalles completos
+   PUT  /api/admin/flights/{id} - Actualizar vuelo
+   POST /api/admin/flights/{id}/publish - Publicar vuelo
+   POST /api/admin/flights/{id}/cancel - Cancelar vuelo
+   PUT  /api/admin/flights/{id}/inventory - Actualizar inventario
+   PUT  /api/admin/flights/{id}/fares - Actualizar precios
+   GET  /api/admin/flights/statistics - Estadísticas
+🏥 ENSURANCE PHARMACY:
+   POST /api/login - Login de usuarios
+   GET  /api/users - Obtener usuarios
+   POST /api/users - Crear usuario
+   PUT  /api/users - Actualizar usuario
+   GET  /api/users/by-email - Buscar usuario por email
+   GET  /api/policy - Obtener pólizas
+   POST /api/policy - Crear póliza
+   GET  /api/appointment - Obtener citas
+   POST /api/appointment - Crear cita
+   GET  /api/category - Obtener categorías
+   POST /api/category - Crear categoría
+   GET  /api/hospital - Obtener hospitales
+   POST /api/hospital - Crear hospital
+   GET  /api/medicine - Obtener medicinas
+   POST /api/medicine - Crear medicina
+   GET  /api/pharmacy - Obtener farmacias
+   POST /api/pharmacy - Crear farmacia
+   GET  /api/prescription - Obtener recetas
+   POST /api/prescription - Crear receta
+   GET  /api/service - Obtener servicios
+   POST /api/service - Crear servicio
+   GET  /api/transactions - Obtener transacciones
+   POST /api/transactions - Crear transacción
+   GET  /api/insurance-services - Obtener servicios de seguro
+   POST /api/insurance-services - Crear servicio de seguro
+   GET  /api/hospital-services - Obtener servicios de hospital
+   POST /api/hospital-services - Crear servicio de hospital
+   GET  /api/ensurance-appointments - Obtener citas de seguro
+   POST /api/ensurance-appointments - Crear cita de seguro
+🔍 SISTEMA:
+   GET  /api/health - Estado del servidor
+   GET  /api/debug/cities - Debug de ciudades
+Oct 17, 2025 11:51:16 PM org.hibernate.Version logVersion
+INFO: HHH000412: Hibernate ORM core version 6.6.6.Final
+Oct 17, 2025 11:51:16 PM org.hibernate.cache.internal.RegionFactoryInitiator initiateService
+INFO: HHH000026: Second-level cache disabled
+Oct 17, 2025 11:51:16 PM org.hibernate.engine.jdbc.connections.internal.ConnectionProviderInitiator instantiateC3p0Provider
+WARN: HHH000022: c3p0 properties were encountered, but the c3p0 provider class was not found on the classpath; these properties are going to be ignored.
+Oct 17, 2025 11:51:16 PM org.hibernate.engine.jdbc.connections.internal.DriverManagerConnectionProviderImpl configure
+WARN: HHH10001002: Using built-in connection pool (not intended for production use)
+Oct 17, 2025 11:51:17 PM org.hibernate.engine.jdbc.dialect.internal.DialectFactoryImpl constructDialect
+WARN: HHH90000025: OracleDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+Oct 17, 2025 11:51:17 PM org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator initiateService
+INFO: HHH10001005: Database info:
+	Database JDBC URL [jdbc:oracle:thin:@//64.225.58.196:1521/XEPDB1]
+	Database driver: oracle.jdbc.driver.OracleDriver
+	Database version: 21.0
+	Autocommit mode: false
+	Isolation level: READ_COMMITTED
+	Minimum pool size: 1
+	Maximum pool size: 10
+Oct 17, 2025 11:51:17 PM org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator initiateService
+INFO: HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+Hibernate: select c1_0.ID_CITY,c1_0.COUNTRY,c1_0.NAME from CITIES c1_0
+Ciudades encontradas: 14

@@ -23,8 +23,7 @@ public class ServiceApproval {
      * Generado mediante una secuencia.
      */
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "service_approval_seq")
-    @SequenceGenerator(name = "service_approval_seq", sequenceName = "service_approval_seq", allocationSize = 1)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
     /**

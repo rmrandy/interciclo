@@ -502,5 +502,259 @@ public class UserDAO {
             return List.of();
         }
     }
+
+    /**
+     * Crea un nuevo usuario empresarial con API Key.
+     *
+     * @param companyName Nombre de la empresa.
+     * @param name Nombre del contacto.
+     * @param email Email del usuario.
+     * @param phone Teléfono.
+     * @param cui CUI/NIT de la empresa.
+     * @param address Dirección.
+     * @param password Contraseña.
+     * @param apiKey API Key único.
+     * @param birthDate Fecha de nacimiento (opcional).
+     * @return El usuario creado, null si falla.
+     */
+    public User createCorporateUser(String companyName, String name, String email, 
+                                    String phone, Long cui, String address, 
+                                    String password, String apiKey, Date birthDate) {
+        Transaction tx = null;
+        Session session = null;
+        try {
+            session = HibernateUtil.getSessionFactory().openSession();
+            tx = session.beginTransaction();
+
+            User user = new User();
+            user.setCompanyName(companyName);
+            user.setName(name);
+            
+            // Dividir el nombre en firstName y lastName
+            String[] nameParts = name.trim().split("\\s+", 2);
+            if (nameParts.length >= 2) {
+                user.setFirstName(nameParts[0]);
+                user.setLastName(nameParts[1]);
+            } else {
+                // Si solo hay un nombre, usar el mismo para ambos
+                user.setFirstName(name);
+                user.setLastName(companyName); // Usar nombre de empresa como apellido
+            }
+            
+            user.setEmail(email);
+            user.setPhone(phone);
+            user.setCui(cui);
+            user.setAddress(address);
+            user.setPassword(password);
+            user.setApiKey(apiKey);
+            user.setBirthDate(birthDate);
+            user.setIsCorporate(1); // Marcar como empresarial
+            user.setRole("corporate"); // Rol empresarial
+            user.setEnabled(1); // Activo por defecto
+            
+            // Campos adicionales requeridos con valores por defecto para usuarios empresariales
+            user.setAge(0); // Edad no aplica para usuarios empresariales
+            user.setCountry("N/A"); // País no aplica
+            user.setPassportNumber(String.valueOf(cui)); // Usar CUI como passportNumber
+            user.setPaidService(null); // Servicio pagado no aplica
+            user.setExpirationDate(null); // Fecha de expiración no aplica
+
+            session.persist(user);
+            tx.commit();
+            
+            System.out.println("✅ Usuario empresarial creado: " + companyName + " (API Key: " + apiKey + ")");
+            return user;
+        } catch (Exception e) {
+            if (tx != null) {
+                try {
+                    if (tx.getStatus().canRollback()) {
+                        tx.rollback();
+                    }
+                } catch (Exception rollbackEx) {
+                    System.err.println("⚠️ Error en rollback: " + rollbackEx.getMessage());
+                }
+            }
+            System.err.println("❌ Error creando usuario empresarial: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        } finally {
+            if (session != null) {
+                try {
+                    session.close();
+                } catch (Exception closeEx) {
+                    System.err.println("⚠️ Error cerrando sesión: " + closeEx.getMessage());
+                }
+            }
+        }
+    }
+
+    /**
+     * Actualiza un usuario empresarial existente.
+     *
+     * @param userId ID del usuario a actualizar.
+     * @param companyName Nombre de la empresa.
+     * @param name Nombre del contacto.
+     * @param email Email.
+     * @param phone Teléfono.
+     * @param cui CUI/NIT.
+     * @param address Dirección.
+     * @param enabled Estado (activo/inactivo).
+     * @param password Nueva contraseña (opcional, null para no cambiar).
+     * @param apiKey Nuevo API Key (opcional, null para no cambiar).
+     * @param birthDate Fecha de nacimiento.
+     * @return El usuario actualizado, null si falla.
+     */
+    public User updateCorporateUser(Long userId, String companyName, String name, 
+                                    String email, String phone, Long cui, String address, 
+                                    Integer enabled, String password, String apiKey, Date birthDate) {
+        Transaction tx = null;
+        Session session = null;
+        try {
+            session = HibernateUtil.getSessionFactory().openSession();
+            tx = session.beginTransaction();
+
+            User user = session.get(User.class, userId);
+            if (user == null || user.getIsCorporate() != 1) {
+                System.err.println("❌ Usuario empresarial no encontrado: " + userId);
+                return null;
+            }
+
+            // Actualizar campos
+            user.setCompanyName(companyName);
+            user.setName(name);
+            user.setEmail(email);
+            user.setPhone(phone);
+            user.setCui(cui);
+            user.setAddress(address);
+            user.setEnabled(enabled);
+            user.setBirthDate(birthDate);
+
+            // Solo actualizar password si se proporciona uno nuevo
+            if (password != null && !password.trim().isEmpty()) {
+                user.setPassword(password);
+            }
+
+            // Solo actualizar API Key si se proporciona uno nuevo
+            if (apiKey != null && !apiKey.trim().isEmpty()) {
+                user.setApiKey(apiKey);
+            }
+
+            session.merge(user);
+            tx.commit();
+            
+            System.out.println("✅ Usuario empresarial actualizado: " + companyName);
+            return user;
+        } catch (Exception e) {
+            if (tx != null) {
+                try {
+                    if (tx.getStatus().canRollback()) {
+                        tx.rollback();
+                    }
+                } catch (Exception rollbackEx) {
+                    System.err.println("⚠️ Error en rollback: " + rollbackEx.getMessage());
+                }
+            }
+            System.err.println("❌ Error actualizando usuario empresarial: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        } finally {
+            if (session != null) {
+                try {
+                    session.close();
+                } catch (Exception closeEx) {
+                    System.err.println("⚠️ Error cerrando sesión: " + closeEx.getMessage());
+                }
+            }
+        }
+    }
+
+    /**
+     * Regenera el API Key de un usuario empresarial.
+     *
+     * @param userId ID del usuario.
+     * @param newApiKey Nuevo API Key.
+     * @return true si se actualizó correctamente, false si falla.
+     */
+    public boolean regenerateApiKey(Long userId, String newApiKey) {
+        Transaction tx = null;
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            tx = session.beginTransaction();
+
+            User user = session.get(User.class, userId);
+            if (user == null || user.getIsCorporate() != 1) {
+                System.err.println("❌ Usuario empresarial no encontrado: " + userId);
+                return false;
+            }
+
+            user.setApiKey(newApiKey);
+            session.merge(user);
+            tx.commit();
+            
+            System.out.println("✅ API Key regenerado para: " + user.getCompanyName());
+            return true;
+        } catch (Exception e) {
+            if (tx != null && tx.getStatus().canRollback()) {
+                tx.rollback();
+            }
+            System.err.println("❌ Error regenerando API Key: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Alterna el estado (activo/inactivo) de un usuario empresarial.
+     *
+     * @param userId ID del usuario.
+     * @return El usuario actualizado, null si falla.
+     */
+    public User toggleCorporateUserStatus(Long userId) {
+        Transaction tx = null;
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            tx = session.beginTransaction();
+
+            User user = session.get(User.class, userId);
+            if (user == null || user.getIsCorporate() != 1) {
+                System.err.println("❌ Usuario empresarial no encontrado: " + userId);
+                return null;
+            }
+
+            // Alternar estado
+            user.setEnabled(user.getEnabled() == 1 ? 0 : 1);
+            session.merge(user);
+            tx.commit();
+            
+            String status = user.getEnabled() == 1 ? "activado" : "desactivado";
+            System.out.println("✅ Usuario empresarial " + status + ": " + user.getCompanyName());
+            return user;
+        } catch (Exception e) {
+            if (tx != null && tx.getStatus().canRollback()) {
+                tx.rollback();
+            }
+            System.err.println("❌ Error alternando estado: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Verifica si ya existe un API Key en uso.
+     *
+     * @param apiKey El API Key a verificar.
+     * @return true si ya existe, false en caso contrario.
+     */
+    public boolean existsApiKey(String apiKey) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Query<Long> query = session.createQuery(
+                "SELECT COUNT(u) FROM User u WHERE u.apiKey = :apiKey", 
+                Long.class
+            );
+            query.setParameter("apiKey", apiKey);
+            return query.uniqueResult() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
 }
 

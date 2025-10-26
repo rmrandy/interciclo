@@ -92,7 +92,8 @@ public class App {
         }
 
         String ip = getLocalExternalIp();
-        int port = 8080; // Puerto fijo
+        // Leer puerto desde propiedad del sistema o usar 8080 por defecto
+        int port = Integer.parseInt(System.getProperty("port", "8080"));
         
         System.out.println("Iniciando servidor en puerto: " + port);
 
@@ -118,6 +119,8 @@ public class App {
         HttpServer server = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
         server.createContext("/api/login", new LoginHandler(userDAO));
         server.createContext("/api/users", new UserHandler(userDAO));
+        // Gestión de usuarios empresariales (Corporate Users) con API Keys
+        server.createContext("/api/corporate-users", new CorporateUserHandler(userDAO));
         // Exponer endpoints de aerolínea bajo el mismo servidor
         server.createContext("/api/airline", new AirlineHttpHandler(userDAO));
         server.createContext("/api/airline/flights", new FlightHandler());

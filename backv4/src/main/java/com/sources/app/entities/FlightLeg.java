@@ -8,7 +8,8 @@ import java.io.Serializable;
 public class FlightLeg implements Serializable {
     
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "flight_leg_seq")
+    @SequenceGenerator(name = "flight_leg_seq", sequenceName = "FLIGHT_LEGS_SEQ", allocationSize = 1)
     @Column(name = "ID_LEG")
     private Long idLeg;
     

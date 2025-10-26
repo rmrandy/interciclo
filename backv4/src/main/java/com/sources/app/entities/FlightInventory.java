@@ -8,7 +8,8 @@ import java.time.LocalDateTime;
 public class FlightInventory {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "flight_inventory_seq")
+    @SequenceGenerator(name = "flight_inventory_seq", sequenceName = "FLIGHT_INVENTORY_SEQ", allocationSize = 1)
     @Column(name = "ID_INVENTORY")
     private Long idInventory;
 
