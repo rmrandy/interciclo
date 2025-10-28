@@ -9,6 +9,7 @@ const emptyAirline = {
 	host: '',
 	port: 80,
 	basePath: '/',
+	apiKey: '', // API Key para autenticación
 	endpoints: { search: '/search', book: '/book', cancel: '/cancel', health: '/health' },
 	enabled: true,
 	timeoutMs: 2000,
@@ -139,6 +140,21 @@ export default function Admin() {
 							<label className="field"><span className="label">Puerto</span><input className="input" type="number" value={form.port} onChange={e=>update('port', parseInt(e.target.value)||0)} required/></label>
 							<label className="field"><span className="label">Base path</span><input className="input" value={form.basePath} onChange={e=>update('basePath', e.target.value)} required/></label>
 						</div>
+						<div className="grid-1">
+							<label className="field">
+								<span className="label">🔑 API Key (Usuario Empresarial)</span>
+								<input 
+									className="input" 
+									value={form.apiKey || ''} 
+									onChange={e=>update('apiKey', e.target.value)} 
+									placeholder="Ej: abc123xyz456..." 
+									style={{ fontFamily: 'monospace', fontSize: '0.9em' }}
+								/>
+								<span className="small" style={{ color: '#666', marginTop: '4px', display: 'block' }}>
+									API Key generado desde la aerolínea para autenticación
+								</span>
+							</label>
+						</div>
 						<div className="grid-3">
 							<label className="field"><span className="label">Endpoint búsqueda</span><input className="input" value={form.endpoints.search} onChange={e=>updateEndpoint('search', e.target.value)} /></label>
 							<label className="field"><span className="label">Endpoint compra</span><input className="input" value={form.endpoints.book} onChange={e=>updateEndpoint('book', e.target.value)} /></label>
@@ -172,7 +188,7 @@ export default function Admin() {
 										<th>Código</th>
 										<th>Host</th>
 										<th>Puerto</th>
-										<th>Base</th>
+										<th>API Key</th>
 										<th>Activo</th>
 										<th></th>
 									</tr>
@@ -184,8 +200,10 @@ export default function Admin() {
 											<td>{it.code}</td>
 											<td>{it.host}</td>
 											<td>{it.port}</td>
-											<td>{it.basePath}</td>
-											<td>{it.enabled ? 'Sí' : 'No'}</td>
+											<td style={{ fontFamily: 'monospace', fontSize: '0.85em' }}>
+												{it.apiKey ? `${it.apiKey.substring(0, 8)}...${it.apiKey.substring(it.apiKey.length - 4)}` : '❌ Sin API Key'}
+											</td>
+											<td>{it.enabled ? '✅ Sí' : '❌ No'}</td>
 											<td style={{ textAlign: 'right' }}>
 												<button className="btn" onClick={()=>editAirline(it)}>Editar</button>
 												<button className="btn" onClick={()=>removeAirline(it._id)}>Eliminar</button>

@@ -72,3 +72,4 @@ WHERE sequence_name IN ('SEQ_TICKETS', 'SEQ_CLICK_EVENTS', 'SEQ_CITIES');
 COMMIT;
 
 
+

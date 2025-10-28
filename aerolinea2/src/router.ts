@@ -14,6 +14,7 @@ import CatalogInsuranceServices from "./pages/catalog/insurance-services.vue";
 import CatalogHospitals from "./pages/catalog/hospitals.vue";
 import CatalogHospitalServices from "./pages/catalog/hospital-services.vue";
 import Policies from "./pages/admin/policies.vue";
+import CorporateUsers from "./pages/admin/corporate-users.vue";
 import RegisterClient from "./pages/employee/register-client.vue";
 import ClientManagement from "./pages/admin/client-management.vue";
 import SystemConfiguration from "./pages/admin/system-configuration.vue";
@@ -177,6 +178,11 @@ const routes = [
   {
     path: "/admin/policies",
     component: Policies,
+    beforeEnter: requireAdmin
+  },
+  {
+    path: "/admin/corporate-users",
+    component: CorporateUsers,
     beforeEnter: requireAdmin
   },
   {

@@ -117,6 +117,7 @@ com/sources/app/dao/TotalPharmacyDAO.class
 com/sources/app/handlers/FlightReviewHandler$1.class
 com/sources/app/entities/Prescription.class
 com/sources/app/dao/RouteDAO.class
+com/sources/app/handlers/CorporateUserHandler.class
 com/sources/app/dao/UserDAO.class
 com/sources/app/entities/SystemConfig.class
 com/sources/app/SimpleAirlineServer.class

@@ -952,6 +952,21 @@ const downloadTicketPdf = async (id: number) => {
             <p class="text-sm text-gray-600">Planes de cobertura aeronáutica</p>
           </div>
         </div>
+        
+        <div 
+          @click="router.push('/admin/corporate-users')" 
+          class="airline-card cursor-pointer transform hover:scale-105 transition-all duration-300 group"
+        >
+          <div class="flex flex-col items-center text-center">
+            <div class="w-14 h-14 bg-indigo-100 rounded-2xl flex items-center justify-center mb-3 group-hover:airline-gradient-primary transition-all">
+              <svg class="w-7 h-7 text-indigo-600 group-hover:text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
+              </svg>
+            </div>
+            <h3 class="font-bold mb-2 group-hover:text-blue-700">🏢 Usuarios Empresariales</h3>
+            <p class="text-sm text-gray-600">Gestión de clientes corporativos</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>

@@ -15,7 +15,8 @@ public class User {
      * Identificador único del usuario (Clave primaria).
      */
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "user_seq")
+    @SequenceGenerator(name = "user_seq", sequenceName = "USERS_SEQ", allocationSize = 1)
     @Column(name = "ID_USER")
     private Long idUser;  // Clave primaria
 

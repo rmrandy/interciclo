@@ -143,6 +143,7 @@ public class App {
         // Crear contextos con filtro CORS aplicado
         createContextWithCors(server, "/api/login", new LoginHandler(userDAO), corsFilter);
         createContextWithCors(server, "/api/users", new UserHandler(userDAO), corsFilter);
+        createContextWithCors(server, "/api/corporate-users", new CorporateUserHandler(userDAO), corsFilter);
         // Exponer endpoints de aerolínea bajo el mismo servidor
         createContextWithCors(server, "/api/airline", new AirlineHttpHandler(userDAO), corsFilter);
         createContextWithCors(server, "/api/airline/flights", new FlightHandler(), corsFilter);
