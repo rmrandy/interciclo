@@ -151,23 +151,23 @@
                 </div>
 
                 <!-- Price info -->
-                <div v-if="item.selectedCategory && item.quantity > 0" class="price-info">
+                <div v-if="(item.selectedCategory || item.flight.basePrice) && item.quantity > 0" class="price-info">
                   <div class="price-breakdown">
                     <div class="price-item">
                       <span>Tarifa base (x{{ item.quantity }}):</span>
-                      <span class="amount">${{ (item.flight.fares?.[item.selectedCategory] || 0) * item.quantity }}</span>
+                      <span class="amount">${{ getItemFare(item) * item.quantity }}</span>
                     </div>
                     <div class="price-item">
                       <span>Impuestos (15%):</span>
-                      <span class="amount">${{ calculateTaxes((item.flight.fares?.[item.selectedCategory] || 0) * item.quantity) }}</span>
+                      <span class="amount">${{ calculateTaxes(getItemFare(item) * item.quantity) }}</span>
                     </div>
                     <div class="price-item">
                       <span>Cargos (5%):</span>
-                      <span class="amount">${{ calculateFees((item.flight.fares?.[item.selectedCategory] || 0) * item.quantity) }}</span>
+                      <span class="amount">${{ calculateFees(getItemFare(item) * item.quantity) }}</span>
                     </div>
                     <div class="price-item total">
                       <span>Total:</span>
-                      <span class="amount">${{ calculateTotal((item.flight.fares?.[item.selectedCategory] || 0) * item.quantity) }}</span>
+                      <span class="amount">${{ calculateTotal(getItemFare(item) * item.quantity) }}</span>
                     </div>
                   </div>
                 </div>
@@ -275,7 +275,8 @@ const totalSeats = computed(() => {
 
 const totalFares = computed(() => {
   return cartItems.value.reduce((total, item) => {
-    return total + ((item.flight.fares?.[item.selectedCategory] || 0) * (item.quantity || 0))
+    const fare = getItemFare(item)
+    return total + (fare * (item.quantity || 0))
   }, 0)
 })
 
@@ -295,11 +296,20 @@ const loadCart = () => {
     const savedCart = localStorage.getItem('flight_cart')
     if (savedCart) {
       cartItems.value = JSON.parse(savedCart)
+      console.log('🛒 Carrito cargado:', cartItems.value)
       // Initialize quantity for each item if not set
       cartItems.value.forEach((item, index) => {
         if (!item.quantity) {
           item.quantity = 1
         }
+        console.log(`Item ${index}:`, {
+          flightNumber: item.flight?.flightNumber,
+          basePrice: item.flight?.basePrice,
+          fares: item.flight?.fares,
+          selectedCategory: item.selectedCategory,
+          quantity: item.quantity,
+          isStopover: item.flight?.isStopoverSegment
+        })
         loadInventoryForFlight(item, index)
       })
     }
@@ -485,6 +495,20 @@ const calculateDuration = (flight: any) => {
   const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
   
   return `${diffHours}h ${diffMinutes}m`
+}
+
+const getItemFare = (item: any) => {
+  // Si tiene categoría seleccionada y fares, usar fares
+  if (item.selectedCategory && item.flight.fares?.[item.selectedCategory]) {
+    return Number(item.flight.fares[item.selectedCategory]) || 0
+  }
+  // Si es un vuelo con escala, usar basePrice
+  if (item.flight.basePrice != null) {
+    return Number(item.flight.basePrice) || 0
+  }
+  // Si no tiene nada, retornar 0
+  console.warn('⚠️ Vuelo sin precio:', item.flight?.flightNumber, item)
+  return 0
 }
 
 const calculateTaxes = (basePrice: number) => {

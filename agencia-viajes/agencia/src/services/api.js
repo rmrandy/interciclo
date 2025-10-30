@@ -222,6 +222,14 @@ export const agencyReviewsApi = {
     create: (payload) => apiPost('/agency/reviews', payload),
 };
 
+export const aggregatedApi = {
+	 cities: () => apiGet('/flights/aggregated-cities'),
+	 searchFlights: (params) => apiGet(`/flights/aggregated-search${toQuery(params)}`),
+	 allFlights: () => apiGet('/flights/aggregated-all'),
+	 seats: ({ airlineId, flightId }) => apiGet(`/flights/aggregated-seats${toQuery({ airlineId, flightId })}`),
+	 purchase: (payload) => apiPost('/flights/aggregated-purchase', payload),
+};
+
 // Informative pages (agencia)
 export const infoPagesApi = {
 	list: (params) => apiGet(`/info-pages${toQuery(params)}`),

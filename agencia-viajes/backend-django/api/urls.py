@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import login_view, register_view, profile_view, airlines_list_view, airlines_detail_view, airlines_active_view, proxy_airline_cities, proxy_airline_flights, proxy_airline_seats, proxy_airline_create_ticket, proxy_airline_create_roundtrip, proxy_airline_create_stopover, proxy_airline_login, proxy_airline_register, proxy_airline_tickets, proxy_airline_ticket_pdf, proxy_airline_ticket_by_id, proxy_airline_flight_reviews, proxy_airline_corporate_tickets, agency_reviews_view, db_info_view, users_list_view, users_detail_view, corporate_users_list_view, corporate_users_detail_view, corporate_users_regenerate_key_view, corporate_users_toggle_status_view, aggregated_flight_search, aggregated_flight_purchase
+from .views import login_view, register_view, profile_view, airlines_list_view, airlines_detail_view, airlines_active_view, proxy_airline_cities, proxy_airline_flights, proxy_airline_seats, proxy_airline_create_ticket, proxy_airline_create_roundtrip, proxy_airline_create_stopover, proxy_airline_login, proxy_airline_register, proxy_airline_tickets, proxy_airline_ticket_pdf, proxy_airline_ticket_by_id, proxy_airline_flight_reviews, proxy_airline_corporate_tickets, agency_reviews_view, db_info_view, users_list_view, users_detail_view, corporate_users_list_view, corporate_users_detail_view, corporate_users_regenerate_key_view, corporate_users_toggle_status_view, aggregated_flight_search, aggregated_flight_purchase, aggregated_airline_cities, aggregated_flight_seats, aggregated_all_flights
 
 urlpatterns = [
     path('auth/login', login_view),
@@ -36,7 +36,10 @@ urlpatterns = [
     path('corporate-users/<str:user_id>/toggle-status', corporate_users_toggle_status_view),    # PUT
     
     # Agregador de vuelos multi-aerolíneas
-    path('flights/aggregated-search', aggregated_flight_search),   # GET - Buscar vuelos en todas las aerolíneas
+    path('flights/aggregated-search', aggregated_flight_search),   # GET - Buscar vuelos en todas las aerolíneas (con filtros en backend)
+    path('flights/aggregated-all', aggregated_all_flights),        # GET - Obtener todos los vuelos y filtrar en frontend
+    path('flights/aggregated-cities', aggregated_airline_cities),   # GET - Listado de ciudades combinadas
+    path('flights/aggregated-seats', aggregated_flight_seats),      # GET - Asientos por aerolínea específica
     path('flights/aggregated-purchase', aggregated_flight_purchase),  # POST - Comprar vuelo en aerolínea específica
 ]
 

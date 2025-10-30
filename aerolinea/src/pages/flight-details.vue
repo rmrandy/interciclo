@@ -952,8 +952,9 @@ const addToCart = () => {
           totalSegments: 2,
           viaCityName: route.viaCityName
         },
-        selectedCategory: '',
+        selectedCategory: 'ECONOMY',
         selectedSeat: '',
+        quantity: 1,
         availableSeats: {},
         processing: false
       }
@@ -967,8 +968,9 @@ const addToCart = () => {
           totalSegments: 2,
           viaCityName: route.viaCityName
         },
-        selectedCategory: '',
+        selectedCategory: 'ECONOMY',
         selectedSeat: '',
+        quantity: 1,
         availableSeats: {},
         processing: false
       }

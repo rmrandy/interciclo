@@ -1,0 +1,160 @@
+-- ============================================================================
+-- SCRIPT PARA CORREGIR TODOS LOS TRIGGERS DE AEROLINEA3.TICKETS
+-- Este script corrige referencias incorrectas de esquema y elimina duplicados
+-- ============================================================================
+
+-- PASO 1: ELIMINAR TRIGGER DUPLICADO (causa que los asientos se descuenten DOS VECES)
+DROP TRIGGER AEROLINEA3.TRG_TICKETS_DECREMENT_SEATS;
+
+-- PASO 2: CORREGIR TRG_TICKETS_AD_RESTORE (referencia incorrecta a AEROLINEA.FLIGHTS)
+CREATE OR REPLACE TRIGGER AEROLINEA3.TRG_TICKETS_AD_RESTORE
+AFTER DELETE ON AEROLINEA3.TICKETS
+FOR EACH ROW
+DECLARE
+  v_qty NUMBER := NVL(:OLD.QUANTITY, 1);
+BEGIN
+  -- CORREGIDO: AEROLINEA3.FLIGHTS en lugar de AEROLINEA.FLIGHTS
+  UPDATE AEROLINEA3.FLIGHTS
+     SET AVAILABLE_SEATS = NVL(AVAILABLE_SEATS,0) + v_qty,
+         UPDATED_AT      = TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS')
+   WHERE ID_FLIGHT = :OLD.FLIGHT_ID;
+
+  BEGIN
+    UPDATE AEROLINEA3.FLIGHT_INVENTORY
+       SET SOLD_SEATS      = GREATEST(0, NVL(SOLD_SEATS,0) - v_qty),
+           AVAILABLE_SEATS = GREATEST(
+                               0,
+                               NVL(TOTAL_SEATS,0) - NVL(RESERVED_SEATS,0) - GREATEST(0, NVL(SOLD_SEATS,0) - v_qty)
+                             ),
+           UPDATED_AT      = SYSTIMESTAMP
+     WHERE FLIGHT_ID     = :OLD.FLIGHT_ID
+       AND SEAT_CATEGORY = :OLD.SEAT_CATEGORY;
+  EXCEPTION WHEN OTHERS THEN NULL;
+  END;
+END;
+/
+
+-- PASO 3: TRG_TICKETS_AI_DECREMENT ya está correcto, pero lo recreamos por seguridad
+CREATE OR REPLACE TRIGGER AEROLINEA3.TRG_TICKETS_AI_DECREMENT
+AFTER INSERT ON AEROLINEA3.TICKETS
+FOR EACH ROW
+DECLARE
+  v_qty NUMBER := NVL(:NEW.QUANTITY, 1);
+BEGIN
+  -- Global del vuelo (indiferente a categoría)
+  UPDATE AEROLINEA3.FLIGHTS
+     SET AVAILABLE_SEATS = GREATEST(0, NVL(AVAILABLE_SEATS,0) - v_qty),
+         UPDATED_AT      = TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS')
+   WHERE ID_FLIGHT = :NEW.FLIGHT_ID;
+
+  -- Inventario por categoría (si existe registro)
+  BEGIN
+    UPDATE AEROLINEA3.FLIGHT_INVENTORY
+       SET SOLD_SEATS      = NVL(SOLD_SEATS,0) + v_qty,
+           AVAILABLE_SEATS = GREATEST(
+                               0,
+                               NVL(TOTAL_SEATS,0) - NVL(RESERVED_SEATS,0) - (NVL(SOLD_SEATS,0) + v_qty)
+                             ),
+           UPDATED_AT      = SYSTIMESTAMP
+     WHERE FLIGHT_ID     = :NEW.FLIGHT_ID
+       AND SEAT_CATEGORY = :NEW.SEAT_CATEGORY;
+  EXCEPTION WHEN OTHERS THEN NULL;
+  END;
+END;
+/
+
+-- PASO 4: CORREGIR TRG_TICKETS_AU_STATUS_RESTORE (referencia incorrecta a AEROLINEA.TICKETS)
+CREATE OR REPLACE TRIGGER AEROLINEA3.TRG_TICKETS_AU_STATUS_RESTORE
+AFTER UPDATE OF STATUS ON AEROLINEA3.TICKETS
+FOR EACH ROW
+DECLARE
+  v_qty NUMBER := NVL(:OLD.QUANTITY, 1);
+  FUNCTION is_cancel(new_status VARCHAR2) RETURN NUMBER IS
+  BEGIN
+    IF new_status IN ('CANCELLED','REFUNDED') THEN RETURN 1; END IF;
+    RETURN 0;
+  END;
+BEGIN
+  IF NVL(:OLD.STATUS,'CONFIRMED') IN ('RESERVED','CONFIRMED')
+     AND is_cancel(:NEW.STATUS) = 1 THEN
+
+    UPDATE AEROLINEA3.FLIGHTS
+       SET AVAILABLE_SEATS = NVL(AVAILABLE_SEATS,0) + v_qty,
+           UPDATED_AT      = TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS')
+     WHERE ID_FLIGHT = :OLD.FLIGHT_ID;
+
+    BEGIN
+      UPDATE AEROLINEA3.FLIGHT_INVENTORY
+         SET SOLD_SEATS      = GREATEST(0, NVL(SOLD_SEATS,0) - v_qty),
+             AVAILABLE_SEATS = GREATEST(
+                                 0,
+                                 NVL(TOTAL_SEATS,0) - NVL(RESERVED_SEATS,0) - GREATEST(0, NVL(SOLD_SEATS,0) - v_qty)
+                               ),
+             UPDATED_AT      = SYSTIMESTAMP
+       WHERE FLIGHT_ID     = :OLD.FLIGHT_ID
+         AND SEAT_CATEGORY = :OLD.SEAT_CATEGORY;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+  END IF;
+END;
+/
+
+-- PASO 5: CORREGIR TRG_TICKETS_CREATED_AT (agregar esquema completo)
+CREATE OR REPLACE TRIGGER AEROLINEA3.TRG_TICKETS_CREATED_AT
+BEFORE INSERT ON AEROLINEA3.TICKETS
+FOR EACH ROW
+BEGIN
+    -- Establecer CREATED_AT si es NULL
+    IF :NEW.CREATED_AT IS NULL THEN
+        :NEW.CREATED_AT := TO_CHAR(SYSTIMESTAMP, 'YYYY-MM-DD HH24:MI:SS');
+    END IF;
+    
+    -- Establecer BOOKING_DATE si es NULL
+    IF :NEW.BOOKING_DATE IS NULL THEN
+        :NEW.BOOKING_DATE := TO_CHAR(SYSDATE, 'YYYY-MM-DD');
+    END IF;
+    
+    -- Establecer BOOKING_TIME si es NULL
+    IF :NEW.BOOKING_TIME IS NULL THEN
+        :NEW.BOOKING_TIME := TO_CHAR(SYSTIMESTAMP, 'HH24:MI:SS');
+    END IF;
+END;
+/
+
+-- PASO 6: CREAR TRG_TICKETS_UPDATED_AT (si no existe)
+CREATE OR REPLACE TRIGGER AEROLINEA3.TRG_TICKETS_UPDATED_AT
+BEFORE UPDATE ON AEROLINEA3.TICKETS
+FOR EACH ROW
+BEGIN
+    :NEW.UPDATED_AT := TO_CHAR(SYSTIMESTAMP, 'YYYY-MM-DD HH24:MI:SS');
+END;
+/
+
+-- PASO 7: VERIFICAR QUE TODOS LOS TRIGGERS ESTÉN VÁLIDOS
+SELECT 
+    trigger_name, 
+    status, 
+    trigger_type,
+    triggering_event
+FROM user_triggers 
+WHERE table_name = 'TICKETS'
+ORDER BY triggering_event, trigger_name;
+
+-- Deberías ver EXACTAMENTE estos 5 triggers (todos ENABLED):
+-- TRG_TICKETS_CREATED_AT        | ENABLED | BEFORE EACH ROW | INSERT
+-- TRG_TICKETS_AI_DECREMENT      | ENABLED | AFTER EACH ROW  | INSERT
+-- TRG_TICKETS_UPDATED_AT        | ENABLED | BEFORE EACH ROW | UPDATE
+-- TRG_TICKETS_AU_STATUS_RESTORE | ENABLED | AFTER EACH ROW  | UPDATE
+-- TRG_TICKETS_AD_RESTORE        | ENABLED | AFTER EACH ROW  | DELETE
+
+COMMIT;
+
+-- ============================================================================
+-- RESUMEN DE CORRECCIONES:
+-- ✅ Eliminado trigger duplicado TRG_TICKETS_DECREMENT_SEATS
+-- ✅ Corregida referencia AEROLINEA.FLIGHTS → AEROLINEA3.FLIGHTS
+-- ✅ Corregida referencia AEROLINEA.TICKETS → AEROLINEA3.TICKETS
+-- ✅ Agregado esquema completo en TRG_TICKETS_CREATED_AT
+-- ✅ Agregado trigger TRG_TICKETS_UPDATED_AT
+-- ============================================================================
+

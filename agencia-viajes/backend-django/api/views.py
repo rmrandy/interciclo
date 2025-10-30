@@ -2,6 +2,7 @@ import os
 import bcrypt
 import jwt
 from datetime import datetime, timedelta
+from decimal import Decimal
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
@@ -11,6 +12,9 @@ from django.conf import settings
 import json
 import re
 import requests
+from bson import ObjectId
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Optional, Union, List, Dict, Any
 
 
 def get_db():
@@ -460,6 +464,88 @@ def normalize_flights_response(data):
     if isinstance(data, list):
         return { 'success': True, 'flights': data }
     return { 'success': False, 'flights': [] }
+
+
+def build_airline_base_url_from_doc(airline: dict) -> str:
+    """Construye la URL base (protocol://host:port/basePath) para una aerolínea concreta."""
+    protocol = (airline.get('protocol') or 'http').strip() or 'http'
+    host = (airline.get('host') or 'localhost').strip() or 'localhost'
+    port = str(airline.get('port', 8080)).strip() or '8080'
+    base = (airline.get('basePath') or '/api').strip() or '/api'
+    if not base.startswith('/'):
+        base = '/' + base
+    url = f"{protocol}://{host}:{port}{base}"
+    return url.rstrip('/')
+
+
+def build_airline_endpoint_url(base_url: str, endpoint: Optional[str]) -> str:
+    endpoint = (endpoint or '').strip()
+    if not endpoint:
+        return base_url
+    if not base_url.endswith('/'):
+        base_url = base_url + '/'
+    return base_url + endpoint.lstrip('/')
+
+
+def get_airline_timeout_seconds_from_doc(airline: dict, default_ms: int = 40000) -> float:
+    try:
+        if 'timeoutMs' in airline and airline.get('timeoutMs') is not None:
+            return max(3, int(airline.get('timeoutMs', default_ms)) // 1000)
+    except Exception:
+        pass
+    return max(3, default_ms // 1000)
+
+
+def get_airline_headers_for_doc(airline: dict) -> dict:
+    headers = {'Content-Type': 'application/json'}
+    api_key = (airline.get('apiKey') or '').strip()
+    if api_key:
+        headers['X-API-Key'] = api_key
+    return headers
+
+
+def fetch_airline_cities_for_doc(airline: dict, timeout: Optional[float] = None) -> list:
+    base_url = build_airline_base_url_from_doc(airline)
+    endpoints = airline.get('endpoints') or {}
+    cities_endpoint = endpoints.get('cities') or 'airline/cities'
+    url = build_airline_endpoint_url(base_url, cities_endpoint)
+    headers = get_airline_headers_for_doc(airline)
+    read_timeout = timeout or get_airline_timeout_seconds_from_doc(airline)
+    try:
+        response = requests.get(url, headers=headers, timeout=(3.0, read_timeout))
+        response.raise_for_status()
+        data = response.json()
+        if isinstance(data, dict) and isinstance(data.get('data'), list):
+            return data['data']
+        if isinstance(data, list):
+            return data
+    except Exception as exc:
+        print(f"❌ Error obteniendo ciudades de {airline.get('name')}: {exc}")
+    return []
+
+
+def resolve_city_id_for_airline(airline: dict, city_value: Optional[Union[str, int]], city_country: Optional[str], cities_cache: Optional[list] = None) -> Optional[str]:
+    if city_value is None:
+        return None
+    value_str = str(city_value).strip()
+    if not value_str:
+        return None
+    if value_str.isdigit():
+        return value_str
+
+    # Lazy load cities if not provided
+    cities = cities_cache if cities_cache is not None else fetch_airline_cities_for_doc(airline)
+    needle_name = value_str.lower()
+    needle_country = (city_country or '').strip().lower()
+
+    for city in cities:
+        name = str(city.get('name') or '').strip().lower()
+        country = str(city.get('country') or '').strip().lower()
+        if name == needle_name and (not needle_country or not country or country == needle_country):
+            for key in ('idCity', 'id_city', 'id', 'cityId', 'id_city_pk'):
+                if key in city and city[key] is not None:
+                    return str(city[key])
+    return None
 
 
 @csrf_exempt
@@ -1246,131 +1332,419 @@ def corporate_users_toggle_status_view(request, user_id: str):
 @csrf_exempt
 def aggregated_flight_search(request):
     """
-    Busca vuelos en todas las aerolíneas configuradas en paralelo
-    GET /api/flights/aggregated-search?origin=X&destination=Y&departureDate=YYYY-MM-DD
+    Busca vuelos en todas las aerolíneas configuradas en paralelo.
+    GET /api/flights/aggregated-search?originName=Guatemala&destinationName=Panama&departureDate=2025-10-29
     """
+
     if request.method != 'GET':
         return JsonResponse({'error': 'Método no permitido'}, status=405)
-    
-    # Obtener parámetros de búsqueda
-    origin = request.GET.get('origin')
-    destination = request.GET.get('destination')
-    departure_date = request.GET.get('departureDate')
-    passengers = request.GET.get('passengers', '1')
-    
-    if not all([origin, destination, departure_date]):
+
+    query = request.GET
+
+    origin_value = (query.get('originName') or query.get('origin') or query.get('originCity') or '').strip()
+    origin_country = (query.get('originCountry') or query.get('origin_country') or '').strip()
+    destination_value = (query.get('destinationName') or query.get('destination') or query.get('destinationCity') or '').strip()
+    destination_country = (query.get('destinationCountry') or query.get('destination_country') or '').strip()
+    departure_date = (query.get('departureDate') or query.get('date') or '').strip()
+    return_date = (query.get('returnDate') or query.get('return') or '').strip()
+    passengers = (query.get('passengers') or query.get('travelers') or '1').strip() or '1'
+    seat_category = (query.get('seatCategory') or query.get('seat_class') or query.get('cabin') or '').strip()
+    nonstop = (query.get('nonstop') or '').strip()
+
+    if not origin_value or not destination_value or not departure_date:
         return JsonResponse({
-            'error': 'Parámetros requeridos: origin, destination, departureDate'
+            'error': 'Parámetros requeridos: originName, destinationName, departureDate'
         }, status=400)
-    
-    # Obtener aerolíneas habilitadas
+
     db = get_db()
     airlines = list(db.airlines.find({'enabled': True}))
-    
+
     if not airlines:
         return JsonResponse({
             'success': True,
             'totalFlights': 0,
-            'airlines': 0,
+            'airlinesQueried': 0,
             'flights': [],
             'message': 'No hay aerolíneas configuradas'
         })
-    
+
     aggregated_flights = []
+    airlines_summary = []
     airlines_with_results = 0
     airlines_with_errors = []
-    
-    # Buscar en cada aerolínea
-    for airline in airlines:
-        try:
-            # Construir URL de la aerolínea
-            airline_url = f"{airline.get('protocol', 'http')}://{airline['host']}:{airline.get('port', 80)}{airline.get('basePath', '/')}"
-            if not airline_url.endswith('/'):
-                airline_url += '/'
-            
-            # Endpoint de búsqueda (por defecto /airline/flights/search)
-            search_endpoint = airline.get('endpoints', {}).get('search', 'airline/flights/search')
-            full_url = f"{airline_url}{search_endpoint}".replace('//', '/').replace('http:/', 'http://').replace('https:/', 'https://')
-            
-            # Headers con API Key si existe
-            headers = {'Content-Type': 'application/json'}
-            if airline.get('apiKey'):
-                headers['X-API-Key'] = airline['apiKey']
-            
-            # Parámetros de búsqueda
-            params = {
-                'origin': origin,
-                'destination': destination,
-                'departureDate': departure_date,
-                'passengers': passengers
+
+    def price_value(flight: dict) -> float:
+        for key in ('basePrice', 'price', 'fare', 'totalAmount'):
+            value = flight.get(key)
+            if isinstance(value, Decimal):
+                return float(value)
+            try:
+                if value is not None:
+                    return float(value)
+            except (TypeError, ValueError):
+                continue
+        return float('inf')
+
+    def query_airline(airline_doc: dict) -> dict:
+        airline_id = str(airline_doc.get('_id'))
+        base_url = build_airline_base_url_from_doc(airline_doc)
+        headers = get_airline_headers_for_doc(airline_doc)
+        timeout = get_airline_timeout_seconds_from_doc(airline_doc)
+
+        cities = fetch_airline_cities_for_doc(airline_doc, timeout=timeout)
+        origin_id = resolve_city_id_for_airline(airline_doc, origin_value, origin_country, cities) if origin_value else None
+        destination_id = resolve_city_id_for_airline(airline_doc, destination_value, destination_country, cities) if destination_value else None
+
+        if origin_value and origin_id is None:
+            return {
+                'error': f"La ciudad de origen '{origin_value}' no está disponible en {airline_doc.get('name')}",
+                'airlineCities': cities,
+                'flights': [],
+                'baseUrl': base_url,
+                'endpoint': None
             }
-            
-            print(f"🔍 Buscando en {airline['name']}: {full_url}")
-            
-            # Hacer petición con timeout
-            timeout = airline.get('timeoutMs', 5000) / 1000  # convertir a segundos
-            response = requests.get(
-                full_url,
-                params=params,
-                headers=headers,
-                timeout=timeout
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Obtener vuelos (puede venir en data.flights o directamente data)
-                flights = data.get('flights', data if isinstance(data, list) else [])
-                
-                if flights:
-                    # Agregar información de la aerolínea a cada vuelo
-                    for flight in flights:
-                        flight['airlineId'] = str(airline['_id'])
-                        flight['airlineName'] = airline['name']
-                        flight['airlineCode'] = airline.get('code', 'N/A')
-                        flight['airlineUrl'] = airline_url
-                        # ID único compuesto
-                        flight['uniqueId'] = f"{airline['code']}-{flight.get('idFlight', flight.get('id', ''))}"
-                    
-                    aggregated_flights.extend(flights)
-                    airlines_with_results += 1
-                    print(f"✅ {airline['name']}: {len(flights)} vuelos encontrados")
+
+        if destination_value and destination_id is None:
+            return {
+                'error': f"La ciudad de destino '{destination_value}' no está disponible en {airline_doc.get('name')}",
+                'airlineCities': cities,
+                'flights': [],
+                'baseUrl': base_url,
+                'endpoint': None
+            }
+
+        params = {}
+        if origin_id:
+            params['origin'] = origin_id
+        if destination_id:
+            params['destination'] = destination_id
+        if departure_date:
+            params['departureDate'] = departure_date
+        if return_date:
+            params['returnDate'] = return_date
+        if passengers:
+            params['passengers'] = passengers
+        if seat_category:
+            params['seatCategory'] = seat_category
+        if nonstop:
+            params['nonstop'] = nonstop
+
+        endpoints = airline_doc.get('endpoints') or {}
+        search_endpoint = endpoints.get('search') or 'airline/flights'
+        url = build_airline_endpoint_url(base_url, search_endpoint)
+
+        response = requests.get(
+            url,
+            params=params,
+            headers=headers,
+            timeout=(3.0, timeout)
+        )
+        response.raise_for_status()
+
+        payload = response.json() if response.headers.get('content-type', '').startswith('application/json') else {}
+
+        flights_payload = []
+        if isinstance(payload, dict):
+            if isinstance(payload.get('flights'), list):
+                flights_payload = payload.get('flights')
+            elif isinstance(payload.get('data'), list):
+                flights_payload = payload.get('data')
+        elif isinstance(payload, list):
+            flights_payload = payload
+
+        enriched_flights = []
+        for flight in flights_payload:
+            if not isinstance(flight, dict):
+                continue
+            flight_copy = dict(flight)
+            price = flight_copy.get('basePrice')
+            if isinstance(price, Decimal):
+                flight_copy['basePrice'] = float(price)
+            elif isinstance(price, str):
+                try:
+                    flight_copy['basePrice'] = float(price)
+                except ValueError:
+                    pass
+            flight_copy['airlineId'] = airline_id
+            flight_copy['airlineName'] = airline_doc.get('name')
+            flight_copy['airlineCode'] = airline_doc.get('code')
+            flight_copy['airlineBaseUrl'] = base_url
+            flight_copy['airlineEndpoint'] = search_endpoint
+            unique_parts = [airline_doc.get('code') or airline_doc.get('name') or 'AL', str(flight_copy.get('idFlight') or flight_copy.get('id') or flight_copy.get('flightNumber') or flight_copy.get('flightId') or '')]
+            flight_copy['uniqueId'] = '-'.join([p for p in unique_parts if p])
+            flight_copy['priceValue'] = price_value(flight_copy)
+            enriched_flights.append(flight_copy)
+
+        return {
+            'flights': enriched_flights,
+            'airlineCities': cities,
+            'baseUrl': base_url,
+            'endpoint': url,
+            'raw': payload,
+        }
+
+    with ThreadPoolExecutor(max_workers=min(8, len(airlines))) as executor:
+        future_map = {executor.submit(query_airline, airline): airline for airline in airlines}
+        for future in as_completed(future_map):
+            airline_doc = future_map[future]
+            airline_id = str(airline_doc.get('_id'))
+            airline_name = airline_doc.get('name')
+            summary_entry = {
+                'id': airline_id,
+                'name': airline_name,
+                'code': airline_doc.get('code'),
+                'baseUrl': build_airline_base_url_from_doc(airline_doc),
+                'timeoutSeconds': get_airline_timeout_seconds_from_doc(airline_doc),
+                'flightsFound': 0,
+            }
+            try:
+                result = future.result()
+                error = result.get('error')
+                flights = result.get('flights') or []
+                summary_entry['flightsFound'] = len(flights)
+                if error:
+                    summary_entry['error'] = error
+                    airlines_with_errors.append({'id': airline_id, 'name': airline_name, 'error': error})
                 else:
-                    print(f"⚠️ {airline['name']}: Sin vuelos disponibles")
-            else:
-                error_msg = f"HTTP {response.status_code}"
-                airlines_with_errors.append({'name': airline['name'], 'error': error_msg})
-                print(f"❌ {airline['name']}: {error_msg}")
-                
-        except requests.exceptions.Timeout:
-            error_msg = 'Timeout - La aerolínea no respondió a tiempo'
-            airlines_with_errors.append({'name': airline['name'], 'error': error_msg})
-            print(f"⏱️ {airline['name']}: Timeout")
-        except requests.exceptions.ConnectionError:
-            error_msg = 'Error de conexión - No se pudo conectar con la aerolínea'
-            airlines_with_errors.append({'name': airline['name'], 'error': error_msg})
-            print(f"🔌 {airline['name']}: Error de conexión")
-        except Exception as e:
-            error_msg = str(e)
-            airlines_with_errors.append({'name': airline['name'], 'error': error_msg})
-            print(f"❌ {airline['name']}: Error - {error_msg}")
-    
-    # Ordenar por precio (menor a mayor)
-    aggregated_flights.sort(key=lambda x: float(x.get('basePrice', x.get('price', 999999))))
-    
-    return JsonResponse({
+                    if flights:
+                        airlines_with_results += 1
+                        aggregated_flights.extend(flights)
+            except requests.exceptions.Timeout:
+                summary_entry['error'] = 'Timeout'
+                airlines_with_errors.append({'id': airline_id, 'name': airline_name, 'error': 'Timeout - La aerolínea no respondió a tiempo'})
+            except requests.exceptions.ConnectionError:
+                summary_entry['error'] = 'ConnectionError'
+                airlines_with_errors.append({'id': airline_id, 'name': airline_name, 'error': 'Error de conexión con la aerolínea'})
+            except Exception as exc:
+                summary_entry['error'] = str(exc)
+                airlines_with_errors.append({'id': airline_id, 'name': airline_name, 'error': str(exc)})
+            airlines_summary.append(summary_entry)
+
+    aggregated_flights.sort(key=lambda x: x.get('priceValue', float('inf')))
+    for flight in aggregated_flights:
+        flight.pop('priceValue', None)
+
+    response_payload = {
         'success': True,
         'totalFlights': len(aggregated_flights),
         'airlinesQueried': len(airlines),
         'airlinesWithResults': airlines_with_results,
-        'airlinesWithErrors': airlines_with_errors if airlines_with_errors else None,
         'flights': aggregated_flights,
+        'airlinesSummary': airlines_summary,
         'searchParams': {
-            'origin': origin,
-            'destination': destination,
+            'originName': origin_value,
+            'originCountry': origin_country,
+            'destinationName': destination_value,
+            'destinationCountry': destination_country,
             'departureDate': departure_date,
-            'passengers': passengers
+            'returnDate': return_date,
+            'passengers': passengers,
+            'seatCategory': seat_category,
+            'nonstop': nonstop or None,
         }
+    }
+
+    if airlines_with_errors:
+        response_payload['airlinesWithErrors'] = airlines_with_errors
+
+    return JsonResponse(response_payload)
+
+
+@csrf_exempt
+def aggregated_airline_cities(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+    db = get_db()
+    airlines = list(db.airlines.find({'enabled': True}))
+
+    if not airlines:
+        return JsonResponse({
+            'success': True,
+            'totalAirlines': 0,
+            'totalCities': 0,
+            'cities': [],
+            'flat': []
+        })
+
+    def extract_city_id(city_doc: dict) -> Optional[str]:
+        for key in ('idCity', 'id_city', 'id', 'cityId', 'city_id', 'id_city_pk'):
+            if key in city_doc and city_doc[key] is not None and str(city_doc[key]).strip():
+                return str(city_doc[key]).strip()
+        return None
+
+    flat_entries = []
+    grouped_map: dict[str, list] = {}
+    errors = []
+
+    def collect_cities(airline_doc: dict) -> tuple[str, list]:
+        timeout = get_airline_timeout_seconds_from_doc(airline_doc)
+        cities = fetch_airline_cities_for_doc(airline_doc, timeout=timeout)
+        return str(airline_doc.get('_id')), cities
+
+    with ThreadPoolExecutor(max_workers=min(8, len(airlines))) as executor:
+        futures = {executor.submit(collect_cities, airline): airline for airline in airlines}
+        for future in as_completed(futures):
+            airline_doc = futures[future]
+            airline_id = str(airline_doc.get('_id'))
+            airline_name = airline_doc.get('name')
+            airline_code = airline_doc.get('code')
+            try:
+                _, cities = future.result()
+                if not cities:
+                    errors.append({'id': airline_id, 'name': airline_name, 'error': 'Sin ciudades o no disponible'})
+                for city in cities:
+                    city_id = extract_city_id(city) or ''
+                    entry = {
+                        'airlineId': airline_id,
+                        'airlineName': airline_name,
+                        'airlineCode': airline_code,
+                        'cityId': city_id,
+                        'name': city.get('name'),
+                        'country': city.get('country'),
+                        'raw': city
+                    }
+                    flat_entries.append(entry)
+                    grouped_key = f"{(city.get('name') or '').strip().lower()}|{(city.get('country') or '').strip().lower()}"
+                    grouped_map.setdefault(grouped_key, []).append(entry)
+            except Exception as exc:
+                errors.append({'id': airline_id, 'name': airline_name, 'error': str(exc)})
+
+    grouped_cities = []
+    for group_entries in grouped_map.values():
+        if not group_entries:
+            continue
+        primary = group_entries[0]
+        label = primary.get('name') or 'Ciudad'
+        country = primary.get('country')
+        if country:
+            label = f"{label} ({country})"
+        grouped_cities.append({
+            'label': label,
+            'name': primary.get('name'),
+            'country': country,
+            'airlines': group_entries
+        })
+
+    grouped_cities.sort(key=lambda item: item.get('label') or '')
+
+    payload = {
+        'success': True,
+        'totalAirlines': len(airlines),
+        'totalCities': len(flat_entries),
+        'cities': grouped_cities,
+        'flat': flat_entries,
+    }
+
+    if errors:
+        payload['errors'] = errors
+
+    return JsonResponse(payload)
+
+
+@csrf_exempt
+def aggregated_all_flights(request):
+    """Obtiene todos los vuelos de todas las aerolíneas activas sin filtros y deja el filtrado al frontend."""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+    db = get_db()
+    airlines = list(db.airlines.find({'enabled': True}))
+
+    if not airlines:
+        return JsonResponse({
+            'success': True,
+            'totalFlights': 0,
+            'airlinesQueried': 0,
+            'flights': [],
+            'airlinesSummary': [],
+            'airlinesWithErrors': []
+        })
+
+    aggregated_flights = []
+    airlines_summary = []
+    airlines_with_errors = []
+
+    def fetch_all_flights_for_airline(airline_doc: dict) -> list:
+        airline_id = str(airline_doc.get('_id'))
+        base_url = build_airline_base_url_from_doc(airline_doc)
+        endpoints = airline_doc.get('endpoints') or {}
+        flights_endpoint = endpoints.get('flights') or 'airline/flights'
+        url = build_airline_endpoint_url(base_url, flights_endpoint)
+        headers = get_airline_headers_for_doc(airline_doc)
+        timeout = get_airline_timeout_seconds_from_doc(airline_doc)
+
+        response = requests.get(url, headers=headers, timeout=(3.0, timeout))
+        response.raise_for_status()
+
+        payload = response.json() if response.headers.get('content-type', '').startswith('application/json') else {}
+        flights_payload: List[Dict[str, Any]] = []
+        if isinstance(payload, dict):
+            if isinstance(payload.get('flights'), list):
+                flights_payload = payload.get('flights')
+            elif isinstance(payload.get('data'), list):
+                flights_payload = payload.get('data')
+        elif isinstance(payload, list):
+            flights_payload = payload
+
+        enriched: List[Dict[str, Any]] = []
+        for flight in flights_payload:
+            if not isinstance(flight, dict):
+                continue
+            flight_copy = dict(flight)
+            price = flight_copy.get('basePrice')
+            if isinstance(price, Decimal):
+                flight_copy['basePrice'] = float(price)
+            elif isinstance(price, str):
+                try:
+                    flight_copy['basePrice'] = float(price)
+                except ValueError:
+                    pass
+
+            flight_copy['airlineId'] = airline_id
+            flight_copy['airlineName'] = airline_doc.get('name')
+            flight_copy['airlineCode'] = airline_doc.get('code')
+            flight_copy['airlineBaseUrl'] = base_url
+            flight_copy['airlineEndpoint'] = flights_endpoint
+            unique_parts = [airline_doc.get('code') or airline_doc.get('name') or 'AL', str(flight_copy.get('idFlight') or flight_copy.get('id') or flight_copy.get('flightNumber') or flight_copy.get('flightId') or '')]
+            flight_copy['uniqueId'] = '-'.join([part for part in unique_parts if part])
+            enriched.append(flight_copy)
+
+        return enriched
+
+    with ThreadPoolExecutor(max_workers=min(8, len(airlines))) as executor:
+        future_map = {executor.submit(fetch_all_flights_for_airline, airline): airline for airline in airlines}
+        for future in as_completed(future_map):
+            airline_doc = future_map[future]
+            airline_id = str(airline_doc.get('_id'))
+            summary_entry = {
+                'id': airline_id,
+                'name': airline_doc.get('name'),
+                'code': airline_doc.get('code'),
+                'flightsFound': 0,
+            }
+            try:
+                flights = future.result()
+                summary_entry['flightsFound'] = len(flights)
+                aggregated_flights.extend(flights)
+            except requests.exceptions.Timeout:
+                summary_entry['error'] = 'Timeout'
+                airlines_with_errors.append({'id': airline_id, 'name': airline_doc.get('name'), 'error': 'Timeout - La aerolínea no respondió a tiempo'})
+            except requests.exceptions.ConnectionError:
+                summary_entry['error'] = 'ConnectionError'
+                airlines_with_errors.append({'id': airline_id, 'name': airline_doc.get('name'), 'error': 'Error de conexión con la aerolínea'})
+            except Exception as exc:
+                summary_entry['error'] = str(exc)
+                airlines_with_errors.append({'id': airline_id, 'name': airline_doc.get('name'), 'error': str(exc)})
+            airlines_summary.append(summary_entry)
+
+    return JsonResponse({
+        'success': True,
+        'totalFlights': len(aggregated_flights),
+        'airlinesQueried': len(airlines),
+        'flights': aggregated_flights,
+        'airlinesSummary': airlines_summary,
+        'airlinesWithErrors': airlines_with_errors,
     })
 
 
@@ -1394,67 +1768,63 @@ def aggregated_flight_purchase(request):
                 'error': 'airlineId y flightId son requeridos'
             }, status=400)
         
-        # Buscar la aerolínea
         db = get_db()
         try:
             airline_oid = ObjectId(airline_id)
         except Exception:
             return JsonResponse({'error': 'airlineId inválido'}, status=400)
-        
+
         airline = db.airlines.find_one({'_id': airline_oid})
         if not airline:
             return JsonResponse({'error': 'Aerolínea no encontrada'}, status=404)
-        
+
         if not airline.get('enabled', False):
             return JsonResponse({'error': 'Aerolínea deshabilitada'}, status=400)
+
+        base_url = build_airline_base_url_from_doc(airline)
+        endpoints = airline.get('endpoints') or {}
+        book_endpoint = endpoints.get('book') or 'airline/tickets'
         
-        # Construir URL de compra
-        airline_url = f"{airline.get('protocol', 'http')}://{airline['host']}:{airline.get('port', 80)}{airline.get('basePath', '/')}"
-        if not airline_url.endswith('/'):
-            airline_url += '/'
+        # Si el endpoint configurado es solo '/book', usar 'airline/tickets'
+        if book_endpoint in ('/book', 'book'):
+            book_endpoint = 'airline/tickets'
+            print(f"⚠️  Endpoint '/book' detectado, usando 'airline/tickets' en su lugar")
         
-        # Endpoint de compra
-        book_endpoint = airline.get('endpoints', {}).get('book', 'airline/tickets/purchase')
-        full_url = f"{airline_url}{book_endpoint}".replace('//', '/').replace('http:/', 'http://').replace('https:/', 'https://')
-        
-        # Headers con API Key
-        headers = {'Content-Type': 'application/json'}
-        if airline.get('apiKey'):
-            headers['X-API-Key'] = airline['apiKey']
-        
-        # Preparar datos de compra
+        full_url = build_airline_endpoint_url(base_url, book_endpoint)
+
+        headers = get_airline_headers_for_doc(airline)
+
         purchase_payload = {
             'flightId': flight_id,
-            **{k: v for k, v in data.items() if k not in ['airlineId']}
+            **{k: v for k, v in data.items() if k != 'airlineId'}
         }
-        
-        print(f"💳 Comprando vuelo en {airline['name']}: {full_url}")
+
+        print(f"💳 Comprando vuelo en {airline.get('name')}: {full_url}")
+        print(f"🔑 API Key: {headers.get('X-API-Key', 'NO CONFIGURADO')[:15]}...")
         print(f"📦 Payload: {purchase_payload}")
-        
-        # Hacer petición de compra
-        timeout = airline.get('timeoutMs', 10000) / 1000
+
+        timeout = get_airline_timeout_seconds_from_doc(airline, default_ms=20000)
         response = requests.post(
             full_url,
             json=purchase_payload,
             headers=headers,
-            timeout=timeout
+            timeout=(3.0, timeout)
         )
-        
-        if response.status_code in [200, 201]:
-            result = response.json()
-            result['airlineName'] = airline['name']
+
+        if response.status_code in (200, 201):
+            result = response.json() if response.headers.get('content-type', '').startswith('application/json') else {'success': True}
+            result['airlineName'] = airline.get('name')
             result['airlineCode'] = airline.get('code')
-            
-            print(f"✅ Compra exitosa en {airline['name']}")
+            print(f"✅ Compra exitosa en {airline.get('name')}")
             return JsonResponse(result)
-        else:
-            error_data = response.json() if response.headers.get('Content-Type', '').startswith('application/json') else {'error': response.text}
-            print(f"❌ Error en compra: {response.status_code} - {error_data}")
-            return JsonResponse({
-                'error': f'Error en compra con {airline["name"]}',
-                'details': error_data,
-                'statusCode': response.status_code
-            }, status=response.status_code)
+
+        error_payload = response.json() if response.headers.get('content-type', '').startswith('application/json') else {'error': response.text}
+        print(f"❌ Error en compra: {response.status_code} - {error_payload}")
+        return JsonResponse({
+            'error': f"Error en compra con {airline.get('name')}",
+            'details': error_payload,
+            'statusCode': response.status_code
+        }, status=response.status_code)
             
     except requests.exceptions.Timeout:
         return JsonResponse({
@@ -1470,5 +1840,62 @@ def aggregated_flight_purchase(request):
             'error': 'Error interno al procesar la compra',
             'details': str(e)
         }, status=500)
+
+
+@csrf_exempt
+def aggregated_flight_seats(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+    airline_id = (request.GET.get('airlineId') or '').strip()
+    flight_id = (request.GET.get('flightId') or '').strip()
+
+    if not airline_id or not flight_id:
+        return JsonResponse({'error': 'Parámetros requeridos: airlineId y flightId'}, status=400)
+
+    db = get_db()
+    try:
+        airline_oid = ObjectId(airline_id)
+    except Exception:
+        return JsonResponse({'error': 'airlineId inválido'}, status=400)
+
+    airline = db.airlines.find_one({'_id': airline_oid})
+    if not airline:
+        return JsonResponse({'error': 'Aerolínea no encontrada'}, status=404)
+
+    if not airline.get('enabled', False):
+        return JsonResponse({'error': 'Aerolínea deshabilitada'}, status=400)
+
+    base_url = build_airline_base_url_from_doc(airline)
+    endpoints = airline.get('endpoints') or {}
+    seats_endpoint_template = endpoints.get('seats') or 'airline/flights/{flightId}/seats'
+    if '{flightId}' in seats_endpoint_template:
+        endpoint_path = seats_endpoint_template.replace('{flightId}', str(flight_id))
+    else:
+        endpoint_path = seats_endpoint_template.rstrip('/') + f'/{flight_id}'
+        if not endpoint_path.endswith('/seats'):
+            endpoint_path = endpoint_path.rstrip('/') + '/seats'
+
+    url = build_airline_endpoint_url(base_url, endpoint_path)
+    headers = get_airline_headers_for_doc(airline)
+    timeout = get_airline_timeout_seconds_from_doc(airline)
+
+    try:
+        response = requests.get(url, headers=headers, timeout=(3.0, timeout))
+        response.raise_for_status()
+        if response.headers.get('content-type', '').startswith('application/json'):
+            payload = response.json()
+        else:
+            payload = {'success': True, 'raw': response.text}
+        payload.setdefault('success', True)
+        payload.setdefault('airlineName', airline.get('name'))
+        payload.setdefault('airlineCode', airline.get('code'))
+        return JsonResponse(payload)
+    except requests.exceptions.Timeout:
+        return JsonResponse({'error': 'Timeout - La aerolínea no respondió a tiempo'}, status=504)
+    except requests.exceptions.ConnectionError:
+        return JsonResponse({'error': 'Error de conexión con la aerolínea'}, status=503)
+    except Exception as exc:
+        return JsonResponse({'error': str(exc)}, status=502)
 
 

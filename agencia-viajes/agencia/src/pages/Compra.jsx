@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { integrationsApi } from '../services/api.js';
+import { aggregatedApi, integrationsApi } from '../services/api.js';
 
 export default function Compra() {
 	const [params] = useSearchParams();
 	const tipo = 'vuelo';
-	const itemId = params.get('item') || '';
+	const flightId = params.get('flightId') || params.get('item') || '';
+	const airlineId = params.get('airlineId') || '';
+	const priceParam = Number(params.get('price') || params.get('precio') || 0) || 0;
     const [form, setForm] = useState({
 		firstName: '',
 		lastName: '',
@@ -60,10 +62,13 @@ export default function Compra() {
 
     // Cargar asientos disponibles del vuelo seleccionado desde Aerolínea (proxy Django)
     useEffect(() => {
-        if (!itemId) return;
+        if (!airlineId || !flightId) {
+            setError('Faltan datos del vuelo seleccionado. Regresa a la búsqueda e intenta de nuevo.');
+            return;
+        }
         setSeatsError('');
         setLoadingSeats(true);
-        integrationsApi.seats(itemId).then(res => {
+        aggregatedApi.seats({ airlineId, flightId }).then(res => {
             const seats = res?.seatsByCategory || {};
             const next = {
                 FIRST_CLASS: seats.FIRST_CLASS || [],
@@ -85,7 +90,7 @@ export default function Compra() {
             setAvailable({ FIRST_CLASS: [], BUSINESS: [], ECONOMY: [] });
             setSeatsError(e?.message || 'No se pudieron cargar los asientos disponibles');
         }).finally(() => setLoadingSeats(false));
-    }, [itemId]);
+    }, [airlineId, flightId]);
 
     // Cuando cambia la categoría, limpiar/sugerir asiento acorde
     useEffect(() => {
@@ -161,11 +166,12 @@ export default function Compra() {
         // Construir payload para compra empresarial
         // El backend Django agregará el API_KEY automáticamente
         const payload = {
-            flightId: Number(itemId),
+            airlineId,
+            flightId,
             // NO enviamos userId - el backend Java usará el usuario empresarial del API_KEY
             seatNumber: form.seatNumber || 'AUTO',
             seatCategory: form.seatCategory,
-            fare:  Number(params.get('precio') || 0) || 0,
+            fare:  priceParam,
             quantity: Number.isFinite(Number(quantity)) ? Math.max(1, Math.min(9, Number(quantity))) : 1,
             // Datos del pasajero (cliente de la agencia)
             passengerFirstName: form.firstName,
@@ -176,12 +182,12 @@ export default function Compra() {
             passengerPhone: form.phone || '',
             specialRequests: '',
             paymentMethod: 'CREDIT_CARD',
-            totalAmount: (Number(params.get('precio') || 0) || 0) * (Number(quantity) || 1),
+            totalAmount: priceParam * (Number(quantity) || 1),
         };
         
         console.log('🏢 Compra empresarial - Payload:', payload);
         setLoading(true);
-        integrationsApi.createTicket(payload)
+        aggregatedApi.purchase(payload)
             .then(res => {
                 if (res && (res.success || res.ticketId)) {
                     setSuccess(res);
