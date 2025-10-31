@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import login_view, register_view, profile_view, airlines_list_view, airlines_detail_view, airlines_active_view, proxy_airline_cities, proxy_airline_flights, proxy_airline_seats, proxy_airline_create_ticket, proxy_airline_create_roundtrip, proxy_airline_create_stopover, proxy_airline_login, proxy_airline_register, proxy_airline_tickets, proxy_airline_ticket_pdf, proxy_airline_ticket_by_id, proxy_airline_flight_reviews, proxy_airline_corporate_tickets, agency_reviews_view, db_info_view, users_list_view, users_detail_view, corporate_users_list_view, corporate_users_detail_view, corporate_users_regenerate_key_view, corporate_users_toggle_status_view, aggregated_flight_search, aggregated_flight_purchase, aggregated_airline_cities, aggregated_flight_seats, aggregated_all_flights
+from .views import login_view, register_view, profile_view, airlines_list_view, airlines_detail_view, airlines_active_view, proxy_airline_cities, proxy_airline_flights, proxy_airline_seats, proxy_airline_create_ticket, proxy_airline_create_roundtrip, proxy_airline_create_stopover, proxy_airline_login, proxy_airline_register, proxy_airline_tickets, proxy_airline_ticket_pdf, proxy_airline_ticket_by_id, proxy_airline_flight_reviews, proxy_airline_corporate_tickets, agency_reviews_view, db_info_view, users_list_view, users_detail_view, corporate_users_list_view, corporate_users_detail_view, corporate_users_regenerate_key_view, corporate_users_toggle_status_view, aggregated_flight_search, aggregated_flight_purchase, aggregated_airline_cities, aggregated_flight_seats, aggregated_all_flights, site_config_view, flight_cancellations_view, flight_cancellation_mark_read_view, flight_cancellations_mark_all_read_view, flight_cancellation_delete_view
 
 urlpatterns = [
     path('auth/login', login_view),
@@ -41,6 +41,15 @@ urlpatterns = [
     path('flights/aggregated-cities', aggregated_airline_cities),   # GET - Listado de ciudades combinadas
     path('flights/aggregated-seats', aggregated_flight_seats),      # GET - Asientos por aerolínea específica
     path('flights/aggregated-purchase', aggregated_flight_purchase),  # POST - Comprar vuelo en aerolínea específica
+    
+    # Configuración del sitio
+    path('site-config', site_config_view),  # GET, PUT - Obtener/actualizar configuración del sitio
+    
+    # Notificaciones de cancelación de vuelos
+    path('flight-cancellations', flight_cancellations_view),  # GET, POST - Obtener/recibir notificaciones
+    path('flight-cancellations/<str:notification_id>/read', flight_cancellation_mark_read_view),  # PUT - Marcar como leída
+    path('flight-cancellations/mark-all-read', flight_cancellations_mark_all_read_view),  # PUT - Marcar todas como leídas
+    path('flight-cancellations/<str:notification_id>', flight_cancellation_delete_view),  # DELETE - Eliminar notificación
 ]
 
 

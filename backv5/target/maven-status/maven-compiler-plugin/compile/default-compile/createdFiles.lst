@@ -9,6 +9,7 @@ com/sources/app/handlers/RoundTripTicketHandler.class
 com/sources/app/dao/AircraftDAO.class
 com/sources/app/entities/Flight.class
 com/sources/app/dao/TransactionsDAO.class
+com/sources/app/services/RealEmailService$1.class
 com/sources/app/dao/PrescriptionDAO.class
 com/sources/app/entities/Agency.class
 com/sources/app/handlers/UserProfileHandler.class
@@ -46,6 +47,7 @@ com/sources/app/entities/MedicinePresId.class
 com/sources/app/entities/FlightFare.class
 com/sources/app/handlers/TotalHospitalHandler.class
 com/sources/app/handlers/MedicineHandler.class
+com/sources/app/services/RealEmailService.class
 com/sources/app/entities/Policy.class
 com/sources/app/dao/HospitalInsuranceServiceDAO.class
 com/sources/app/services/SimpleEmailService.class

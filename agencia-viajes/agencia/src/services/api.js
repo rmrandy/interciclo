@@ -239,3 +239,17 @@ export const infoPagesApi = {
 	replaceBySlug: (slug, payload) => request(`/info-pages/slug/${encodeURIComponent(slug)}`, { method: 'PUT', body: payload }),
 	deleteBySlug: (slug) => apiDelete(`/info-pages/slug/${encodeURIComponent(slug)}`)
 };
+
+// Site configuration (configuración del sitio)
+export const siteConfigApi = {
+	get: () => apiGet('/site-config'),
+	update: (payload) => request('/site-config', { method: 'PUT', body: payload }),
+};
+
+// Flight cancellations (notificaciones de cancelación)
+export const flightCancellationsApi = {
+	list: (params) => apiGet(`/flight-cancellations${toQuery(params)}`),
+	markRead: (notificationId) => request(`/flight-cancellations/${notificationId}/read`, { method: 'PUT' }),
+	markAllRead: () => request('/flight-cancellations/mark-all-read', { method: 'PUT' }),
+	delete: (notificationId) => apiDelete(`/flight-cancellations/${notificationId}`),
+};

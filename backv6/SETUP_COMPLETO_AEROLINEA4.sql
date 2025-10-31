@@ -1,0 +1,185 @@
+-- ============================================================================
+-- SETUP COMPLETO PARA AEROLINEA4
+-- Ejecutar TODO este script en DBeaver conectado a AEROLINEA4
+-- ============================================================================
+
+-- PASO 1: Crear secuencia para CLICK_EVENTS (soluciona error de unique constraint)
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE SEQUENCE SEQ_CLICK_EVENTS START WITH 1 INCREMENT BY 1';
+EXCEPTION
+    WHEN OTHERS THEN 
+        IF SQLCODE = -955 THEN NULL; -- Sequence already exists
+        ELSE RAISE;
+        END IF;
+END;
+/
+
+-- PASO 2: Eliminar triggers duplicados si existen
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER AEROLINEA4.TRG_TICKETS_DECREMENT_SEATS';
+EXCEPTION WHEN OTHERS THEN NULL;
+END;
+/
+
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER AEROLINEA4.TRG_TICKETS_CREATED_AT';
+EXCEPTION WHEN OTHERS THEN NULL;
+END;
+/
+
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TRIGGER AEROLINEA4.TRG_TICKETS_UPDATED_AT';
+EXCEPTION WHEN OTHERS THEN NULL;
+END;
+/
+
+-- ============================================================================
+-- TRIGGERS PARA TABLA TICKETS
+-- ============================================================================
+
+-- TRIGGER 1: BEFORE INSERT - Establecer CREATED_AT y UPDATED_AT
+CREATE OR REPLACE TRIGGER AEROLINEA4.TRG_TICKETS_BI_TIMESTAMPS
+BEFORE INSERT ON AEROLINEA4.TICKETS
+FOR EACH ROW
+BEGIN
+    IF :NEW.CREATED_AT IS NULL THEN
+        :NEW.CREATED_AT := LOCALTIMESTAMP;
+    END IF;
+
+    IF :NEW.UPDATED_AT IS NULL THEN
+        :NEW.UPDATED_AT := LOCALTIMESTAMP;
+    END IF;
+END;
+/
+
+-- TRIGGER 2: AFTER INSERT - Descontar asientos del inventario
+CREATE OR REPLACE TRIGGER AEROLINEA4.TRG_TICKETS_AI_DECREMENT
+AFTER INSERT ON AEROLINEA4.TICKETS
+FOR EACH ROW
+DECLARE
+  v_qty NUMBER := NVL(:NEW.QUANTITY, 1);
+BEGIN
+  -- Actualizar contador global del vuelo
+  UPDATE AEROLINEA4.FLIGHTS
+     SET AVAILABLE_SEATS = GREATEST(0, NVL(AVAILABLE_SEATS,0) - v_qty),
+         UPDATED_AT      = TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS')
+   WHERE ID_FLIGHT = :NEW.FLIGHT_ID;
+
+  -- Actualizar inventario por categoría si existe
+  BEGIN
+    UPDATE AEROLINEA4.FLIGHT_INVENTORY
+       SET SOLD_SEATS      = NVL(SOLD_SEATS,0) + v_qty,
+           AVAILABLE_SEATS = GREATEST(
+                               0,
+                               NVL(TOTAL_SEATS,0) - NVL(RESERVED_SEATS,0) - (NVL(SOLD_SEATS,0) + v_qty)
+                             ),
+           UPDATED_AT      = SYSTIMESTAMP
+     WHERE FLIGHT_ID     = :NEW.FLIGHT_ID
+       AND SEAT_CATEGORY = :NEW.SEAT_CATEGORY;
+  EXCEPTION WHEN OTHERS THEN NULL;
+  END;
+END;
+/
+
+-- TRIGGER 3: BEFORE UPDATE - Actualizar UPDATED_AT
+CREATE OR REPLACE TRIGGER AEROLINEA4.TRG_TICKETS_BU_UPDATED_AT
+BEFORE UPDATE ON AEROLINEA4.TICKETS
+FOR EACH ROW
+BEGIN
+    :NEW.UPDATED_AT := LOCALTIMESTAMP;
+END;
+/
+
+-- TRIGGER 4: AFTER UPDATE - Restaurar asientos al cancelar
+CREATE OR REPLACE TRIGGER AEROLINEA4.TRG_TICKETS_AU_STATUS_RESTORE
+AFTER UPDATE OF STATUS ON AEROLINEA4.TICKETS
+FOR EACH ROW
+DECLARE
+  v_qty NUMBER := NVL(:OLD.QUANTITY, 1);
+  FUNCTION is_cancel(new_status VARCHAR2) RETURN NUMBER IS
+  BEGIN
+    IF new_status IN ('CANCELLED','REFUNDED') THEN RETURN 1; END IF;
+    RETURN 0;
+  END;
+BEGIN
+  IF NVL(:OLD.STATUS,'CONFIRMED') IN ('RESERVED','CONFIRMED')
+     AND is_cancel(:NEW.STATUS) = 1 THEN
+
+    UPDATE AEROLINEA4.FLIGHTS
+       SET AVAILABLE_SEATS = NVL(AVAILABLE_SEATS,0) + v_qty,
+           UPDATED_AT      = TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS')
+     WHERE ID_FLIGHT = :OLD.FLIGHT_ID;
+
+    BEGIN
+      UPDATE AEROLINEA4.FLIGHT_INVENTORY
+         SET SOLD_SEATS      = GREATEST(0, NVL(SOLD_SEATS,0) - v_qty),
+             AVAILABLE_SEATS = GREATEST(
+                                 0,
+                                 NVL(TOTAL_SEATS,0) - NVL(RESERVED_SEATS,0) - GREATEST(0, NVL(SOLD_SEATS,0) - v_qty)
+                               ),
+             UPDATED_AT      = SYSTIMESTAMP
+       WHERE FLIGHT_ID     = :OLD.FLIGHT_ID
+         AND SEAT_CATEGORY = :OLD.SEAT_CATEGORY;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+  END IF;
+END;
+/
+
+-- TRIGGER 5: AFTER DELETE - Restaurar asientos al eliminar ticket
+CREATE OR REPLACE TRIGGER AEROLINEA4.TRG_TICKETS_AD_RESTORE
+AFTER DELETE ON AEROLINEA4.TICKETS
+FOR EACH ROW
+DECLARE
+  v_qty NUMBER := NVL(:OLD.QUANTITY, 1);
+BEGIN
+  UPDATE AEROLINEA4.FLIGHTS
+     SET AVAILABLE_SEATS = NVL(AVAILABLE_SEATS,0) + v_qty,
+         UPDATED_AT      = TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD HH24:MI:SS')
+   WHERE ID_FLIGHT = :OLD.FLIGHT_ID;
+
+  BEGIN
+    UPDATE AEROLINEA4.FLIGHT_INVENTORY
+       SET SOLD_SEATS      = GREATEST(0, NVL(SOLD_SEATS,0) - v_qty),
+           AVAILABLE_SEATS = GREATEST(
+                               0,
+                               NVL(TOTAL_SEATS,0) - NVL(RESERVED_SEATS,0) - GREATEST(0, NVL(SOLD_SEATS,0) - v_qty)
+                             ),
+           UPDATED_AT      = SYSTIMESTAMP
+     WHERE FLIGHT_ID     = :OLD.FLIGHT_ID
+       AND SEAT_CATEGORY = :OLD.SEAT_CATEGORY;
+  EXCEPTION WHEN OTHERS THEN NULL;
+  END;
+END;
+/
+
+-- PASO 3: VERIFICAR QUE TODOS LOS TRIGGERS ESTÉN VÁLIDOS
+SELECT 
+    trigger_name, 
+    status, 
+    trigger_type,
+    triggering_event
+FROM user_triggers 
+WHERE table_name = 'TICKETS'
+ORDER BY triggering_event, trigger_name;
+
+-- Deberías ver estos 5 triggers (todos ENABLED):
+-- TRG_TICKETS_BI_TIMESTAMPS      | ENABLED | BEFORE EACH ROW | INSERT
+-- TRG_TICKETS_AI_DECREMENT       | ENABLED | AFTER EACH ROW  | INSERT
+-- TRG_TICKETS_BU_UPDATED_AT      | ENABLED | BEFORE EACH ROW | UPDATE
+-- TRG_TICKETS_AU_STATUS_RESTORE  | ENABLED | AFTER EACH ROW  | UPDATE
+-- TRG_TICKETS_AD_RESTORE         | ENABLED | AFTER EACH ROW  | DELETE
+
+-- PASO 4: Verificar la secuencia de CLICK_EVENTS
+SELECT sequence_name, last_number 
+FROM user_sequences 
+WHERE sequence_name = 'SEQ_CLICK_EVENTS';
+
+COMMIT;
+
+-- ============================================================================
+-- ✅ SCRIPT COMPLETADO
+-- Ahora backv6 guardará correctamente en AEROLINEA4
+-- ============================================================================
+
+

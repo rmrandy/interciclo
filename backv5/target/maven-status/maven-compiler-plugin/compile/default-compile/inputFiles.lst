@@ -119,6 +119,7 @@
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/handlers/SeatsHandler.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/dao/AppointmentMadeDAO.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/entities/Ticket.java
+/Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/services/RealEmailService.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/entities/AppointmentMade.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/entities/Agency.java
 /Users/randyrivera/Documents/Farmacia/ensurancePharmacy/backv5/src/main/java/com/sources/app/entities/TotalHospital.java

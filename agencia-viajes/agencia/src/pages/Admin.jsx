@@ -111,11 +111,19 @@ export default function Admin() {
 
 	return (
 		<section className="section" style={{ maxWidth: 980 }}>
-			<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+			<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
 				<h2>Administración</h2>
-				<Link to="/admin/corporate-users" className="btn btn-primary">
-					👔 Gestionar Usuarios Empresariales
-				</Link>
+				<div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+					<Link to="/admin/cancelled-flights" className="btn btn-primary">
+						🚨 Vuelos Cancelados
+					</Link>
+					<Link to="/admin/site-config" className="btn btn-primary">
+						⚙️ Configuración del Sitio
+					</Link>
+					<Link to="/admin/corporate-users" className="btn btn-primary">
+						👔 Usuarios Empresariales
+					</Link>
+				</div>
 			</div>
 			<div className="tabs" style={{ marginBottom: 12 }}>
 				<button className={`tab${tab==='airlines' ? ' active' : ''}`} onClick={()=>setTab('airlines')}>Aerolíneas</button>

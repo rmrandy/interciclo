@@ -182,8 +182,9 @@ def login_view(request):
             }
         })
     except Exception as e:
-        return JsonResponse({'success': False, 'message': f'Error interno del servidor: {type(e).__name__}'}, status=500)
-    except Exception as e:
+        print(f"❌ Error en login_view: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return JsonResponse({'success': False, 'message': f'Error interno del servidor: {type(e).__name__}'}, status=500)
 
 
@@ -1338,7 +1339,7 @@ def aggregated_flight_search(request):
 
     if request.method != 'GET':
         return JsonResponse({'error': 'Método no permitido'}, status=405)
-
+    
     query = request.GET
 
     origin_value = (query.get('originName') or query.get('origin') or query.get('originCity') or '').strip()
@@ -1355,10 +1356,10 @@ def aggregated_flight_search(request):
         return JsonResponse({
             'error': 'Parámetros requeridos: originName, destinationName, departureDate'
         }, status=400)
-
+    
     db = get_db()
     airlines = list(db.airlines.find({'enabled': True}))
-
+    
     if not airlines:
         return JsonResponse({
             'success': True,
@@ -1367,12 +1368,12 @@ def aggregated_flight_search(request):
             'flights': [],
             'message': 'No hay aerolíneas configuradas'
         })
-
+    
     aggregated_flights = []
     airlines_summary = []
     airlines_with_results = 0
     airlines_with_errors = []
-
+    
     def price_value(flight: dict) -> float:
         for key in ('basePrice', 'price', 'fare', 'totalAmount'):
             value = flight.get(key)
@@ -1523,7 +1524,7 @@ def aggregated_flight_search(request):
     aggregated_flights.sort(key=lambda x: x.get('priceValue', float('inf')))
     for flight in aggregated_flights:
         flight.pop('priceValue', None)
-
+    
     response_payload = {
         'success': True,
         'totalFlights': len(aggregated_flights),
@@ -1773,14 +1774,14 @@ def aggregated_flight_purchase(request):
             airline_oid = ObjectId(airline_id)
         except Exception:
             return JsonResponse({'error': 'airlineId inválido'}, status=400)
-
+        
         airline = db.airlines.find_one({'_id': airline_oid})
         if not airline:
             return JsonResponse({'error': 'Aerolínea no encontrada'}, status=404)
-
+        
         if not airline.get('enabled', False):
             return JsonResponse({'error': 'Aerolínea deshabilitada'}, status=400)
-
+        
         base_url = build_airline_base_url_from_doc(airline)
         endpoints = airline.get('endpoints') or {}
         book_endpoint = endpoints.get('book') or 'airline/tickets'
@@ -1798,11 +1799,11 @@ def aggregated_flight_purchase(request):
             'flightId': flight_id,
             **{k: v for k, v in data.items() if k != 'airlineId'}
         }
-
+        
         print(f"💳 Comprando vuelo en {airline.get('name')}: {full_url}")
         print(f"🔑 API Key: {headers.get('X-API-Key', 'NO CONFIGURADO')[:15]}...")
         print(f"📦 Payload: {purchase_payload}")
-
+        
         timeout = get_airline_timeout_seconds_from_doc(airline, default_ms=20000)
         response = requests.post(
             full_url,
@@ -1810,7 +1811,7 @@ def aggregated_flight_purchase(request):
             headers=headers,
             timeout=(3.0, timeout)
         )
-
+        
         if response.status_code in (200, 201):
             result = response.json() if response.headers.get('content-type', '').startswith('application/json') else {'success': True}
             result['airlineName'] = airline.get('name')
@@ -1897,5 +1898,260 @@ def aggregated_flight_seats(request):
         return JsonResponse({'error': 'Error de conexión con la aerolínea'}, status=503)
     except Exception as exc:
         return JsonResponse({'error': str(exc)}, status=502)
+
+
+# ============================================================================
+# CONFIGURACIÓN DEL SITIO
+# ============================================================================
+
+@csrf_exempt
+def site_config_view(request):
+    """
+    GET: Obtiene la configuración del sitio (nombre de la agencia, footer, etc.)
+    PUT: Actualiza la configuración del sitio
+    """
+    db = get_db()
+    config_collection = db['site_config']
+    
+    if request.method == 'GET':
+        config = config_collection.find_one()
+        if not config:
+            # Configuración por defecto si no existe
+            default_config = {
+                'agencyName': 'Agencia de Viajes',
+                'footer': {
+                    'companyName': 'Agencia de Viajes S.A.',
+                    'address': 'Av. Principal 123, Ciudad',
+                    'phone': '+1 234 567 890',
+                    'email': 'info@agencia.com',
+                    'socialMedia': {
+                        'facebook': '',
+                        'twitter': '',
+                        'instagram': ''
+                    }
+                },
+                'logo': '',
+                'primaryColor': '#1e40af',
+                'secondaryColor': '#3b82f6'
+            }
+            config_collection.insert_one(default_config)
+            config = default_config
+        
+        if '_id' in config:
+            config['_id'] = str(config['_id'])
+        
+        return JsonResponse({'success': True, 'config': config})
+    
+    elif request.method == 'PUT':
+        # Verificar autenticación (opcional: agregar verificación de admin)
+        try:
+            data = json.loads(request.body)
+            
+            # Validar campos requeridos
+            update_data = {}
+            if 'agencyName' in data:
+                update_data['agencyName'] = data['agencyName']
+            if 'footer' in data:
+                update_data['footer'] = data['footer']
+            if 'logo' in data:
+                update_data['logo'] = data['logo']
+            if 'primaryColor' in data:
+                update_data['primaryColor'] = data['primaryColor']
+            if 'secondaryColor' in data:
+                update_data['secondaryColor'] = data['secondaryColor']
+            
+            # Actualizar o insertar
+            result = config_collection.update_one(
+                {},
+                {'$set': update_data},
+                upsert=True
+            )
+            
+            # Obtener configuración actualizada
+            config = config_collection.find_one()
+            if '_id' in config:
+                config['_id'] = str(config['_id'])
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Configuración actualizada exitosamente',
+                'config': config
+            })
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    else:
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+
+# ============================================================================
+# NOTIFICACIONES DE CANCELACIÓN DE VUELOS
+# ============================================================================
+
+@csrf_exempt
+def flight_cancellations_view(request):
+    """
+    GET: Obtiene notificaciones de cancelación de vuelos
+    POST: Recibe notificaciones de cancelación desde las aerolíneas (webhook)
+    """
+    db = get_db()
+    cancellations_collection = db['flight_cancellations']
+    
+    if request.method == 'GET':
+        # Filtros opcionales
+        status = request.GET.get('status')  # 'unread', 'read', 'archived'
+        airline_id = request.GET.get('airlineId')
+        limit = int(request.GET.get('limit', 50))
+        
+        # Construir query
+        query = {}
+        if status:
+            query['status'] = status
+        if airline_id:
+            query['airlineId'] = airline_id
+        
+        # Obtener notificaciones ordenadas por fecha (más recientes primero)
+        notifications = list(cancellations_collection.find(query).sort('cancelledAt', -1).limit(limit))
+        
+        # Convertir ObjectId a string
+        for notification in notifications:
+            if '_id' in notification:
+                notification['_id'] = str(notification['_id'])
+        
+        # Contar no leídas
+        unread_count = cancellations_collection.count_documents({'status': 'unread'})
+        
+        return JsonResponse({
+            'success': True,
+            'notifications': notifications,
+            'unreadCount': unread_count,
+            'total': len(notifications)
+        })
+    
+    elif request.method == 'POST':
+        # Webhook para recibir notificaciones desde las aerolíneas
+        try:
+            data = json.loads(request.body)
+            
+            # Validar campos requeridos
+            required_fields = ['flightId', 'flightNumber', 'cancellationReason', 'airlineCode']
+            for field in required_fields:
+                if field not in data:
+                    return JsonResponse({'error': f'Campo requerido: {field}'}, status=400)
+            
+            # Crear notificación
+            notification = {
+                'flightId': data['flightId'],
+                'flightNumber': data['flightNumber'],
+                'airlineId': data.get('airlineId'),
+                'airlineCode': data['airlineCode'],
+                'airlineName': data.get('airlineName', data['airlineCode']),
+                'originCity': data.get('originCity', 'N/A'),
+                'destinationCity': data.get('destinationCity', 'N/A'),
+                'departureDate': data.get('departureDate'),
+                'departureTime': data.get('departureTime'),
+                'cancellationReason': data['cancellationReason'],
+                'cancelledBy': data.get('cancelledBy'),
+                'cancelledAt': data.get('cancelledAt', datetime.now().isoformat()),
+                'status': 'unread',  # unread, read, archived
+                'createdAt': datetime.now().isoformat(),
+            }
+            
+            result = cancellations_collection.insert_one(notification)
+            notification['_id'] = str(result.inserted_id)
+            
+            print(f"📧 Nueva notificación de cancelación recibida: {data['flightNumber']}")
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Notificación recibida',
+                'notificationId': str(result.inserted_id)
+            })
+            
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    else:
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+
+@csrf_exempt
+def flight_cancellation_mark_read_view(request, notification_id):
+    """
+    PUT: Marca una notificación como leída
+    """
+    if request.method != 'PUT':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    
+    db = get_db()
+    cancellations_collection = db['flight_cancellations']
+    
+    try:
+        result = cancellations_collection.update_one(
+            {'_id': ObjectId(notification_id)},
+            {'$set': {'status': 'read', 'readAt': datetime.now().isoformat()}}
+        )
+        
+        if result.modified_count > 0:
+            return JsonResponse({'success': True, 'message': 'Notificación marcada como leída'})
+        else:
+            return JsonResponse({'error': 'Notificación no encontrada'}, status=404)
+            
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def flight_cancellations_mark_all_read_view(request):
+    """
+    PUT: Marca todas las notificaciones como leídas
+    """
+    if request.method != 'PUT':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    
+    db = get_db()
+    cancellations_collection = db['flight_cancellations']
+    
+    try:
+        result = cancellations_collection.update_many(
+            {'status': 'unread'},
+            {'$set': {'status': 'read', 'readAt': datetime.now().isoformat()}}
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'{result.modified_count} notificaciones marcadas como leídas',
+            'count': result.modified_count
+        })
+            
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def flight_cancellation_delete_view(request, notification_id):
+    """
+    DELETE: Elimina una notificación
+    """
+    if request.method != 'DELETE':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    
+    db = get_db()
+    cancellations_collection = db['flight_cancellations']
+    
+    try:
+        result = cancellations_collection.delete_one({'_id': ObjectId(notification_id)})
+        
+        if result.deleted_count > 0:
+            return JsonResponse({'success': True, 'message': 'Notificación eliminada'})
+        else:
+            return JsonResponse({'error': 'Notificación no encontrada'}, status=404)
+            
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 

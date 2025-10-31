@@ -230,7 +230,8 @@ public class FlightDAO {
                 "SELECT DISTINCT f FROM Flight f " +
                 "LEFT JOIN FETCH f.originCity " +
                 "LEFT JOIN FETCH f.destinationCity " +
-                "WHERE 1=1"
+                "WHERE 1=1 " +
+                "AND (f.status IS NULL OR f.status != 'CANCELLED') " // Excluir vuelos cancelados
             );
 
             java.util.Map<String, Object> params = new java.util.HashMap<>();
@@ -370,11 +371,12 @@ public class FlightDAO {
     public List<Flight> getAllFlights() {
         Session session = HibernateUtil.getSessionFactory().openSession();
         try {
-            // Cargar vuelos con ciudades y escalas
+            // Cargar vuelos con ciudades y escalas (excluyendo cancelados)
             Query<Flight> query = session.createQuery(
                 "SELECT DISTINCT f FROM Flight f " +
                 "LEFT JOIN FETCH f.originCity " +
                 "LEFT JOIN FETCH f.destinationCity " +
+                "WHERE (f.status IS NULL OR f.status != 'CANCELLED') " +
                 // "LEFT JOIN FETCH f.flightLegs fl " +
                 // "LEFT JOIN FETCH fl.city " +
                 "ORDER BY f.departureDate, f.departureTime", 
@@ -555,10 +557,14 @@ public class FlightDAO {
      * Cancela un vuelo
      */
     public boolean cancelFlight(Integer flightId, String cancellationReason, Integer cancelledBy) {
-        System.out.println("🚀 FlightDAO.cancelFlight() - Iniciando cancelación");
+        System.out.println("\n=================================================");
+        System.out.println("🚀 FlightDAO.cancelFlight() - INICIANDO CANCELACIÓN [AEROLINEA3]");
+        System.out.println("=================================================");
+        System.out.println("📋 Parámetros recibidos:");
         System.out.println("   - Flight ID: " + flightId);
         System.out.println("   - Reason: " + cancellationReason);
         System.out.println("   - Cancelled by: " + cancelledBy);
+        System.out.println("=================================================\n");
         
         Transaction tx = null;
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
@@ -599,19 +605,34 @@ public class FlightDAO {
             session.merge(flight);
             tx.commit();
             
-            // Enviar notificaciones por correo a los pasajeros
+            // Enviar notificaciones por correo REALES usando JavaMail
             try {
-                System.out.println("📧 Iniciando envío de notificaciones de cancelación...");
-                com.sources.app.services.SimpleEmailService emailService = new com.sources.app.services.SimpleEmailService();
+                System.out.println("\n🚀 === INICIANDO ENVÍO DE NOTIFICACIONES DE CANCELACIÓN ===");
+                com.sources.app.services.RealEmailService emailService = new com.sources.app.services.RealEmailService();
+                
+                // Enviar a pasajeros
                 boolean emailsSent = emailService.sendFlightCancellationNotifications(flightId, cancellationReason);
                 
                 if (emailsSent) {
-                    System.out.println("✅ Notificaciones de cancelación enviadas exitosamente");
+                    System.out.println("✅ Notificaciones enviadas exitosamente a pasajeros");
                 } else {
-                    System.out.println("⚠️ Algunas notificaciones no se pudieron enviar");
+                    System.out.println("⚠️ Algunas notificaciones a pasajeros no se pudieron enviar");
                 }
+                
+                // Enviar a agencias
+                boolean agencyEmailsSent = emailService.sendCancellationNotificationsToAgencies(flightId, cancellationReason);
+                
+                if (agencyEmailsSent) {
+                    System.out.println("✅ Notificaciones enviadas exitosamente a agencias");
+                } else {
+                    System.out.println("⚠️ Algunas notificaciones a agencias no se pudieron enviar");
+                }
+                
+                System.out.println("🚀 === FIN DE ENVÍO DE NOTIFICACIONES ===\n");
+                
             } catch (Exception emailException) {
-                System.err.println("❌ Error enviando notificaciones de cancelación: " + emailException.getMessage());
+                System.err.println("❌ Error enviando notificaciones: " + emailException.getMessage());
+                emailException.printStackTrace();
                 // No fallar la cancelación si hay error en el correo
             }
             

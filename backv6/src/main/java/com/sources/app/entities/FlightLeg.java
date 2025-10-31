@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import java.io.Serializable;
 
 @Entity
-@Table(name = "FLIGHT_LEGS", schema = "AEROLINEA")
+@Table(name = "FLIGHT_LEGS")
 public class FlightLeg implements Serializable {
     
     @Id

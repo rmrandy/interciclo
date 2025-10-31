@@ -55,7 +55,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'agencia_backend.wsgi.application'
 
 # MongoDB via pymongo (usamos una capa simple en la app)
-# Default: cluster de MongoDB Atlas
+# Default: MongoDB Atlas (nube)
 MONGODB_URI = os.environ.get('MONGODB_URI', 'mongodb+srv://admin:123@cluster0.svqq8ek.mongodb.net/agencia-viajes?retryWrites=true&w=majority&appName=Cluster0')
 
 AUTH_PASSWORD_VALIDATORS = []
